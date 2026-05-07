@@ -18,7 +18,8 @@ stan:
 test:
 	uv run pytest -v
 
-check: format lint stan test
+
+all: format lint stan test 
 
 run:
 	@if ! nc -z localhost 5432 2>/dev/null; then \

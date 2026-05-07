@@ -52,6 +52,12 @@ Utility modules MUST stay narrowly scoped and MUST NOT become dumping grounds fo
 
 Tests SHOULD mirror source ownership boundaries so it is obvious which module is responsible for which behavior.
 
+Tests MUST mirror src/ that verify only the responsibility of the file under test. Mock or stub collaborators and test behavior at that layer boundary, not the logic of called dependencies. Tests MUST prove the change works and fail if the file’s implementation is reverted.
+
+Tests SHOULD be focused on realistic scenarios, not cheating to get 100% coverage.
+
+Tests MUST use unittest.mock for mocking, and pytest MUST be used as test runner/framework.
+
 Generated outputs, deployment manifests, and environment-specific assets MUST stay outside the application source layer.
 
 When a module does not have a clear ownership boundary, it SHOULD be moved or split before more code is added to it.
