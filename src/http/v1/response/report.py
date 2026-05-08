@@ -7,4 +7,3 @@ class ReportSummaryResponse(BaseModel):
     id: str
     company_id: str
     status: str
-

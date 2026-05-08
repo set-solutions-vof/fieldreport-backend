@@ -14,5 +14,7 @@ async def get_reports(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> list[ReportSummaryResponse]:
     return [
-        ReportSummaryResponse(id="demo-report", company_id=str(current_user.company_id), status="draft")
+        ReportSummaryResponse(
+            id="demo-report", company_id=str(current_user.company_id), status="draft"
+        )
     ]
