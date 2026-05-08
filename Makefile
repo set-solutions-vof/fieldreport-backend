@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := install
 
-.PHONY: install format lint stan test check run stop
+.PHONY: install format format-check lint stan test check run stop db-upgrade db-downgrade
 
 install:
 	uv python install
@@ -8,6 +8,9 @@ install:
 
 format:
 	uv run ruff format .
+
+format-check:
+	uv run ruff format . --check
 
 lint:
 	uv run ruff check .
@@ -17,6 +20,14 @@ stan:
 
 test:
 	uv run pytest -v
+
+check: format-check lint stan test
+
+db-upgrade:
+	uv run alembic upgrade head
+
+db-downgrade:
+	uv run alembic downgrade base
 
 
 all: format lint stan test 
@@ -31,7 +42,9 @@ run:
 		docker compose up db -d --wait; \
 	fi
 	@cp -n .env.example .env 2>/dev/null || true
+	uv run alembic upgrade head
 	uv run uvicorn src.main:app --reload
 
 stop:
+	-pkill -f "$(CURDIR)/.venv/bin/uvicorn src.main:app --reload"
 	docker compose down

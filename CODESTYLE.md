@@ -44,6 +44,12 @@ External integrations such as API clients, SDK wrappers, storage gateways, or me
 
 Transport models, internal models, and public response models SHOULD remain separate when they serve different contracts.
 
+HTTP transport contracts MUST live under `src/http/<version>/request/` and `src/http/<version>/response/`.
+
+Internal typed models MUST live under `src/models/`, organized by ownership as use case folders.
+
+Reusable request and response models MUST NOT be defined inline inside route modules once a dedicated HTTP contract module exists.
+
 Configuration access MUST be centralized in a dedicated configuration boundary.
 
 Security and authentication concerns SHOULD live in their own layer rather than being scattered through feature modules.
@@ -104,6 +110,8 @@ Transport entrypoints MUST NOT contain business logic, domain transformation log
 
 Transport entrypoints MUST translate incoming requests into service calls and translate service results into transport responses.
 
+HTTP route modules MUST depend on request and response contract models from `src/http/<version>/...` rather than defining reusable transport contracts inline.
+
 Framework-specific concerns MUST stay in transport modules.
 
 Shared use-case behavior across multiple entrypoints MUST be implemented in service or lower layers, not duplicated per entrypoint.
@@ -142,9 +150,15 @@ Internal models MUST remain independent from framework classes and external payl
 
 Request and response models MUST represent the public contract only.
 
+Request contract models MUST live under `src/http/<version>/request/`.
+
+Response contract models MUST live under `src/http/<version>/response/`.
+
 Transport models MUST reflect the external system payload shape only.
 
 Internal domain rules MUST NOT leak into transport model modules.
+
+Internal models in `src/models/` MUST NOT be reused as HTTP request or response contracts unless the public contract is intentionally identical and stable.
 
 If two layers need similar models for different reasons, they SHOULD remain separate unless the contract is truly identical.
 
