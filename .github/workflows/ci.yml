@@ -3,7 +3,6 @@ name: testing
 on:
   push:
     branches:
-      - main
       - staging
   pull_request:
 
