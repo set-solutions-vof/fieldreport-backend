@@ -12,6 +12,7 @@ def map_authenticated_user(row: asyncpg.Record) -> AuthenticatedUser:
     return AuthenticatedUser(
         id=row["id"],
         company_id=row["company_id"],
+        company_name=row["company_name"],
         email=row["email"],
         password_hash=row["password_hash"],
         name=row["name"],
@@ -23,6 +24,7 @@ def map_current_user(row: asyncpg.Record) -> CurrentUser:
     return CurrentUser(
         id=row["id"],
         company_id=row["company_id"],
+        company_name=row["company_name"],
         email=row["email"],
         name=row["name"],
         role=row["role"],
@@ -35,8 +37,16 @@ async def get_user_by_email(email: str) -> AuthenticatedUser | None:
     try:
         row = await connection.fetchrow(
             """
-            SELECT id, company_id, email, password_hash, name, role
+            SELECT
+                users.id,
+                users.company_id,
+                company.name AS company_name,
+                email,
+                password_hash,
+                users.name,
+                role
             FROM users
+            JOIN company ON company.id = users.company_id
             WHERE email = $1
             """,
             email,
@@ -56,9 +66,16 @@ async def get_user_by_id(user_id: str) -> CurrentUser | None:
     try:
         row = await connection.fetchrow(
             """
-            SELECT id, company_id, email, name, role
+            SELECT
+                users.id,
+                users.company_id,
+                company.name AS company_name,
+                email,
+                users.name,
+                role
             FROM users
-            WHERE id = $1::uuid
+            JOIN company ON company.id = users.company_id
+            WHERE users.id = $1::uuid
             """,
             user_id,
         )

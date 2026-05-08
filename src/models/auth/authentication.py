@@ -14,6 +14,7 @@ class LoginCredentials(BaseModel):
 class AuthenticatedUser(BaseModel):
     id: UUID
     company_id: UUID
+    company_name: str
     email: str
     password_hash: str
     name: str
@@ -23,6 +24,7 @@ class AuthenticatedUser(BaseModel):
 class CurrentUser(BaseModel):
     id: UUID
     company_id: UUID
+    company_name: str
     email: str
     name: str
     role: UserRole

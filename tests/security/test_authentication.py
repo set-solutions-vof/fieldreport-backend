@@ -12,6 +12,7 @@ def build_current_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
+        company_name="LEKK BV",
         email="sanne.devries@lekk.nl",
         name="Sanne de Vries",
         role="admin",

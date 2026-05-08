@@ -1,22 +1,38 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
+
+import pytest
 
 from src.models.auth.authentication import CurrentUser
-from src.models.reports.report import ReportSummary
+from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
 from src.services import reports as reports_service
+
+
+def build_report_summary(company_id: UUID) -> ReportSummary:
+    return ReportSummary(
+        id=uuid4(),
+        company_id=company_id,
+        status="draft",
+        client_name="ACME",
+        address="Main Street 1",
+        inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
+        inspector_name="Jeroen van Dijk",
+    )
 
 
 async def test_list_reports_for_user_returns_repository_reports() -> None:
     current_user = CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
+        company_name="LEKK BV",
         email="demo@fieldreport.local",
         name="Demo User",
         role="admin",
     )
     report_summaries = [
-        ReportSummary(id=uuid4(), company_id=current_user.company_id, status="draft"),
-        ReportSummary(id=uuid4(), company_id=current_user.company_id, status="approved"),
+        build_report_summary(current_user.company_id),
+        build_report_summary(current_user.company_id).model_copy(update={"status": "approved"}),
     ]
 
     with patch.object(
@@ -28,3 +44,71 @@ async def test_list_reports_for_user_returns_repository_reports() -> None:
 
     assert result == report_summaries
     list_reports.assert_awaited_once_with(str(current_user.company_id))
+
+
+async def test_get_report_detail_returns_report_with_sections() -> None:
+    current_user = CurrentUser(
+        id=uuid4(),
+        company_id=uuid4(),
+        company_name="LEKK BV",
+        email="demo@fieldreport.local",
+        name="Demo User",
+        role="admin",
+    )
+    report_id = uuid4()
+    report = ReportDetail(
+        id=report_id,
+        status="draft",
+        client_name="ACME",
+        address="Main Street 1",
+        inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
+        inspector_name="Jeroen van Dijk",
+        sections=[],
+    )
+    sections = [
+        ReportSection(
+            id=uuid4(),
+            section_key="bevindingen",
+            ai_draft="Draft",
+            field_expert_content=None,
+            is_approved=False,
+            sources=[],
+        )
+    ]
+
+    with (
+        patch.object(
+            reports_service.report_repository,
+            "get_report_by_id",
+            AsyncMock(return_value=report),
+        ) as get_report,
+        patch.object(
+            reports_service.report_repository,
+            "get_sections_with_sources",
+            AsyncMock(return_value=sections),
+        ) as get_sections,
+    ):
+        result = await reports_service.get_report_detail(str(report_id), current_user)
+
+    assert result.sections == sections
+    get_report.assert_awaited_once_with(str(report_id), str(current_user.company_id))
+    get_sections.assert_awaited_once_with(str(report_id))
+
+
+async def test_get_report_detail_raises_when_report_is_missing() -> None:
+    current_user = CurrentUser(
+        id=uuid4(),
+        company_id=uuid4(),
+        company_name="LEKK BV",
+        email="demo@fieldreport.local",
+        name="Demo User",
+        role="admin",
+    )
+
+    with patch.object(
+        reports_service.report_repository,
+        "get_report_by_id",
+        AsyncMock(return_value=None),
+    ):
+        with pytest.raises(reports_service.ReportNotFoundError):
+            await reports_service.get_report_detail(str(uuid4()), current_user)
