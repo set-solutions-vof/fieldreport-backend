@@ -19,7 +19,7 @@ stan:
 	uv run ty check src
 
 test:
-	uv run pytest -v
+	PYTHONPATH=$(CURDIR) uv run pytest -v
 
 check: format-check lint stan test
 
@@ -30,7 +30,7 @@ db-downgrade:
 	uv run alembic downgrade base
 
 
-all: format lint stan test 
+all: format lint stan test
 
 run:
 	@if ! nc -z localhost 5432 2>/dev/null; then \
