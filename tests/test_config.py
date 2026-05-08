@@ -27,7 +27,4 @@ def test_settings_loads_values_from_environment() -> None:
         config_module = load_config_module()
 
     assert config_module.settings.app_env == "test"
-    assert (
-        config_module.settings.database_url
-        == "test"
-    )
+    assert config_module.settings.database_url == "test"
