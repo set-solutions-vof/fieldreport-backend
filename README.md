@@ -20,4 +20,6 @@ make run
 
 `make stop` stops the local API process and tears down the Docker services.
 
+`make check` runs the CI-safe local checks: format validation, linting, static analysis, and tests.
+
 See `Makefile` for all available commands.

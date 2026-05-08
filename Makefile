@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := install
 
-.PHONY: install format lint stan test check run stop db-upgrade db-downgrade
+.PHONY: install format format-check lint stan test check run stop db-upgrade db-downgrade
 
 install:
 	uv python install
@@ -8,6 +8,9 @@ install:
 
 format:
 	uv run ruff format .
+
+format-check:
+	uv run ruff format . --check
 
 lint:
 	uv run ruff check .
@@ -17,6 +20,8 @@ stan:
 
 test:
 	uv run pytest -v
+
+check: format-check lint stan test
 
 db-upgrade:
 	uv run alembic upgrade head
