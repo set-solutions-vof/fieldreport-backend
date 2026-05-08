@@ -15,9 +15,12 @@ async def test_refresh_raises_for_access_token_claims() -> None:
             await service.refresh("token")
 
 
-async def test_get_current_user_raises_when_repository_returns_none() -> None:
+async def test_refresh_raises_when_repository_returns_none() -> None:
     claims = TokenClaims(sub=uuid4(), company_id=None, role=None, exp=1, type="refresh")
 
-    with patch.object(service.auth_repository, "get_user_by_id", AsyncMock(return_value=None)):
+    with (
+        patch.object(service.authentication, "decode_token", return_value=claims),
+        patch.object(service.auth_repository, "get_user_by_id", AsyncMock(return_value=None)),
+    ):
         with pytest.raises(service.InvalidCredentialsError):
-            await service.get_current_user(claims)
+            await service.refresh("token")

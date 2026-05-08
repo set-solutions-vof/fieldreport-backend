@@ -9,7 +9,14 @@ from src.config import Settings
 def test_settings_loads_values_from_environment() -> None:
     with patch.dict(
         os.environ,
-        {"DATABASE_URL": "postgresql+asyncpg://user:pass@localhost:5432/test_db"},
+        {
+            "APP_ENV": "test",
+            "DATABASE_URL": "postgresql+asyncpg://user:pass@localhost:5432/test_db",
+            "JWT_SECRET_KEY": "jwt-secret-for-tests-jwt-secret-for-tests",
+            "JWT_ALGORITHM": "HS256",
+            "ACCESS_TOKEN_EXPIRE_MINUTES": "15",
+            "REFRESH_TOKEN_EXPIRE_DAYS": "7",
+        },
         clear=False,
     ):
         settings = Settings()

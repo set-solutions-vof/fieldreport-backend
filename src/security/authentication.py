@@ -1,6 +1,5 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
-from uuid import UUID
 
 import bcrypt
 import jwt
@@ -77,12 +76,10 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Cur
 
         if claims.type != "access":
             raise credentials_exception
-
-        user_id = UUID(str(claims.sub))
     except (AuthenticationError, ValueError):
         raise credentials_exception
 
-    user = await auth_repository.get_user_by_id(str(user_id))
+    user = await auth_repository.get_user_by_id(str(claims.sub))
 
     if user is None:
         raise credentials_exception

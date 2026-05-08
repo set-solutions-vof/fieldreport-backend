@@ -27,10 +27,15 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
     ):
         user = await auth_repository.get_user_by_email("sanne.devries@lekk.nl")
 
-    assert (
-        auth_repository.get_database_connection_url()
-        == "postgresql://fieldreport:fieldreport@localhost:5432/fieldreport_test"
-    )
+    with patch.object(
+        auth_repository.settings,
+        "database_url",
+        "postgresql+asyncpg://fieldreport:fieldreport@localhost:5432/fieldreport_test",
+    ):
+        assert (
+            auth_repository.get_database_connection_url()
+            == "postgresql://fieldreport:fieldreport@localhost:5432/fieldreport_test"
+        )
     assert user is not None
     assert user.email == "sanne.devries@lekk.nl"
     assert user.password_hash == "hash"

@@ -24,7 +24,7 @@ async def login_form(
     except authentication.InvalidCredentialsError:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return TokenResponse.model_validate(token_pair.model_dump())
+    return TokenResponse.model_validate(token_pair)
 
 
 @router.post("/login/json", response_model=TokenResponse)
@@ -36,7 +36,7 @@ async def login_json(request_body: LoginJsonRequest) -> TokenResponse:
     except authentication.InvalidCredentialsError:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return TokenResponse.model_validate(token_pair.model_dump())
+    return TokenResponse.model_validate(token_pair)
 
 
 @router.post("/refresh", response_model=RefreshTokenResponse)
@@ -46,11 +46,11 @@ async def refresh_token(request_body: RefreshTokenRequest) -> RefreshTokenRespon
     except (authentication.InvalidCredentialsError, AuthenticationError):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    return RefreshTokenResponse.model_validate(refreshed_token.model_dump())
+    return RefreshTokenResponse.model_validate(refreshed_token)
 
 
 @router.get("/me", response_model=CurrentUserResponse)
 async def get_me(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> CurrentUserResponse:
-    return CurrentUserResponse.model_validate(current_user.model_dump())
+    return CurrentUserResponse.model_validate(current_user)
