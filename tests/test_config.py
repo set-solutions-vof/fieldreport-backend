@@ -20,11 +20,14 @@ def test_settings_loads_values_from_environment() -> None:
         os.environ,
         {
             "APP_ENV": "test",
-            "DATABASE_URL": "postgresql+asyncpg://user:pass@localhost:5432/test_db",
+            "DATABASE_URL": "test",
         },
         clear=False,
     ):
         config_module = load_config_module()
 
     assert config_module.settings.app_env == "test"
-    assert config_module.settings.database_url == "postgresql+asyncpg://user:pass@localhost:5432/test_db"
+    assert (
+        config_module.settings.database_url
+        == "test"
+    )
