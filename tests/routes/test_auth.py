@@ -8,6 +8,7 @@ from httpx import ASGITransport, AsyncClient
 
 from src.main import app
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
+from src.models.reports.report import ReportSummary
 from src.security import authentication as security
 from src.services import authentication as service
 
@@ -164,8 +165,16 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    with patch.object(
-        service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+    fake_report = ReportSummary(id=uuid4(), company_id=current_user.company_id, status="draft")
+
+    with (
+        patch.object(
+            service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+        ),
+        patch(
+            "src.routes.reports.reports.list_reports_for_user",
+            AsyncMock(return_value=[fake_report]),
+        ),
     ):
         response = await client.get(
             "/api/v1/reports",
@@ -175,7 +184,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert response.json() == [
         {
-            "id": "demo-report",
+            "id": str(fake_report.id),
             "company_id": str(current_user.company_id),
             "status": "draft",
         }
