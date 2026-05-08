@@ -13,3 +13,4 @@ class CurrentUserResponse(BaseModel):
     email: str
     role: UserRole
     company_id: UUID
+    company_name: str

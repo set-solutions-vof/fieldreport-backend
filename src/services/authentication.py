@@ -21,6 +21,7 @@ async def login(credentials: LoginCredentials) -> TokenPair:
     current_user = CurrentUser(
         id=user.id,
         company_id=user.company_id,
+        company_name=user.company_name,
         email=user.email,
         name=user.name,
         role=user.role,
