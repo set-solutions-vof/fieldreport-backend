@@ -32,6 +32,8 @@ class ReportSection(BaseModel):
     ai_draft: str
     field_expert_content: str | None
     is_approved: bool
+    confidence_level: Literal["high", "medium", "low"]
+    confidence_score: float
     sources: list[ReportSectionSource]
 
 
