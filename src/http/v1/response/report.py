@@ -41,6 +41,8 @@ class ReportSectionResponse(BaseModel):
     ai_draft: str
     field_expert_content: str | None
     is_approved: bool
+    confidence_level: str
+    confidence_score: float
     sources: list[SectionSourceResponse]
 
 
@@ -92,6 +94,8 @@ def report_section_response(section: ReportSection) -> ReportSectionResponse:
         ai_draft=section.ai_draft,
         field_expert_content=section.field_expert_content,
         is_approved=section.is_approved,
+        confidence_level=section.confidence_level,
+        confidence_score=section.confidence_score,
         sources=[section_source_response(source) for source in section.sources],
     )
 

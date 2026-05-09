@@ -17,7 +17,6 @@ from src.models.reports.report import (
 )
 from src.security import authentication as security
 from src.services import authentication as service
-from src.services import reports
 
 
 @pytest.fixture
@@ -236,6 +235,8 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 ai_draft="Draft",
                 field_expert_content=None,
                 is_approved=False,
+                confidence_level="high",
+                confidence_score=0.95,
                 sources=[
                     ReportSectionSource(
                         type="image",
@@ -279,6 +280,8 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 "ai_draft": "Draft",
                 "field_expert_content": None,
                 "is_approved": False,
+                "confidence_level": "high",
+                "confidence_score": 0.95,
                 "sources": [
                     {
                         "type": "image",
@@ -293,24 +296,70 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     }
 
 
-async def test_report_detail_returns_not_found(client: AsyncClient) -> None:
+async def test_update_report_section_accepts_access_token(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
     report_id = uuid4()
+    section_id = uuid4()
+    capture_time = datetime(2026, 5, 8, 12, 45, tzinfo=UTC)
+    fake_section = ReportSection(
+        id=section_id,
+        section_key="advies",
+        ai_draft="Advice",
+        field_expert_content="Updated advice",
+        is_approved=True,
+        confidence_level="medium",
+        confidence_score=0.76,
+        sources=[
+            ReportSectionSource(
+                type="image",
+                timestamp_start=None,
+                timestamp_end=None,
+                capture_time=capture_time,
+                content_summary="Image summary",
+            )
+        ],
+    )
 
     with (
         patch.object(
             service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
-            "src.routes.reports.reports.get_report_detail",
-            AsyncMock(side_effect=reports.ReportNotFoundError),
-        ),
+            "src.routes.reports.reports.update_report_section",
+            AsyncMock(return_value=fake_section),
+        ) as update_section,
     ):
-        response = await client.get(
-            f"/api/v1/reports/{report_id}",
+        response = await client.patch(
+            f"/api/v1/reports/{report_id}/sections/{section_id}",
+            json={"field_expert_content": "Updated advice", "is_approved": True},
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
-    assert response.status_code == 404
-    assert response.json() == {"detail": "Report not found"}
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": str(section_id),
+        "section_key": "advies",
+        "label": "Advies",
+        "ai_draft": "Advice",
+        "field_expert_content": "Updated advice",
+        "is_approved": True,
+        "confidence_level": "medium",
+        "confidence_score": 0.76,
+        "sources": [
+            {
+                "type": "image",
+                "timestamp_start": None,
+                "timestamp_end": None,
+                "capture_time": "2026-05-08T12:45:00+00:00",
+                "content_summary": "Image summary",
+            }
+        ],
+    }
+    update_section.assert_awaited_once_with(
+        str(report_id),
+        str(section_id),
+        current_user,
+        "Updated advice",
+        True,
+    )

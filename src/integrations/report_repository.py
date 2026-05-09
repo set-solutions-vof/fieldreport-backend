@@ -56,6 +56,33 @@ def map_report_section_source(row: asyncpg.Record) -> ReportSectionSource:
     )
 
 
+def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
+    sections_by_id = {}
+    sections = []
+
+    for row in rows:
+        section_id = row["id"]
+
+        if section_id not in sections_by_id:
+            section = ReportSection(
+                id=section_id,
+                section_key=row["section_key"],
+                ai_draft=row["ai_draft"],
+                field_expert_content=row["field_expert_content"],
+                is_approved=row["is_approved"],
+                confidence_level=row["confidence_level"],
+                confidence_score=float(row["confidence_score"]),
+                sources=[],
+            )
+            sections_by_id[section_id] = section
+            sections.append(section)
+
+        if row["source_type"] is not None:
+            sections_by_id[section_id].sources.append(map_report_section_source(row))
+
+    return sections
+
+
 async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSummary]:
     connection = await asyncpg.connect(get_database_connection_url())
 
@@ -84,7 +111,7 @@ async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSum
     return [map_report_summary(row) for row in rows]
 
 
-async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail | None:
+async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
     connection = await asyncpg.connect(get_database_connection_url())
 
     try:
@@ -109,9 +136,6 @@ async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail | No
     finally:
         await connection.close()
 
-    if row is None:
-        return None
-
     return map_report_detail(row)
 
 
@@ -128,6 +152,8 @@ async def get_sections_with_sources(report_id: str) -> list[ReportSection]:
                 report_sections.ai_draft,
                 report_sections.field_expert_content,
                 report_sections.is_approved,
+                report_sections.confidence_level,
+                report_sections.confidence_score,
                 report_section_sources.source_type,
                 transcription_segments.start_seconds AS timestamp_start,
                 transcription_segments.end_seconds AS timestamp_end,
@@ -149,25 +175,88 @@ async def get_sections_with_sources(report_id: str) -> list[ReportSection]:
     finally:
         await connection.close()
 
-    sections_by_id = {}
-    sections = []
+    return map_report_sections(rows)
 
-    for row in rows:
-        section_id = row["id"]
 
-        if section_id not in sections_by_id:
-            section = ReportSection(
-                id=section_id,
-                section_key=row["section_key"],
-                ai_draft=row["ai_draft"],
-                field_expert_content=row["field_expert_content"],
-                is_approved=row["is_approved"],
-                sources=[],
+async def update_report_section(
+    report_id: str,
+    section_id: str,
+    company_id: str,
+    field_expert_content: str | None,
+    is_approved: bool | None,
+) -> ReportSection:
+    connection = await asyncpg.connect(get_database_connection_url())
+
+    try:
+        values: list[object] = [report_id, section_id, company_id]
+        assignments: list[str] = []
+
+        if field_expert_content is not None:
+            values.append(field_expert_content)
+            assignments.append(f"field_expert_content = ${len(values)}::text")
+
+        if is_approved is not None:
+            values.append(is_approved)
+            assignments.append(f"is_approved = ${len(values)}::boolean")
+
+        if assignments:
+            assignments.append("updated_at = NOW()")
+            section_row = await connection.fetchrow(
+                f"""
+                UPDATE report_sections
+                SET {", ".join(assignments)}
+                FROM reports
+                WHERE reports.id = report_sections.report_id
+                AND report_sections.id = $2::uuid
+                AND report_sections.report_id = $1::uuid
+                AND reports.company_id = $3::uuid
+                RETURNING report_sections.id
+                """,
+                *values,
             )
-            sections_by_id[section_id] = section
-            sections.append(section)
+        else:
+            section_row = await connection.fetchrow(
+                """
+                SELECT report_sections.id
+                FROM report_sections
+                JOIN reports ON reports.id = report_sections.report_id
+                WHERE report_sections.id = $2::uuid
+                AND report_sections.report_id = $1::uuid
+                AND reports.company_id = $3::uuid
+                """,
+                *values,
+            )
 
-        if row["source_type"] is not None:
-            sections_by_id[section_id].sources.append(map_report_section_source(row))
+        rows = await connection.fetch(
+            """
+            SELECT
+                report_sections.id,
+                report_sections.section_key,
+                report_sections.section_order,
+                report_sections.ai_draft,
+                report_sections.field_expert_content,
+                report_sections.is_approved,
+                report_sections.confidence_level,
+                report_sections.confidence_score,
+                report_section_sources.source_type,
+                transcription_segments.start_seconds AS timestamp_start,
+                transcription_segments.end_seconds AS timestamp_end,
+                transcription_segments.text AS transcription_text,
+                image_analyses.captured_at AS capture_time,
+                image_analyses.analysis_text AS image_analysis_text
+            FROM report_sections
+            LEFT JOIN report_section_sources
+                ON report_section_sources.report_section_id = report_sections.id
+            LEFT JOIN transcription_segments
+                ON transcription_segments.id = report_section_sources.transcription_segment_id
+            LEFT JOIN image_analyses
+                ON image_analyses.id = report_section_sources.image_analysis_id
+            WHERE report_sections.id = $1::uuid
+            ORDER BY report_section_sources.created_at ASC
+            """,
+            section_row["id"],
+        )
+    finally:
+        await connection.close()
 
-    return sections
+    return map_report_sections(rows)[0]

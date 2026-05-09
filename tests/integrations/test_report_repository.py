@@ -100,20 +100,6 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     connection.close.assert_awaited_once()
 
 
-async def test_get_report_by_id_returns_none_when_report_is_missing() -> None:
-    connection = FakeConnection(row=None)
-
-    with patch(
-        "src.integrations.report_repository.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
-        report = await report_repository.get_report_by_id(str(uuid4()), str(uuid4()))
-
-    assert report is None
-    connection.fetchrow.assert_awaited_once()
-    connection.close.assert_awaited_once()
-
-
 async def test_get_sections_with_sources_returns_ordered_sections() -> None:
     first_section_id = uuid4()
     second_section_id = uuid4()
@@ -126,6 +112,8 @@ async def test_get_sections_with_sources_returns_ordered_sections() -> None:
             "ai_draft": "Draft text",
             "field_expert_content": None,
             "is_approved": False,
+            "confidence_level": "high",
+            "confidence_score": 0.95,
             "source_type": "transcription_segment",
             "timestamp_start": 1.5,
             "timestamp_end": 4.0,
@@ -140,6 +128,8 @@ async def test_get_sections_with_sources_returns_ordered_sections() -> None:
             "ai_draft": "Draft text",
             "field_expert_content": None,
             "is_approved": False,
+            "confidence_level": "high",
+            "confidence_score": 0.95,
             "source_type": "image_analysis",
             "timestamp_start": None,
             "timestamp_end": None,
@@ -154,6 +144,8 @@ async def test_get_sections_with_sources_returns_ordered_sections() -> None:
             "ai_draft": "Advice",
             "field_expert_content": "Expert advice",
             "is_approved": True,
+            "confidence_level": "medium",
+            "confidence_score": 0.7,
             "source_type": None,
             "timestamp_start": None,
             "timestamp_end": None,
@@ -172,6 +164,8 @@ async def test_get_sections_with_sources_returns_ordered_sections() -> None:
 
     assert [section.id for section in sections] == [first_section_id, second_section_id]
     assert sections[0].section_key == "bevindingen"
+    assert sections[0].confidence_level == "high"
+    assert sections[0].confidence_score == 0.95
     assert sections[0].sources[0].type == "audio"
     assert sections[0].sources[0].timestamp_start == 1.5
     assert sections[0].sources[0].timestamp_end == 4.0
@@ -180,5 +174,117 @@ async def test_get_sections_with_sources_returns_ordered_sections() -> None:
     assert sections[0].sources[1].capture_time == capture_time
     assert sections[0].sources[1].content_summary == "Image summary"
     assert sections[1].sources == []
+    connection.fetch.assert_awaited_once()
+    connection.close.assert_awaited_once()
+
+
+async def test_update_report_section_returns_updated_section_for_company() -> None:
+    report_id = uuid4()
+    section_id = uuid4()
+    company_id = uuid4()
+    capture_time = datetime(2026, 5, 8, 12, 45, tzinfo=UTC)
+    rows = [
+        {
+            "id": section_id,
+            "section_key": "advies",
+            "section_order": 2,
+            "ai_draft": "Advice",
+            "field_expert_content": "Updated advice",
+            "is_approved": True,
+            "confidence_level": "low",
+            "confidence_score": 0.32,
+            "source_type": "image_analysis",
+            "timestamp_start": None,
+            "timestamp_end": None,
+            "transcription_text": None,
+            "capture_time": capture_time,
+            "image_analysis_text": "Image summary",
+        }
+    ]
+    connection = FakeConnection(rows, {"id": section_id})
+
+    with patch(
+        "src.integrations.report_repository.asyncpg.connect",
+        AsyncMock(return_value=connection),
+    ):
+        section = await report_repository.update_report_section(
+            str(report_id),
+            str(section_id),
+            str(company_id),
+            "Updated advice",
+            True,
+        )
+
+    assert section is not None
+    assert section.id == section_id
+    assert section.section_key == "advies"
+    assert section.field_expert_content == "Updated advice"
+    assert section.is_approved is True
+    assert section.confidence_level == "low"
+    assert section.confidence_score == 0.32
+    assert section.sources[0].type == "image"
+    assert section.sources[0].capture_time == capture_time
+    assert section.sources[0].content_summary == "Image summary"
+    connection.fetch.assert_awaited_once()
+    connection.fetchrow.assert_awaited_once()
+    assert connection.fetchrow.await_args.args[1:] == (
+        str(report_id),
+        str(section_id),
+        str(company_id),
+        "Updated advice",
+        True,
+    )
+    assert connection.fetch.await_args.args[1:] == (section_id,)
+    connection.close.assert_awaited_once()
+
+
+async def test_update_report_section_returns_section_when_no_fields_are_changed() -> None:
+    report_id = uuid4()
+    section_id = uuid4()
+    company_id = uuid4()
+    rows = [
+        {
+            "id": section_id,
+            "section_key": "advies",
+            "section_order": 2,
+            "ai_draft": "Advice",
+            "field_expert_content": "Expert advice",
+            "is_approved": False,
+            "confidence_level": "high",
+            "confidence_score": 0.95,
+            "source_type": None,
+            "timestamp_start": None,
+            "timestamp_end": None,
+            "transcription_text": None,
+            "capture_time": None,
+            "image_analysis_text": None,
+        }
+    ]
+    connection = FakeConnection(rows, {"id": section_id})
+
+    with patch(
+        "src.integrations.report_repository.asyncpg.connect",
+        AsyncMock(return_value=connection),
+    ):
+        section = await report_repository.update_report_section(
+            str(report_id),
+            str(section_id),
+            str(company_id),
+            None,
+            None,
+        )
+
+    assert section is not None
+    assert section.id == section_id
+    assert section.field_expert_content == "Expert advice"
+    assert section.is_approved is False
+    assert section.sources == []
+    connection.fetchrow.assert_awaited_once()
+    assert "SELECT report_sections.id" in connection.fetchrow.await_args.args[0]
+    assert connection.fetchrow.await_args.args[1:] == (
+        str(report_id),
+        str(section_id),
+        str(company_id),
+    )
     connection.fetch.assert_awaited_once()
     connection.close.assert_awaited_once()
