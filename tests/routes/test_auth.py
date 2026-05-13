@@ -11,9 +11,11 @@ from src.main import app
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 from src.models.reports.report import (
     ReportDetail,
+    ReportDetailSection,
     ReportSection,
     ReportSectionSource,
     ReportSummary,
+    ReportTimelineItem,
 )
 from src.security import authentication as security
 from src.services import authentication as service
@@ -220,7 +222,9 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
     report_id = uuid4()
+    image_analysis_id = uuid4()
     capture_time = datetime(2026, 5, 8, 12, 45, tzinfo=UTC)
+    updated_at = datetime(2026, 5, 9, 8, 15, tzinfo=UTC)
     fake_report = ReportDetail(
         id=report_id,
         status="draft",
@@ -228,8 +232,9 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         address="Main Street 1",
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
         inspector_name="Jeroen van Dijk",
+        updated_at=updated_at,
         sections=[
-            ReportSection(
+            ReportDetailSection(
                 id=uuid4(),
                 section_key="technische_bevindingen",
                 ai_draft="Draft",
@@ -237,15 +242,18 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 is_approved=False,
                 confidence_level="high",
                 confidence_score=0.95,
-                sources=[
-                    ReportSectionSource(
-                        type="image",
-                        timestamp_start=None,
-                        timestamp_end=None,
-                        capture_time=capture_time,
-                        content_summary="Image summary",
-                    )
-                ],
+                source_item_ids=[image_analysis_id],
+            )
+        ],
+        timeline_items=[
+            ReportTimelineItem(
+                id=image_analysis_id,
+                source_type="image_analysis",
+                timeline_offset_seconds=15.0,
+                start_seconds=None,
+                end_seconds=None,
+                captured_at=capture_time,
+                content_summary="Image summary",
             )
         ],
     )
@@ -272,6 +280,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         "address": "Main Street 1",
         "inspection_date": "2026-05-08T12:30:00+00:00",
         "inspector_name": "Jeroen van Dijk",
+        "updated_at": "2026-05-09T08:15:00+00:00",
         "sections": [
             {
                 "id": str(fake_report.sections[0].id),
@@ -282,15 +291,18 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 "is_approved": False,
                 "confidence_level": "high",
                 "confidence_score": 0.95,
-                "sources": [
-                    {
-                        "type": "image",
-                        "timestamp_start": None,
-                        "timestamp_end": None,
-                        "capture_time": "2026-05-08T12:45:00+00:00",
-                        "content_summary": "Image summary",
-                    }
-                ],
+                "source_item_ids": [str(image_analysis_id)],
+            }
+        ],
+        "timeline_items": [
+            {
+                "id": str(image_analysis_id),
+                "source_type": "image_analysis",
+                "timeline_offset_seconds": 15.0,
+                "start_seconds": None,
+                "end_seconds": None,
+                "captured_at": "2026-05-08T12:45:00+00:00",
+                "content_summary": "Image summary",
             }
         ],
     }

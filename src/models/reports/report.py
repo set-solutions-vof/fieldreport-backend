@@ -2,10 +2,10 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 ReportStatus = Literal["generating", "draft", "approved", "failed"]
-ReportSectionSourceType = Literal["audio", "image"]
+ReportSourceType = Literal["transcription_segment", "image_analysis"]
 
 
 class ReportSummary(BaseModel):
@@ -19,14 +19,24 @@ class ReportSummary(BaseModel):
 
 
 class ReportSectionSource(BaseModel):
-    type: ReportSectionSourceType
+    type: Literal["audio", "image"]
     timestamp_start: float | None
     timestamp_end: float | None
     capture_time: datetime | None
     content_summary: str
 
 
-class ReportSection(BaseModel):
+class ReportTimelineItem(BaseModel):
+    id: UUID
+    source_type: ReportSourceType
+    timeline_offset_seconds: float
+    start_seconds: float | None
+    end_seconds: float | None
+    captured_at: datetime | None
+    content_summary: str
+
+
+class ReportSectionBase(BaseModel):
     id: UUID
     section_key: str
     ai_draft: str
@@ -34,7 +44,14 @@ class ReportSection(BaseModel):
     is_approved: bool
     confidence_level: Literal["high", "medium", "low"]
     confidence_score: float
+
+
+class ReportSection(ReportSectionBase):
     sources: list[ReportSectionSource]
+
+
+class ReportDetailSection(ReportSectionBase):
+    source_item_ids: list[UUID] = Field(default_factory=list)
 
 
 class ReportDetail(BaseModel):
@@ -44,4 +61,6 @@ class ReportDetail(BaseModel):
     address: str
     inspection_date: datetime
     inspector_name: str
-    sections: list[ReportSection]
+    updated_at: datetime | None = None
+    sections: list[ReportDetailSection]
+    timeline_items: list[ReportTimelineItem] = Field(default_factory=list)

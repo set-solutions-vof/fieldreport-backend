@@ -9,10 +9,9 @@ async def list_reports_for_user(user: CurrentUser) -> list[ReportSummary]:
 
 async def get_report_detail(report_id: str, user: CurrentUser) -> ReportDetail:
     report = await report_repository.get_report_by_id(report_id, str(user.company_id))
+    sections, timeline_items = await report_repository.get_report_detail_sections(report_id)
 
-    sections = await report_repository.get_sections_with_sources(report_id)
-
-    return report.model_copy(update={"sections": sections})
+    return report.model_copy(update={"sections": sections, "timeline_items": timeline_items})
 
 
 async def update_report_section(

@@ -3,7 +3,14 @@ from unittest.mock import AsyncMock, patch
 from uuid import UUID, uuid4
 
 from src.models.auth.authentication import CurrentUser
-from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
+from src.models.reports.report import (
+    ReportDetail,
+    ReportDetailSection,
+    ReportSection,
+    ReportSectionSource,
+    ReportSummary,
+    ReportTimelineItem,
+)
 from src.services import reports as reports_service
 
 
@@ -44,7 +51,7 @@ async def test_list_reports_for_user_returns_repository_reports() -> None:
     list_reports.assert_awaited_once_with(str(current_user.company_id))
 
 
-async def test_get_report_detail_returns_report_with_sections() -> None:
+async def test_get_report_detail_returns_source_centric_timeline_items() -> None:
     current_user = CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
@@ -63,8 +70,12 @@ async def test_get_report_detail_returns_report_with_sections() -> None:
         inspector_name="Jeroen van Dijk",
         sections=[],
     )
+    shared_transcription_segment_id = uuid4()
+    shared_image_analysis_id = uuid4()
+    first_unique_segment_id = uuid4()
+    first_capture_time = datetime(2026, 5, 8, 12, 30, 20, tzinfo=UTC)
     sections = [
-        ReportSection(
+        ReportDetailSection(
             id=uuid4(),
             section_key="bevindingen",
             ai_draft="Draft",
@@ -72,8 +83,51 @@ async def test_get_report_detail_returns_report_with_sections() -> None:
             is_approved=False,
             confidence_level="high",
             confidence_score=0.95,
-            sources=[],
-        )
+            source_item_ids=[shared_image_analysis_id, shared_transcription_segment_id],
+        ),
+        ReportDetailSection(
+            id=uuid4(),
+            section_key="advies",
+            ai_draft="Advice",
+            field_expert_content=None,
+            is_approved=False,
+            confidence_level="medium",
+            confidence_score=0.71,
+            source_item_ids=[
+                shared_transcription_segment_id,
+                first_unique_segment_id,
+                shared_image_analysis_id,
+            ],
+        ),
+    ]
+    timeline_items = [
+        ReportTimelineItem(
+            id=first_unique_segment_id,
+            source_type="transcription_segment",
+            timeline_offset_seconds=5.0,
+            start_seconds=5.0,
+            end_seconds=8.0,
+            captured_at=None,
+            content_summary="Opening note",
+        ),
+        ReportTimelineItem(
+            id=shared_transcription_segment_id,
+            source_type="transcription_segment",
+            timeline_offset_seconds=12.0,
+            start_seconds=12.0,
+            end_seconds=15.0,
+            captured_at=None,
+            content_summary="Moisture mentioned",
+        ),
+        ReportTimelineItem(
+            id=shared_image_analysis_id,
+            source_type="image_analysis",
+            timeline_offset_seconds=20.0,
+            start_seconds=None,
+            end_seconds=None,
+            captured_at=first_capture_time,
+            content_summary="Thermal image",
+        ),
     ]
 
     with (
@@ -84,15 +138,16 @@ async def test_get_report_detail_returns_report_with_sections() -> None:
         ) as get_report,
         patch.object(
             reports_service.report_repository,
-            "get_sections_with_sources",
-            AsyncMock(return_value=sections),
-        ) as get_sections,
+            "get_report_detail_sections",
+            AsyncMock(return_value=(sections, timeline_items)),
+        ) as get_report_sections,
     ):
         result = await reports_service.get_report_detail(str(report_id), current_user)
 
     assert result.sections == sections
+    assert result.timeline_items == timeline_items
     get_report.assert_awaited_once_with(str(report_id), str(current_user.company_id))
-    get_sections.assert_awaited_once_with(str(report_id))
+    get_report_sections.assert_awaited_once_with(str(report_id))
 
 
 async def test_update_report_section_returns_repository_section() -> None:
@@ -114,7 +169,15 @@ async def test_update_report_section_returns_repository_section() -> None:
         is_approved=True,
         confidence_level="medium",
         confidence_score=0.72,
-        sources=[],
+        sources=[
+            ReportSectionSource(
+                type="image",
+                timestamp_start=None,
+                timestamp_end=None,
+                capture_time=None,
+                content_summary="Image summary",
+            )
+        ],
     )
 
     with patch.object(
