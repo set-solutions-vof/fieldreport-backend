@@ -19,9 +19,17 @@ services:
     build: .
     ports:
       - "8000:8000"
-    environment:
-      DATABASE_URL: postgresql+asyncpg://fieldreport:fieldreport@db:5432/fieldreport
-      APP_ENV: development
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ["python", "-m", "src.workers.template_analysis_worker"]
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy

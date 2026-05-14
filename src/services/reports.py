@@ -1,4 +1,4 @@
-from src.integrations import report_repository
+from src.db import report_repository
 from src.models.auth.authentication import CurrentUser
 from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
 

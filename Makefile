@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := install
 
-.PHONY: install format format-check lint stan test check run stop db-upgrade db-downgrade
+.PHONY: install format format-check lint stan test check run worker stop db-upgrade db-downgrade
 
 install:
 	uv python install
@@ -44,7 +44,14 @@ run:
 	@cp -n .env.example .env 2>/dev/null || true
 	uv run alembic upgrade head
 	uv run uvicorn src.main:app --reload
+	uv run python -m src.workers.template_analysis_worker
+
+
+worker:
+	@cp -n .env.example .env 2>/dev/null || true
+	uv run python -m src.workers.template_analysis_worker
 
 stop:
 	-pkill -f "$(CURDIR)/.venv/bin/uvicorn src.main:app --reload"
+	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.template_analysis_worker"
 	docker compose down

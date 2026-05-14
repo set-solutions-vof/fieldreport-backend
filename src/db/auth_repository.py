@@ -1,11 +1,7 @@
 import asyncpg
 
-from src.config import settings
+from src.db.connection import get_connection_url
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
-
-
-def get_database_connection_url() -> str:
-    return settings.database_url.replace("+asyncpg", "")
 
 
 def map_authenticated_user(row: asyncpg.Record) -> AuthenticatedUser:
@@ -32,7 +28,7 @@ def map_current_user(row: asyncpg.Record) -> CurrentUser:
 
 
 async def get_user_by_email(email: str) -> AuthenticatedUser | None:
-    connection = await asyncpg.connect(get_database_connection_url())
+    connection = await asyncpg.connect(get_connection_url())
 
     try:
         row = await connection.fetchrow(
@@ -61,7 +57,7 @@ async def get_user_by_email(email: str) -> AuthenticatedUser | None:
 
 
 async def get_user_by_id(user_id: str) -> CurrentUser | None:
-    connection = await asyncpg.connect(get_database_connection_url())
+    connection = await asyncpg.connect(get_connection_url())
 
     try:
         row = await connection.fetchrow(

@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from src.integrations import auth_repository
+from src.db import auth_repository
 
 
 class FakeConnection:
@@ -23,20 +23,9 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
     }
     connection = FakeConnection(row)
 
-    with patch(
-        "src.integrations.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)
-    ):
+    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_repository.get_user_by_email("sanne.devries@lekk.nl")
 
-    with patch.object(
-        auth_repository.settings,
-        "database_url",
-        "postgresql+asyncpg://fieldreport:fieldreport@localhost:5432/fieldreport_test",
-    ):
-        assert (
-            auth_repository.get_database_connection_url()
-            == "postgresql://fieldreport:fieldreport@localhost:5432/fieldreport_test"
-        )
     assert user is not None
     assert user.email == "sanne.devries@lekk.nl"
     assert user.password_hash == "hash"
@@ -47,9 +36,7 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
 async def test_get_user_by_email_returns_none_when_missing() -> None:
     connection = FakeConnection(None)
 
-    with patch(
-        "src.integrations.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)
-    ):
+    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_repository.get_user_by_email("missing@lekk.nl")
 
     assert user is None
@@ -68,9 +55,7 @@ async def test_get_user_by_id_returns_current_user() -> None:
     }
     connection = FakeConnection(row)
 
-    with patch(
-        "src.integrations.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)
-    ):
+    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_repository.get_user_by_id(str(uuid4()))
 
     assert user is not None
@@ -83,9 +68,7 @@ async def test_get_user_by_id_returns_current_user() -> None:
 async def test_get_user_by_id_returns_none_when_missing() -> None:
     connection = FakeConnection(None)
 
-    with patch(
-        "src.integrations.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)
-    ):
+    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_repository.get_user_by_id(str(uuid4()))
 
     assert user is None

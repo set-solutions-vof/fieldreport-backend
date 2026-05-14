@@ -44,7 +44,9 @@ def test_decode_token_returns_refresh_claims() -> None:
 
 
 def test_decode_token_raises_for_invalid_token() -> None:
-    with pytest.raises(security.AuthenticationError):
+    from jwt import InvalidTokenError
+
+    with pytest.raises(InvalidTokenError):
         security.decode_token("invalid")
 
 

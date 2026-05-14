@@ -1,6 +1,6 @@
 import asyncpg
 
-from src.config import settings
+from src.db.connection import get_connection_url
 from src.models.reports.report import (
     ReportDetail,
     ReportDetailSection,
@@ -9,10 +9,6 @@ from src.models.reports.report import (
     ReportSummary,
     ReportTimelineItem,
 )
-
-
-def get_database_connection_url() -> str:
-    return settings.database_url.replace("+asyncpg", "")
 
 
 def map_report_summary(row: asyncpg.Record) -> ReportSummary:
@@ -83,8 +79,8 @@ def map_report_timeline_item(row: asyncpg.Record) -> ReportTimelineItem:
 
 
 def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
-    sections_by_id = {}
-    sections = []
+    sections_by_id: dict[object, ReportSection] = {}
+    sections: list[ReportSection] = []
 
     for row in rows:
         section_id = row["id"]
@@ -112,9 +108,9 @@ def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
 def map_report_detail_sections(
     rows: list[asyncpg.Record],
 ) -> tuple[list[ReportDetailSection], list[ReportTimelineItem]]:
-    sections_by_id = {}
-    timeline_items_by_id = {}
-    sections = []
+    sections_by_id: dict[object, ReportDetailSection] = {}
+    timeline_items_by_id: dict[object, ReportTimelineItem] = {}
+    sections: list[ReportDetailSection] = []
 
     for row in rows:
         section_id = row["id"]
@@ -142,10 +138,10 @@ def map_report_detail_sections(
 
     timeline_items = sorted(
         timeline_items_by_id.values(),
-        key=lambda timeline_item: (
-            timeline_item.timeline_offset_seconds,
-            timeline_item.source_type,
-            str(timeline_item.id),
+        key=lambda item: (
+            item.timeline_offset_seconds,
+            item.source_type,
+            str(item.id),
         ),
     )
 
@@ -153,7 +149,7 @@ def map_report_detail_sections(
 
 
 async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSummary]:
-    connection = await asyncpg.connect(get_database_connection_url())
+    connection = await asyncpg.connect(get_connection_url())
 
     try:
         rows = await connection.fetch(
@@ -181,7 +177,7 @@ async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSum
 
 
 async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
-    connection = await asyncpg.connect(get_database_connection_url())
+    connection = await asyncpg.connect(get_connection_url())
 
     try:
         row = await connection.fetchrow(
@@ -210,7 +206,7 @@ async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
 
 
 async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
-    connection = await asyncpg.connect(get_database_connection_url())
+    connection = await asyncpg.connect(get_connection_url())
 
     try:
         return await connection.fetch(
@@ -282,7 +278,7 @@ async def update_report_section(
     field_expert_content: str | None,
     is_approved: bool | None,
 ) -> ReportSection:
-    connection = await asyncpg.connect(get_database_connection_url())
+    connection = await asyncpg.connect(get_connection_url())
 
     try:
         values: list[object] = [report_id, section_id, company_id]

@@ -20,7 +20,6 @@ from src.models.templates.template import (
 from src.routes import template as template_route
 from src.security import authentication as security
 from src.services import authentication as auth_service
-from src.services import templates as template_service
 
 
 @pytest.fixture
@@ -61,7 +60,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
                 return_value=TemplateConfigurationActive(
                     status="active",
                     reports_count=3,
-                    sections=[TemplateSection(id="summary", label="Summary", type="text")],
+                    sections=[TemplateSection(id="summary", label="Summary", type="text_block")],
                 )
             ),
         ),
@@ -75,7 +74,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
     assert response.json() == {
         "status": "active",
         "reports_count": 3,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text"}],
+        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
     }
 
 
@@ -167,7 +166,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
                         TemplateSection(
                             id="findings",
                             label="Findings",
-                            type="kv",
+                            type="key_value_table",
                             fields=["Issue", "Action"],
                         )
                     ],
@@ -185,7 +184,12 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
         "status": "pending_review",
         "reports_count": 3,
         "sections": [
-            {"id": "findings", "label": "Findings", "type": "kv", "fields": ["Issue", "Action"]}
+            {
+                "id": "findings",
+                "label": "Findings",
+                "type": "key_value_table",
+                "fields": ["Issue", "Action"],
+            }
         ],
     }
 
@@ -202,7 +206,7 @@ async def test_get_template_analysis_returns_not_found_for_unknown_job(client: A
         ),
         patch(
             "src.routes.template.templates.get_template_analysis",
-            AsyncMock(side_effect=template_service.TemplateAnalysisNotFoundError),
+            AsyncMock(side_effect=LookupError),
         ),
     ):
         response = await client.get(
@@ -219,8 +223,13 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
     access_token = security.create_access_token(current_user)
     request_body = {
         "sections": [
-            {"id": "summary", "label": "Executive Summary", "type": "text"},
-            {"id": "findings", "label": "Findings", "type": "kv", "fields": ["Issue", "Action"]},
+            {"id": "summary", "label": "Executive Summary", "type": "text_block"},
+            {
+                "id": "findings",
+                "label": "Findings",
+                "type": "key_value_table",
+                "fields": ["Issue", "Action"],
+            },
         ]
     }
 
@@ -235,11 +244,15 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
                     status="active",
                     reports_count=3,
                     sections=[
-                        TemplateSection(id="summary", label="Executive Summary", type="text"),
+                        TemplateSection(
+                            id="summary",
+                            label="Executive Summary",
+                            type="text_block",
+                        ),
                         TemplateSection(
                             id="findings",
                             label="Findings",
-                            type="kv",
+                            type="key_value_table",
                             fields=["Issue", "Action"],
                         ),
                     ],
@@ -258,8 +271,13 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
         "status": "active",
         "reports_count": 3,
         "sections": [
-            {"id": "summary", "label": "Executive Summary", "type": "text"},
-            {"id": "findings", "label": "Findings", "type": "kv", "fields": ["Issue", "Action"]},
+            {"id": "summary", "label": "Executive Summary", "type": "text_block"},
+            {
+                "id": "findings",
+                "label": "Findings",
+                "type": "key_value_table",
+                "fields": ["Issue", "Action"],
+            },
         ],
     }
 

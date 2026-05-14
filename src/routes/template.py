@@ -39,7 +39,7 @@ async def get_template_analysis(
 ) -> dict[str, object]:
     try:
         configuration = await templates.get_template_analysis(current_user, job_id)
-    except templates.TemplateAnalysisNotFoundError:
+    except LookupError:
         raise HTTPException(status_code=404, detail="Template analysis not found")
 
     return configuration.model_dump(exclude_none=True)

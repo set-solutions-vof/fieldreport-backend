@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from src.integrations import report_repository
+from src.db import report_repository
 
 
 class FakeConnection:
@@ -39,23 +39,11 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
     ]
     connection = FakeConnection(rows)
 
-    with (
-        patch.object(
-            report_repository.settings,
-            "database_url",
-            "postgresql+asyncpg://fieldreport:fieldreport@localhost:5432/fieldreport_test",
-        ),
-        patch(
-            "src.integrations.report_repository.asyncpg.connect",
-            AsyncMock(return_value=connection),
-        ),
+    with patch(
+        "src.db.report_repository.asyncpg.connect",
+        AsyncMock(return_value=connection),
     ):
         reports = await report_repository.list_report_summaries_by_company_id(str(company_id))
-
-        assert (
-            report_repository.get_database_connection_url()
-            == "postgresql://fieldreport:fieldreport@localhost:5432/fieldreport_test"
-        )
 
     assert [report.id for report in reports] == [rows[0]["id"], rows[1]["id"]]
     assert all(report.company_id == company_id for report in reports)
@@ -85,7 +73,7 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     connection = FakeConnection(row=row)
 
     with patch(
-        "src.integrations.report_repository.asyncpg.connect",
+        "src.db.report_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
         report = await report_repository.get_report_by_id(str(report_id), str(company_id))
@@ -160,7 +148,7 @@ async def test_get_sections_with_sources_returns_ordered_sections() -> None:
     connection = FakeConnection(rows)
 
     with patch(
-        "src.integrations.report_repository.asyncpg.connect",
+        "src.db.report_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
         sections = await report_repository.get_sections_with_sources(str(uuid4()))
@@ -308,7 +296,7 @@ async def test_get_report_detail_sections_returns_source_centric_timeline() -> N
     connection = FakeConnection(rows)
 
     with patch(
-        "src.integrations.report_repository.asyncpg.connect",
+        "src.db.report_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
         sections, timeline_items = await report_repository.get_report_detail_sections(str(uuid4()))
@@ -373,7 +361,7 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
     connection = FakeConnection(rows, {"id": section_id})
 
     with patch(
-        "src.integrations.report_repository.asyncpg.connect",
+        "src.db.report_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
         section = await report_repository.update_report_section(
@@ -432,7 +420,7 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
     connection = FakeConnection(rows, {"id": section_id})
 
     with patch(
-        "src.integrations.report_repository.asyncpg.connect",
+        "src.db.report_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
         section = await report_repository.update_report_section(

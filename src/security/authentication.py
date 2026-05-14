@@ -8,14 +8,10 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
 
 from src.config import settings
-from src.integrations import auth_repository
+from src.db import auth_repository
 from src.models.auth.authentication import CurrentUser, TokenClaims
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
-
-
-class AuthenticationError(Exception):
-    pass
 
 
 def verify_password(password: str, password_hash: str) -> bool:
@@ -53,14 +49,11 @@ def create_refresh_token(user: CurrentUser) -> str:
 
 
 def decode_token(token: str) -> TokenClaims:
-    try:
-        payload = jwt.decode(
-            token,
-            settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm],
-        )
-    except InvalidTokenError as error:
-        raise AuthenticationError from error
+    payload = jwt.decode(
+        token,
+        settings.jwt_secret_key,
+        algorithms=[settings.jwt_algorithm],
+    )
 
     return TokenClaims.model_validate(payload)
 
@@ -76,7 +69,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Cur
 
         if claims.type != "access":
             raise credentials_exception
-    except (AuthenticationError, ValueError):
+    except (InvalidTokenError, ValueError):
         raise credentials_exception
 
     user = await auth_repository.get_user_by_id(str(claims.sub))
