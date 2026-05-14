@@ -12,9 +12,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TYPE template_analysis_status_enum ADD VALUE IF NOT EXISTS 'queued'")
-    op.execute("ALTER TYPE template_analysis_status_enum ADD VALUE IF NOT EXISTS 'processing'")
-    op.execute("ALTER TYPE template_analysis_status_enum ADD VALUE IF NOT EXISTS 'failed'")
+    with op.get_context().autocommit_block():
+        op.execute("ALTER TYPE template_analysis_status_enum ADD VALUE IF NOT EXISTS 'queued'")
+        op.execute("ALTER TYPE template_analysis_status_enum ADD VALUE IF NOT EXISTS 'processing'")
+        op.execute("ALTER TYPE template_analysis_status_enum ADD VALUE IF NOT EXISTS 'failed'")
     op.execute(
         """
         UPDATE template_analysis_jobs
