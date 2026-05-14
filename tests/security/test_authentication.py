@@ -19,6 +19,17 @@ def build_current_user() -> CurrentUser:
     )
 
 
+def build_inspector_user() -> CurrentUser:
+    return CurrentUser(
+        id=uuid4(),
+        company_id=uuid4(),
+        company_name="LEKK BV",
+        email="jeroen.vandijk@lekk.nl",
+        name="Jeroen van Dijk",
+        role="inspector",
+    )
+
+
 def test_decode_token_returns_access_claims() -> None:
     current_user = build_current_user()
     token = security.create_access_token(current_user)
@@ -88,3 +99,13 @@ async def test_get_current_user_raises_when_repository_returns_none() -> None:
             await security.get_current_user(access_token)
 
     assert error.value.status_code == 401
+
+
+async def test_require_admin_raises_for_non_admin_user() -> None:
+    current_user = build_inspector_user()
+
+    with pytest.raises(HTTPException) as error:
+        await security.require_admin(current_user)
+
+    assert error.value.status_code == 403
+    assert error.value.detail == "Admin access required"

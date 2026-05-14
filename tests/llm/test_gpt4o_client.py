@@ -11,9 +11,7 @@ def test_get_gpt4o_client_returns_configured_client() -> None:
         patch.object(gpt4o_client.settings, "gpt4o_endpoint", "https://gpt4o.example/"),
         patch.object(gpt4o_client.settings, "gpt4o_api_key", "gpt4o-key"),
         patch.object(gpt4o_client.settings, "gpt4o_api_version", "2024-12-01-preview"),
-        patch.object(
-            gpt4o_client, "create_azure_openai_client", return_value=client
-        ) as factory,
+        patch.object(gpt4o_client, "create_azure_openai_client", return_value=client) as factory,
     ):
         result = gpt4o_client.get_gpt4o_client()
 

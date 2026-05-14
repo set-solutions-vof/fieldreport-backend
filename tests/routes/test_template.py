@@ -39,6 +39,17 @@ def build_current_user() -> CurrentUser:
     )
 
 
+def create_frontend_build(tmp_path: Path) -> tuple[Path, Path]:
+    frontend_dist_path = tmp_path / "dist"
+    frontend_index_path = frontend_dist_path / "index.html"
+    frontend_asset_path = frontend_dist_path / "assets" / "index-DP-JPQ9M.js"
+    frontend_asset_path.parent.mkdir(parents=True)
+    frontend_index_path.write_text("<!doctype html><html><body>fieldreport</body></html>")
+    frontend_asset_path.write_text("console.log('fieldreport');")
+
+    return frontend_dist_path, frontend_index_path
+
+
 async def test_template_routes_require_access_token(client: AsyncClient) -> None:
     response = await client.get("/api/v1/template")
 
@@ -282,8 +293,16 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
     }
 
 
-async def test_admin_template_path_returns_frontend_entrypoint(client: AsyncClient) -> None:
-    response = await client.get("/admin/template")
+async def test_admin_template_path_returns_frontend_entrypoint(
+    client: AsyncClient, tmp_path: Path
+) -> None:
+    frontend_dist_path, frontend_index_path = create_frontend_build(tmp_path)
+
+    with (
+        patch.object(main_module, "frontend_dist_path", frontend_dist_path),
+        patch.object(main_module, "frontend_index_path", frontend_index_path),
+    ):
+        response = await client.get("/admin/template")
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
@@ -297,8 +316,16 @@ async def test_api_like_frontend_path_returns_not_found(client: AsyncClient) -> 
     assert response.json() == {"detail": "Not Found"}
 
 
-async def test_frontend_static_asset_path_returns_asset_file(client: AsyncClient) -> None:
-    response = await client.get("/assets/index-DP-JPQ9M.js")
+async def test_frontend_static_asset_path_returns_asset_file(
+    client: AsyncClient, tmp_path: Path
+) -> None:
+    frontend_dist_path, frontend_index_path = create_frontend_build(tmp_path)
+
+    with (
+        patch.object(main_module, "frontend_dist_path", frontend_dist_path),
+        patch.object(main_module, "frontend_index_path", frontend_index_path),
+    ):
+        response = await client.get("/assets/index-DP-JPQ9M.js")
 
     assert response.status_code == 200
     assert "javascript" in response.headers["content-type"]

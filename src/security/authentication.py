@@ -62,6 +62,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Cur
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Not authenticated",
+        headers={"WWW-Authenticate": "Bearer"},
     )
 
     try:
@@ -78,3 +79,15 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Cur
         raise credentials_exception
 
     return user
+
+
+async def require_admin(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> CurrentUser:
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+    return current_user
