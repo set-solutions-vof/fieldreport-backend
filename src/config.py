@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field(validation_alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(validation_alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_days: int = Field(validation_alias="REFRESH_TOKEN_EXPIRE_DAYS")
+    azure_openai_api_key: str = Field(validation_alias="AZURE_OPENAI_API_KEY")
 
 
 settings = Settings()

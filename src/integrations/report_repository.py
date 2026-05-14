@@ -219,8 +219,8 @@ async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
                 report_sections.id,
                 report_sections.section_key,
                 report_sections.section_order,
-                report_sections.ai_draft,
-                report_sections.field_expert_content,
+                report_sections.ai_content ->> 0 AS ai_draft,
+                report_sections.expert_content ->> 0 AS field_expert_content,
                 report_sections.is_approved,
                 report_sections.confidence_level,
                 report_sections.confidence_score,
@@ -290,7 +290,7 @@ async def update_report_section(
 
         if field_expert_content is not None:
             values.append(field_expert_content)
-            assignments.append(f"field_expert_content = ${len(values)}::text")
+            assignments.append(f"expert_content = to_jsonb(ARRAY[${len(values)}::text])")
 
         if is_approved is not None:
             values.append(is_approved)
@@ -330,8 +330,8 @@ async def update_report_section(
                 report_sections.id,
                 report_sections.section_key,
                 report_sections.section_order,
-                report_sections.ai_draft,
-                report_sections.field_expert_content,
+                report_sections.ai_content ->> 0 AS ai_draft,
+                report_sections.expert_content ->> 0 AS field_expert_content,
                 report_sections.is_approved,
                 report_sections.confidence_level,
                 report_sections.confidence_score,
