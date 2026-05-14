@@ -1,14 +1,52 @@
+from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from starlette.datastructures import UploadFile
 
 from src.db.template_mapper import build_structure
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.template import TemplateSection
-from src.models.templates.template_analysis import TemplateAnalysisFile
+from src.models.templates.repository_records import CompanyTemplateRecord, TemplateAnalysisJobRecord
+from src.models.templates.template import StoredTemplateStructure, TemplateSection
+from src.models.templates.template_analysis import (
+    TemplateAnalysisFile,
+    TemplateAnalysisJobStatus,
+)
 from src.services import templates as templates_service
+
+
+def build_company_template_record(
+    active_template_id: UUID | None = None,
+    active_structure: StoredTemplateStructure | None = None,
+) -> CompanyTemplateRecord:
+    return CompanyTemplateRecord(
+        active_template_id=active_template_id,
+        active_structure=active_structure,
+    )
+
+
+def build_analysis_job_record(
+    *,
+    job_id=None,
+    company_id=None,
+    template_id=None,
+    status: TemplateAnalysisJobStatus | None = None,
+    reports_count: int | None = None,
+    structure: StoredTemplateStructure | None = None,
+    error_message: str | None = None,
+    created_at: datetime | None = None,
+) -> TemplateAnalysisJobRecord:
+    return TemplateAnalysisJobRecord(
+        id=job_id if job_id is not None else uuid4(),
+        company_id=company_id if company_id is not None else uuid4(),
+        template_id=template_id,
+        status=status if status is not None else "queued",
+        reports_count=reports_count if reports_count is not None else 0,
+        structure=structure,
+        error_message=error_message,
+        created_at=created_at if created_at is not None else datetime.now(UTC),
+    )
 
 
 def build_current_user() -> CurrentUser:
@@ -32,7 +70,7 @@ async def test_get_template_configuration_returns_not_configured() -> None:
     with patch.object(
         templates_service.template_repository,
         "get_company_template_context",
-        AsyncMock(return_value=({"active_template_id": None, "active_structure": None}, None)),
+        AsyncMock(return_value=(build_company_template_record(), None)),
     ):
         result = await templates_service.get_template_configuration(current_user)
 
@@ -48,14 +86,8 @@ async def test_get_template_configuration_maps_queued_job_to_extracting() -> Non
         "get_company_template_context",
         AsyncMock(
             return_value=(
-                {"active_template_id": None, "active_structure": None},
-                {
-                    "id": job_id,
-                    "status": "queued",
-                    "reports_count": 3,
-                    "structure": None,
-                    "error_message": None,
-                },
+                build_company_template_record(),
+                build_analysis_job_record(job_id=job_id, reports_count=3, status="queued"),
             )
         ),
     ):
@@ -76,14 +108,10 @@ async def test_get_template_configuration_returns_failed_job_state() -> None:
         "get_company_template_context",
         AsyncMock(
             return_value=(
-                {"active_template_id": None, "active_structure": None},
-                {
-                    "id": uuid4(),
-                    "status": "failed",
-                    "reports_count": 2,
-                    "structure": None,
-                    "error_message": "model error",
-                },
+                build_company_template_record(),
+                build_analysis_job_record(
+                    status="failed", reports_count=2, error_message="model error"
+                ),
             )
         ),
     ):
@@ -104,9 +132,9 @@ async def test_get_template_configuration_returns_active_company_template() -> N
         "get_company_template_context",
         AsyncMock(
             return_value=(
-                {
-                    "active_template_id": uuid4(),
-                    "active_structure": build_structure(
+                build_company_template_record(
+                    active_template_id=uuid4(),
+                    active_structure=build_structure(
                         [
                             TemplateSection(
                                 id="findings",
@@ -116,7 +144,7 @@ async def test_get_template_configuration_returns_active_company_template() -> N
                             )
                         ]
                     ),
-                },
+                ),
                 None,
             )
         ),
@@ -145,13 +173,9 @@ async def test_get_template_analysis_returns_active_job() -> None:
         templates_service.template_repository,
         "get_template_analysis_job",
         AsyncMock(
-            return_value={
-                "id": uuid4(),
-                "status": "active",
-                "reports_count": 5,
-                "structure": structure,
-                "error_message": None,
-            }
+            return_value=build_analysis_job_record(
+                status="active", reports_count=5, structure=structure
+            )
         ),
     ):
         result = await templates_service.get_template_analysis(current_user, str(uuid4()))
@@ -202,13 +226,9 @@ async def test_get_template_analysis_returns_pending_review_job() -> None:
         templates_service.template_repository,
         "get_template_analysis_job",
         AsyncMock(
-            return_value={
-                "id": uuid4(),
-                "status": "pending_review",
-                "reports_count": 1,
-                "structure": structure,
-                "error_message": None,
-            }
+            return_value=build_analysis_job_record(
+                status="pending_review", reports_count=1, structure=structure
+            )
         ),
     ):
         result = await templates_service.get_template_analysis(current_user, str(uuid4()))
@@ -261,14 +281,10 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             "get_company_template_context",
             AsyncMock(
                 return_value=(
-                    {"active_template_id": None, "active_structure": None},
-                    {
-                        "id": job_id,
-                        "status": "pending_review",
-                        "reports_count": 3,
-                        "structure": None,
-                        "error_message": None,
-                    },
+                    build_company_template_record(),
+                    build_analysis_job_record(
+                        job_id=job_id, status="pending_review", reports_count=3
+                    ),
                 )
             ),
         ),
@@ -320,7 +336,9 @@ async def test_confirm_template_without_pending_job_returns_active_template() ->
             "get_company_template_context",
             AsyncMock(
                 return_value=(
-                    {"active_template_id": uuid4(), "active_structure": None},
+                    build_company_template_record(
+                        active_template_id=uuid4(), active_structure=None
+                    ),
                     None,
                 )
             ),

@@ -1,16 +1,61 @@
 import json
-from uuid import uuid4
+from collections.abc import Mapping
+from datetime import datetime
+from typing import Any, cast
+from uuid import UUID, uuid4
 
 import asyncpg
 
 from src.db.connection import get_connection_url
+from src.models.templates.repository_records import (
+    CompanyTemplateRecord,
+    TemplateAnalysisJobRecord,
+)
 from src.models.templates.template import StoredTemplateStructure
-from src.models.templates.template_analysis import TemplateAnalysisFile, TemplateAnalysisJob
+from src.models.templates.template_analysis import (
+    TemplateAnalysisFile,
+    TemplateAnalysisJob,
+    TemplateAnalysisJobStatus,
+)
+
+
+def parse_structure(
+    structure: str | StoredTemplateStructure | None,
+) -> StoredTemplateStructure | None:
+    if structure is None:
+        return None
+
+    if isinstance(structure, str):
+        return cast(StoredTemplateStructure, json.loads(structure))
+
+    return structure
+
+
+def _company_template_record(row: Mapping[str, Any]) -> CompanyTemplateRecord:
+    return CompanyTemplateRecord(
+        active_template_id=cast(UUID | None, row["active_template_id"]),
+        active_structure=parse_structure(
+            cast(str | StoredTemplateStructure | None, row["active_structure"])
+        ),
+    )
+
+
+def _template_analysis_job_record(row: Mapping[str, Any]) -> TemplateAnalysisJobRecord:
+    return TemplateAnalysisJobRecord(
+        id=cast(UUID, row["id"]),
+        company_id=cast(UUID, row["company_id"]),
+        template_id=cast(UUID | None, row["template_id"]),
+        status=cast(TemplateAnalysisJobStatus, row["status"]),
+        reports_count=cast(int, row["reports_count"]),
+        structure=parse_structure(cast(str | StoredTemplateStructure | None, row["structure"])),
+        error_message=cast(str | None, row["error_message"]),
+        created_at=cast(datetime, row["created_at"]),
+    )
 
 
 async def get_company_template_context(
     company_id: str,
-) -> tuple[asyncpg.Record, asyncpg.Record | None]:
+) -> tuple[CompanyTemplateRecord, TemplateAnalysisJobRecord | None]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
@@ -46,14 +91,19 @@ async def get_company_template_context(
     finally:
         await connection.close()
 
-    return company_row, job_row
+    company = _company_template_record(company_row)
+    job = _template_analysis_job_record(job_row) if job_row is not None else None
+
+    return company, job
 
 
-async def get_template_analysis_job(job_id: str, company_id: str) -> asyncpg.Record | None:
+async def get_template_analysis_job(
+    job_id: str, company_id: str
+) -> TemplateAnalysisJobRecord | None:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
-        return await connection.fetchrow(
+        job_row = await connection.fetchrow(
             """
             SELECT
                 id,
@@ -73,6 +123,11 @@ async def get_template_analysis_job(job_id: str, company_id: str) -> asyncpg.Rec
         )
     finally:
         await connection.close()
+
+    if job_row is None:
+        return None
+
+    return _template_analysis_job_record(job_row)
 
 
 async def replace_template_analysis_job(

@@ -31,15 +31,15 @@ async def get_template_configuration(
 
     if job_row is not None:
         return build_template_configuration(
-            job_row["status"],
-            job_row["reports_count"],
-            job_row["structure"],
-            str(job_row["id"]),
-            job_row["error_message"],
+            job_row.status,
+            job_row.reports_count,
+            job_row.structure,
+            str(job_row.id),
+            job_row.error_message,
         )
 
-    if company_row["active_template_id"] is not None:
-        return build_template_configuration("active", 0, company_row["active_structure"])
+    if company_row.active_template_id is not None:
+        return build_template_configuration("active", 0, company_row.active_structure)
 
     return TemplateConfigurationNotConfigured(status="not_configured")
 
@@ -80,11 +80,11 @@ async def get_template_analysis(
         raise LookupError
 
     return build_template_configuration(
-        job_row["status"],
-        job_row["reports_count"],
-        job_row["structure"],
-        str(job_row["id"]),
-        job_row["error_message"],
+        job_row.status,
+        job_row.reports_count,
+        job_row.structure,
+        str(job_row.id),
+        job_row.error_message,
     )
 
 
@@ -102,13 +102,13 @@ async def confirm_template(
 
     if job_row is not None:
         await template_repository.update_template_analysis_job(
-            str(job_row["id"]),
+            str(job_row.id),
             "active",
             structure,
             template_id,
         )
 
-    reports_count = job_row["reports_count"] if job_row is not None else 0
+    reports_count = job_row.reports_count if job_row is not None else 0
 
     return TemplateConfigurationActive(
         status="active",

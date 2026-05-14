@@ -43,8 +43,11 @@ run:
 	fi
 	@cp -n .env.example .env 2>/dev/null || true
 	uv run alembic upgrade head
+	@worker_pid=""; \
+	trap 'if [ -n "$$worker_pid" ]; then kill "$$worker_pid" 2>/dev/null || true; fi' EXIT INT TERM; \
+	uv run python -m src.workers.template_analysis_worker & \
+	worker_pid=$$!; \
 	uv run uvicorn src.main:app --reload
-	uv run python -m src.workers.template_analysis_worker
 
 
 worker:
