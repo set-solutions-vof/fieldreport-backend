@@ -3,8 +3,10 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from src.db import template_repository
-from src.models.templates.repository_records import CompanyTemplateRecord, TemplateAnalysisJobRecord
-from src.models.templates.template_analysis import TemplateAnalysisFile
+from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
+from src.models.templates.pipeline import TemplateAnalysisFile
+from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
+from src.models.templates.state import TemplateCompanyState
 
 
 class FakeConnection:
@@ -18,8 +20,8 @@ class FakeConnection:
         self.close = AsyncMock()
 
 
-async def test_get_company_template_context_returns_company_and_latest_job() -> None:
-    company_row = {"active_template_id": uuid4(), "active_structure": '{"sections": []}'}
+async def test_fetch_company_template_context_returns_company_and_latest_job() -> None:
+    company_row = {"template_id": uuid4(), "structure": '{"sections": []}'}
     created_at = datetime.now(UTC)
     job_row = {
         "id": uuid4(),
@@ -28,8 +30,7 @@ async def test_get_company_template_context_returns_company_and_latest_job() -> 
         "status": "pending_review",
         "reports_count": 3,
         "structure": (
-            '{"sections": [{"id": "summary", "label": "Summary", '
-            '"order": 0, "render_type": "text_block"}]}'
+            '{"sections": [{"id": "summary", "label": "Summary", "type": "text_block"}]}'
         ),
         "error_message": None,
         "created_at": created_at,
@@ -40,13 +41,13 @@ async def test_get_company_template_context_returns_company_and_latest_job() -> 
         "src.db.template_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
-        result_company_row, result_job_row = await template_repository.get_company_template_context(
+        result_company_row, result_job_row = await template_repository.fetch_company_template_context(
             str(uuid4())
         )
 
     assert result_company_row == CompanyTemplateRecord(
-        active_template_id=company_row["active_template_id"],
-        active_structure={"sections": []},
+        template_id=company_row["template_id"],
+        structure=StoredTemplateStructure(sections=[]),
     )
     assert result_job_row == TemplateAnalysisJobRecord(
         id=job_row["id"],
@@ -54,11 +55,11 @@ async def test_get_company_template_context_returns_company_and_latest_job() -> 
         template_id=None,
         status="pending_review",
         reports_count=3,
-        structure={
-            "sections": [
-                {"id": "summary", "label": "Summary", "order": 0, "render_type": "text_block"}
+        structure=StoredTemplateStructure(
+            sections=[
+                TemplateSection(id="summary", label="Summary", type="text_block"),
             ]
-        },
+        ),
         error_message=None,
         created_at=created_at,
     )
@@ -141,7 +142,7 @@ async def test_get_template_analysis_job_returns_company_scoped_job() -> None:
         template_id=None,
         status="queued",
         reports_count=2,
-        structure={"sections": []},
+        structure=StoredTemplateStructure(sections=[]),
         error_message=None,
         created_at=created_at,
     )
@@ -162,8 +163,40 @@ async def test_get_template_analysis_job_returns_none_when_missing_job() -> None
     connection.close.assert_awaited_once()
 
 
-async def test_get_company_template_context_handles_pre_decoded_and_null_structure() -> None:
-    company_row = {"active_template_id": uuid4(), "active_structure": {"sections": []}}
+async def test_get_template_company_state_resolves_pending_review_job() -> None:
+    company_row = {"template_id": None, "structure": None}
+    job_row = {
+        "id": uuid4(),
+        "company_id": uuid4(),
+        "template_id": None,
+        "status": "pending_review",
+        "reports_count": 3,
+        "structure": (
+            '{"sections": [{"id": "summary", "label": "Summary", "type": "text_block"}]}'
+        ),
+        "error_message": None,
+        "created_at": datetime.now(UTC),
+    }
+    connection = FakeConnection(company_row, job_row)
+
+    with patch(
+        "src.db.template_repository.asyncpg.connect",
+        AsyncMock(return_value=connection),
+    ):
+        result = await template_repository.get_template_company_state(str(uuid4()))
+
+    assert result == TemplateCompanyState(
+        view_status="pending_review",
+        structure=StoredTemplateStructure(
+            sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        ),
+        job_id=job_row["id"],
+        reports_count=3,
+    )
+
+
+async def test_fetch_company_template_context_handles_pre_decoded_and_null_structure() -> None:
+    company_row = {"template_id": uuid4(), "structure": {"sections": []}}
     created_at = datetime.now(UTC)
     job_row = {
         "id": uuid4(),
@@ -181,13 +214,13 @@ async def test_get_company_template_context_handles_pre_decoded_and_null_structu
         "src.db.template_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
-        result_company_row, result_job_row = await template_repository.get_company_template_context(
+        result_company_row, result_job_row = await template_repository.fetch_company_template_context(
             str(uuid4())
         )
 
     assert result_company_row == CompanyTemplateRecord(
-        active_template_id=company_row["active_template_id"],
-        active_structure={"sections": []},
+        template_id=company_row["template_id"],
+        structure=StoredTemplateStructure(sections=[]),
     )
     assert result_job_row == TemplateAnalysisJobRecord(
         id=job_row["id"],
@@ -211,7 +244,7 @@ async def test_update_template_analysis_job_updates_status_structure_and_error_m
         await template_repository.update_template_analysis_job(
             str(uuid4()),
             "failed",
-            {"sections": []},
+            StoredTemplateStructure(sections=[]),
             error_message="model error",
         )
 
@@ -265,7 +298,9 @@ async def test_create_template_inserts_template_structure() -> None:
         "src.db.template_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
-        await template_repository.create_template(str(uuid4()), str(uuid4()), {"sections": []})
+        await template_repository.create_template(
+            str(uuid4()), str(uuid4()), StoredTemplateStructure(sections=[])
+        )
 
     assert "INSERT INTO templates" in connection.execute.await_args.args[0]
     connection.close.assert_awaited_once()

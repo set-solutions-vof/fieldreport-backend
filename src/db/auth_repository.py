@@ -1,30 +1,8 @@
 import asyncpg
 
+from src.db.auth_mapper import map_authenticated_user, map_current_user
 from src.db.connection import get_connection_url
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
-
-
-def map_authenticated_user(row: asyncpg.Record) -> AuthenticatedUser:
-    return AuthenticatedUser(
-        id=row["id"],
-        company_id=row["company_id"],
-        company_name=row["company_name"],
-        email=row["email"],
-        password_hash=row["password_hash"],
-        name=row["name"],
-        role=row["role"],
-    )
-
-
-def map_current_user(row: asyncpg.Record) -> CurrentUser:
-    return CurrentUser(
-        id=row["id"],
-        company_id=row["company_id"],
-        company_name=row["company_name"],
-        email=row["email"],
-        name=row["name"],
-        role=row["role"],
-    )
 
 
 async def get_user_by_email(email: str) -> AuthenticatedUser | None:

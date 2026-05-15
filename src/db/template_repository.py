@@ -1,59 +1,27 @@
-import json
-from collections.abc import Mapping
-from datetime import datetime
-from typing import Any, cast
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import asyncpg
 
 from src.db.connection import get_connection_url
-from src.models.templates.repository_records import (
-    CompanyTemplateRecord,
-    TemplateAnalysisJobRecord,
+from src.db.template_mapper import (
+    map_claimed_template_analysis_job,
+    map_company_template,
+    map_template_analysis_file,
+    map_template_analysis_job,
 )
-from src.models.templates.template import StoredTemplateStructure
-from src.models.templates.template_analysis import (
-    TemplateAnalysisFile,
-    TemplateAnalysisJob,
-    TemplateAnalysisJobStatus,
-)
+from src.models.templates.configuration import StoredTemplateStructure
+from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysisJob
+from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
+from src.models.templates.state import TemplateCompanyState, resolve_template_company_state
 
 
-def parse_structure(
-    structure: str | StoredTemplateStructure | None,
-) -> StoredTemplateStructure | None:
-    if structure is None:
-        return None
+async def get_template_company_state(company_id: str) -> TemplateCompanyState:
+    company, job = await fetch_company_template_context(company_id)
 
-    if isinstance(structure, str):
-        return cast(StoredTemplateStructure, json.loads(structure))
-
-    return structure
+    return resolve_template_company_state(company, job)
 
 
-def _company_template_record(row: Mapping[str, Any]) -> CompanyTemplateRecord:
-    return CompanyTemplateRecord(
-        active_template_id=cast(UUID | None, row["active_template_id"]),
-        active_structure=parse_structure(
-            cast(str | StoredTemplateStructure | None, row["active_structure"])
-        ),
-    )
-
-
-def _template_analysis_job_record(row: Mapping[str, Any]) -> TemplateAnalysisJobRecord:
-    return TemplateAnalysisJobRecord(
-        id=cast(UUID, row["id"]),
-        company_id=cast(UUID, row["company_id"]),
-        template_id=cast(UUID | None, row["template_id"]),
-        status=cast(TemplateAnalysisJobStatus, row["status"]),
-        reports_count=cast(int, row["reports_count"]),
-        structure=parse_structure(cast(str | StoredTemplateStructure | None, row["structure"])),
-        error_message=cast(str | None, row["error_message"]),
-        created_at=cast(datetime, row["created_at"]),
-    )
-
-
-async def get_company_template_context(
+async def fetch_company_template_context(
     company_id: str,
 ) -> tuple[CompanyTemplateRecord, TemplateAnalysisJobRecord | None]:
     connection = await asyncpg.connect(get_connection_url())
@@ -62,8 +30,8 @@ async def get_company_template_context(
         company_row = await connection.fetchrow(
             """
             SELECT
-                company.active_template_id,
-                templates.structure AS active_structure
+                company.active_template_id AS template_id,
+                templates.structure AS structure
             FROM company
             LEFT JOIN templates ON templates.id = company.active_template_id
             WHERE company.id = $1::uuid
@@ -91,8 +59,8 @@ async def get_company_template_context(
     finally:
         await connection.close()
 
-    company = _company_template_record(company_row)
-    job = _template_analysis_job_record(job_row) if job_row is not None else None
+    company = map_company_template(company_row)
+    job = map_template_analysis_job(job_row) if job_row is not None else None
 
     return company, job
 
@@ -127,7 +95,7 @@ async def get_template_analysis_job(
     if job_row is None:
         return None
 
-    return _template_analysis_job_record(job_row)
+    return map_template_analysis_job(job_row)
 
 
 async def replace_template_analysis_job(
@@ -234,7 +202,7 @@ async def update_template_analysis_job(
             """,
             job_id,
             status,
-            json.dumps(structure) if structure is not None else None,
+            structure.model_dump_json() if structure is not None else None,
             template_id,
             error_message,
         )
@@ -274,15 +242,7 @@ async def claim_next_template_analysis_job() -> TemplateAnalysisJob | None:
     if row is None:
         return None
 
-    return TemplateAnalysisJob(
-        id=str(row["id"]),
-        company_id=str(row["company_id"]),
-        status=row["status"],
-        reports_count=row["reports_count"],
-        structure=None,
-        template_id=str(row["template_id"]) if row["template_id"] is not None else None,
-        error_message=row["error_message"],
-    )
+    return map_claimed_template_analysis_job(row)
 
 
 async def get_template_analysis_job_files(job_id: str) -> list[TemplateAnalysisFile]:
@@ -301,10 +261,7 @@ async def get_template_analysis_job_files(job_id: str) -> list[TemplateAnalysisF
     finally:
         await connection.close()
 
-    return [
-        TemplateAnalysisFile(file_name=row["file_name"], storage_path=row["storage_path"])
-        for row in rows
-    ]
+    return [map_template_analysis_file(row) for row in rows]
 
 
 async def create_template(
@@ -336,7 +293,7 @@ async def create_template(
             """,
             template_id,
             company_id,
-            json.dumps(structure),
+            structure.model_dump_json(),
         )
     finally:
         await connection.close()

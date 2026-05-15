@@ -6,7 +6,7 @@ from openai.types.chat.completion_create_params import ResponseFormat
 
 from src.config import settings
 from src.llm.client_factory import create_azure_openai_client
-from src.models.templates.template_analysis import TemplateVisualAnalysis
+from src.models.templates.pipeline import TemplateVisualAnalysis
 from src.prompts.gpt4o_pdf_analysis import GPT4O_PDF_ANALYSIS_PROMPT
 
 

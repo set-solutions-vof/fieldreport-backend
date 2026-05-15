@@ -3,9 +3,9 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from src.db import template_repository
-from src.db.template_mapper import build_structure
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.template import (
+from src.models.templates.configuration import (
+    StoredTemplateStructure,
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
     TemplateConfigurationFailed,
@@ -13,6 +13,7 @@ from src.models.templates.template import (
     TemplateConfigurationPendingReview,
     TemplateSection,
 )
+from src.models.templates.state import resolve_template_job_state
 from src.services.template_configuration import build_template_configuration
 from src.storage import template_file_storage
 
@@ -26,22 +27,9 @@ async def get_template_configuration(
     | TemplateConfigurationActive
     | TemplateConfigurationFailed
 ):
-    company_id = str(user.company_id)
-    company_row, job_row = await template_repository.get_company_template_context(company_id)
+    state = await template_repository.get_template_company_state(str(user.company_id))
 
-    if job_row is not None:
-        return build_template_configuration(
-            job_row.status,
-            job_row.reports_count,
-            job_row.structure,
-            str(job_row.id),
-            job_row.error_message,
-        )
-
-    if company_row.active_template_id is not None:
-        return build_template_configuration("active", 0, company_row.active_structure)
-
-    return TemplateConfigurationNotConfigured(status="not_configured")
+    return build_template_configuration(state)
 
 
 async def start_template_analysis(
@@ -79,13 +67,7 @@ async def get_template_analysis(
     if job_row is None:
         raise LookupError
 
-    return build_template_configuration(
-        job_row.status,
-        job_row.reports_count,
-        job_row.structure,
-        str(job_row.id),
-        job_row.error_message,
-    )
+    return build_template_configuration(resolve_template_job_state(job_row))
 
 
 async def confirm_template(
@@ -93,22 +75,22 @@ async def confirm_template(
     sections: list[TemplateSection],
 ) -> TemplateConfigurationActive:
     company_id = str(user.company_id)
-    _, job_row = await template_repository.get_company_template_context(company_id)
-    structure = build_structure(sections)
+    state = await template_repository.get_template_company_state(company_id)
+    structure = StoredTemplateStructure(sections=sections)
     template_id = str(uuid4())
 
     await template_repository.create_template(company_id, template_id, structure)
     await template_repository.set_active_template(company_id, template_id)
 
-    if job_row is not None:
+    if state.job_id is not None:
         await template_repository.update_template_analysis_job(
-            str(job_row.id),
+            str(state.job_id),
             "active",
             structure,
             template_id,
         )
 
-    reports_count = job_row.reports_count if job_row is not None else 0
+    reports_count = state.reports_count if state.job_id is not None else 0
 
     return TemplateConfigurationActive(
         status="active",

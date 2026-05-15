@@ -3,9 +3,9 @@ import asyncio
 from loguru import logger
 
 from src.db import template_repository
-from src.db.template_mapper import build_structure
 from src.llm import deepseek_client, gpt4o_client
-from src.models.templates.template_analysis import TemplateAnalysisDocument, TemplateAnalysisJob
+from src.models.templates.configuration import StoredTemplateStructure
+from src.models.templates.pipeline import TemplateAnalysisDocument, TemplateAnalysisJob
 from src.pdf import extractor as pdf_extractor
 from src.storage import template_file_storage
 
@@ -28,7 +28,7 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
         sections = await deepseek_client.synthesize_template_sections(documents)
         logger.debug("DeepSeek synthesized {} section(s) for job {}", len(sections), job.id)
 
-        structure = build_structure(sections)
+        structure = StoredTemplateStructure(sections=sections)
 
         await template_repository.update_template_analysis_job(
             job.id,

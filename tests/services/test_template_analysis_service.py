@@ -1,8 +1,7 @@
 from unittest.mock import AsyncMock, patch
 
-from src.db.template_mapper import build_structure
-from src.models.templates.template import TemplateSection
-from src.models.templates.template_analysis import (
+from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
+from src.models.templates.pipeline import (
     TemplateAnalysisDocument,
     TemplateAnalysisFile,
     TemplateAnalysisJob,
@@ -100,7 +99,7 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
     update_job.assert_awaited_once_with(
         "job-1",
         "pending_review",
-        build_structure(sections),
+        StoredTemplateStructure(sections=sections),
     )
 
 

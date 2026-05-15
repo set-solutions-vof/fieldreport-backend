@@ -1,42 +1,52 @@
-import re
+import asyncpg
 
-from src.models.templates.template import (
-    StoredTemplateSection,
-    StoredTemplateStructure,
-    TemplateSection,
-)
+from src.models.templates.configuration import StoredTemplateStructure
+from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysisJob
+from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
-def build_structure(sections: list[TemplateSection]) -> StoredTemplateStructure:
-    return {"sections": [build_stored_section(s, i) for i, s in enumerate(sections)]}
+def parse_structure_column(value: object) -> StoredTemplateStructure | None:
+    if value is None:
+        return None
+
+    if isinstance(value, StoredTemplateStructure):
+        return value
+
+    if isinstance(value, str):
+        return StoredTemplateStructure.model_validate_json(value)
+
+    if isinstance(value, dict):
+        return StoredTemplateStructure.model_validate(value)
+
+    raise TypeError(f"Unsupported structure value: {type(value)!r}")
 
 
-def build_stored_section(section: TemplateSection, order: int) -> StoredTemplateSection:
-    return {
-        "id": section.id,
-        "key": build_section_key(section.label),
-        "label": section.label,
-        "order": order,
-        "render_type": section.type,
-        "fields": section.fields,
-    }
+def map_company_template(row: asyncpg.Record) -> CompanyTemplateRecord:
+    row_data = dict(row)
+    row_data["structure"] = parse_structure_column(row_data.get("structure"))
+
+    return CompanyTemplateRecord.model_validate(row_data)
 
 
-def build_section_key(label: str) -> str:
-    return re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
+def map_template_analysis_job(row: asyncpg.Record) -> TemplateAnalysisJobRecord:
+    row_data = dict(row)
+    row_data["structure"] = parse_structure_column(row_data.get("structure"))
+
+    return TemplateAnalysisJobRecord.model_validate(row_data)
 
 
-def map_sections(structure: StoredTemplateStructure | None) -> list[TemplateSection]:
-    if structure is None:
-        return []
+def map_claimed_template_analysis_job(row: asyncpg.Record) -> TemplateAnalysisJob:
+    job = map_template_analysis_job(row)
 
-    return [map_section(s) for s in sorted(structure["sections"], key=lambda s: s["order"])]
-
-
-def map_section(section: StoredTemplateSection) -> TemplateSection:
-    return TemplateSection(
-        id=section["id"],
-        label=section["label"],
-        type=section["render_type"],
-        fields=section.get("fields"),
+    return TemplateAnalysisJob(
+        id=str(job.id),
+        company_id=str(job.company_id),
+        status=job.status,
+        reports_count=job.reports_count,
+        template_id=str(job.template_id) if job.template_id is not None else None,
+        error_message=job.error_message,
     )
+
+
+def map_template_analysis_file(row: asyncpg.Record) -> TemplateAnalysisFile:
+    return TemplateAnalysisFile.model_validate(dict(row))

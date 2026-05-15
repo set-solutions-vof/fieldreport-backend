@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from src.models.templates.template import TemplateSection
+from src.models.templates.configuration import TemplateSection
 
 TemplateAnalysisJobStatus = Literal[
     "queued",

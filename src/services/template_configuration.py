@@ -1,48 +1,48 @@
-from src.db.template_mapper import map_sections
-from src.models.templates.template import (
-    StoredTemplateStructure,
+from src.models.templates.configuration import (
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
     TemplateConfigurationFailed,
+    TemplateConfigurationNotConfigured,
     TemplateConfigurationPendingReview,
 )
+from src.models.templates.state import TemplateCompanyState
 
 
 def build_template_configuration(
-    status: str,
-    reports_count: int,
-    structure: StoredTemplateStructure | None,
-    job_id: str | None = None,
-    error_message: str | None = None,
+    state: TemplateCompanyState,
 ) -> (
-    TemplateConfigurationExtracting
+    TemplateConfigurationNotConfigured
+    | TemplateConfigurationExtracting
     | TemplateConfigurationPendingReview
     | TemplateConfigurationActive
     | TemplateConfigurationFailed
 ):
-    if status in {"queued", "processing", "extracting"}:
+    if state.view_status == "not_configured":
+        return TemplateConfigurationNotConfigured(status="not_configured")
+
+    if state.view_status == "extracting":
         return TemplateConfigurationExtracting(
             status="extracting",
-            jobId=job_id or "",
-            reports_count=reports_count,
+            jobId=str(state.job_id) if state.job_id is not None else "",
+            reports_count=state.reports_count,
         )
 
-    if status == "pending_review":
+    if state.view_status == "pending_review":
         return TemplateConfigurationPendingReview(
             status="pending_review",
-            reports_count=reports_count,
-            sections=map_sections(structure),
+            reports_count=state.reports_count,
+            sections=state.structure.sections if state.structure else [],
         )
 
-    if status == "failed":
+    if state.view_status == "failed":
         return TemplateConfigurationFailed(
             status="failed",
-            reports_count=reports_count,
-            error_message=error_message or "Template analysis failed",
+            reports_count=state.reports_count,
+            error_message=state.error_message or "Template analysis failed",
         )
 
     return TemplateConfigurationActive(
         status="active",
-        reports_count=reports_count,
-        sections=map_sections(structure),
+        reports_count=state.reports_count,
+        sections=state.structure.sections if state.structure else [],
     )

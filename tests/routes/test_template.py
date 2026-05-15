@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 from src import main as main_module
 from src.main import app
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.template import (
+from src.models.templates.configuration import (
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
     TemplateConfigurationPendingReview,

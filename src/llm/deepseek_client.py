@@ -6,8 +6,8 @@ from openai.types.chat.completion_create_params import ResponseFormat
 
 from src.config import settings
 from src.llm.client_factory import create_openai_compatible_client
-from src.models.templates.template import TemplateSection
-from src.models.templates.template_analysis import (
+from src.models.templates.configuration import TemplateSection
+from src.models.templates.pipeline import (
     TemplateAnalysisDocument,
     TemplateSectionList,
 )

@@ -1,4 +1,4 @@
-from typing import Literal, NotRequired, TypedDict
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -8,7 +8,6 @@ TemplateSectionType = Literal[
     "measurement_table",
     "photo_grid",
 ]
-TemplateStatus = Literal["not_configured", "extracting", "pending_review", "active", "failed"]
 
 
 class TemplateSection(BaseModel):
@@ -46,14 +45,5 @@ class TemplateConfigurationFailed(BaseModel):
     error_message: str
 
 
-class StoredTemplateSection(TypedDict):
-    id: str
-    key: str
-    label: str
-    order: int
-    render_type: TemplateSectionType
-    fields: NotRequired[list[str] | None]
-
-
-class StoredTemplateStructure(TypedDict):
-    sections: list[StoredTemplateSection]
+class StoredTemplateStructure(BaseModel):
+    sections: list[TemplateSection]

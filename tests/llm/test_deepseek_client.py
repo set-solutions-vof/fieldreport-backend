@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from src.llm import deepseek_client
-from src.models.templates.template_analysis import TemplateAnalysisDocument
+from src.models.templates.pipeline import TemplateAnalysisDocument
 
 
 def build_documents() -> list[TemplateAnalysisDocument]:

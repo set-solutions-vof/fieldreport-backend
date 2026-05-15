@@ -4,7 +4,7 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from src.config import settings
-from src.models.templates.template_analysis import TemplateAnalysisFile
+from src.models.templates.pipeline import TemplateAnalysisFile
 
 
 def get_template_analysis_storage_directory() -> Path:

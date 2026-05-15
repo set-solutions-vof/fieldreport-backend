@@ -1,67 +1,75 @@
-from src.db.template_mapper import build_section_key, build_structure, map_sections
-from src.models.templates.template import TemplateSection
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
+
+from src.db.template_mapper import (
+    map_company_template,
+    map_template_analysis_job,
+    parse_structure_column,
+)
+from src.models.templates.configuration import StoredTemplateStructure
+from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
-def test_build_section_key_normalizes_label() -> None:
-    assert build_section_key("Project Gegevens!") == "project_gegevens"
+def test_parse_structure_column_parses_json_string() -> None:
+    structure = parse_structure_column('{"sections": []}')
+
+    assert structure == StoredTemplateStructure(sections=[])
 
 
-def test_build_structure_serializes_sections_in_order() -> None:
-    sections = [
-        TemplateSection(id="summary", label="Summary", type="text_block"),
-        TemplateSection(id="photos", label="Photos", type="photo_grid"),
-    ]
+def test_parse_structure_column_returns_existing_model() -> None:
+    structure = StoredTemplateStructure(sections=[])
 
-    result = build_structure(sections)
-
-    assert result == {
-        "sections": [
-            {
-                "id": "summary",
-                "key": "summary",
-                "label": "Summary",
-                "order": 0,
-                "render_type": "text_block",
-                "fields": None,
-            },
-            {
-                "id": "photos",
-                "key": "photos",
-                "label": "Photos",
-                "order": 1,
-                "render_type": "photo_grid",
-                "fields": None,
-            },
-        ]
-    }
+    assert parse_structure_column(structure) is structure
 
 
-def test_map_sections_returns_empty_list_for_missing_structure() -> None:
-    assert map_sections(None) == []
+def test_parse_structure_column_rejects_unsupported_value() -> None:
+    with pytest.raises(TypeError, match="Unsupported structure value"):
+        parse_structure_column(42)
 
 
-def test_map_sections_restores_ordered_sections() -> None:
-    structure = {
-        "sections": [
-            {
-                "id": "photos",
-                "key": "photos",
-                "label": "Photos",
-                "order": 1,
-                "render_type": "photo_grid",
-                "fields": None,
-            },
-            {
-                "id": "summary",
-                "key": "summary",
-                "label": "Summary",
-                "order": 0,
-                "render_type": "text_block",
-                "fields": None,
-            },
-        ]
-    }
+def test_map_company_template_parses_record() -> None:
+    template_id = uuid4()
 
-    result = map_sections(structure)
+    record = map_company_template(
+        {
+            "template_id": template_id,
+            "structure": '{"sections": []}',
+        }
+    )
 
-    assert [section.id for section in result] == ["summary", "photos"]
+    assert record == CompanyTemplateRecord(
+        template_id=template_id,
+        structure=StoredTemplateStructure(sections=[]),
+    )
+
+
+def test_map_template_analysis_job_parses_record() -> None:
+    job_id = uuid4()
+    company_id = uuid4()
+    created_at = datetime.now(UTC)
+
+    record = map_template_analysis_job(
+        {
+            "id": job_id,
+            "company_id": company_id,
+            "template_id": None,
+            "status": "queued",
+            "reports_count": 2,
+            "structure": None,
+            "error_message": None,
+            "created_at": created_at,
+        }
+    )
+
+    assert record == TemplateAnalysisJobRecord(
+        id=job_id,
+        company_id=company_id,
+        template_id=None,
+        status="queued",
+        reports_count=2,
+        structure=None,
+        error_message=None,
+        created_at=created_at,
+    )
