@@ -22,14 +22,20 @@ def build_template_company_state(
     reports_count: int = 0,
     error_message: str | None = None,
 ) -> TemplateCompanyState:
-    return TemplateCompanyState(
-        view_status=view_status,
-        structure=structure,
-        job_id=job_id,
-        template_id=template_id,
-        reports_count=reports_count,
-        error_message=error_message,
-    )
+    state_data = {
+        "view_status": view_status,
+        "job_id": job_id,
+        "template_id": template_id,
+        "reports_count": reports_count,
+    }
+
+    if structure is not None:
+        state_data["structure"] = structure
+
+    if error_message is not None:
+        state_data["error_message"] = error_message
+
+    return TemplateCompanyState.model_validate(state_data)
 
 
 def build_analysis_job_record(
@@ -43,16 +49,22 @@ def build_analysis_job_record(
     error_message: str | None = None,
     created_at: datetime | None = None,
 ) -> TemplateAnalysisJobRecord:
-    return TemplateAnalysisJobRecord(
-        id=job_id if job_id is not None else uuid4(),
-        company_id=company_id if company_id is not None else uuid4(),
-        template_id=template_id,
-        status=status if status is not None else "queued",
-        reports_count=reports_count if reports_count is not None else 0,
-        structure=structure,
-        error_message=error_message,
-        created_at=created_at if created_at is not None else datetime.now(UTC),
-    )
+    job_data = {
+        "id": job_id if job_id is not None else uuid4(),
+        "company_id": company_id if company_id is not None else uuid4(),
+        "template_id": template_id,
+        "status": status if status is not None else "queued",
+        "reports_count": reports_count if reports_count is not None else 0,
+        "created_at": created_at if created_at is not None else datetime.now(UTC),
+    }
+
+    if structure is not None:
+        job_data["structure"] = structure
+
+    if error_message is not None:
+        job_data["error_message"] = error_message
+
+    return TemplateAnalysisJobRecord.model_validate(job_data)
 
 
 def build_current_user() -> CurrentUser:

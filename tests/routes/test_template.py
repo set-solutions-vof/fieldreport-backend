@@ -85,7 +85,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
     assert response.json() == {
         "status": "active",
         "reports_count": 3,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+        "sections": [{"id": "summary", "label": "Summary", "type": "text_block", "fields": None}],
     }
 
 
@@ -282,7 +282,12 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
         "status": "active",
         "reports_count": 3,
         "sections": [
-            {"id": "summary", "label": "Executive Summary", "type": "text_block"},
+            {
+                "id": "summary",
+                "label": "Executive Summary",
+                "type": "text_block",
+                "fields": None,
+            },
             {
                 "id": "findings",
                 "label": "Findings",

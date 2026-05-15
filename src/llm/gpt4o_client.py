@@ -1,8 +1,11 @@
 import base64
-from typing import cast
 
 from openai import AsyncAzureOpenAI
 from openai.types.chat.completion_create_params import ResponseFormat
+from openai.types.shared_params.response_format_json_schema import (
+    JSONSchema,
+    ResponseFormatJSONSchema,
+)
 
 from src.config import settings
 from src.llm.client_factory import create_azure_openai_client
@@ -17,19 +20,16 @@ def get_gpt4o_client() -> AsyncAzureOpenAI:
 
 
 def build_visual_analysis_schema() -> ResponseFormat:
-    schema = TemplateVisualAnalysis.model_json_schema()
+    schema: dict[str, object] = TemplateVisualAnalysis.model_json_schema()
     schema["additionalProperties"] = False
 
-    return cast(
-        ResponseFormat,
-        {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "template_visual_analysis",
-                "schema": schema,
-                "strict": True,
-            },
-        },
+    return ResponseFormatJSONSchema(
+        type="json_schema",
+        json_schema=JSONSchema(
+            name="template_visual_analysis",
+            schema=schema,
+            strict=True,
+        ),
     )
 
 

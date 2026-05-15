@@ -69,7 +69,5 @@ def test_map_template_analysis_job_parses_record() -> None:
         template_id=None,
         status="queued",
         reports_count=2,
-        structure=None,
-        error_message=None,
         created_at=created_at,
     )

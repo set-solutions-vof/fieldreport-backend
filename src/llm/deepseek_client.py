@@ -1,8 +1,8 @@
 import json
-from typing import cast
 
 from openai import AsyncOpenAI
 from openai.types.chat.completion_create_params import ResponseFormat
+from openai.types.shared_params.response_format_json_object import ResponseFormatJSONObject
 
 from src.config import settings
 from src.llm.client_factory import create_openai_compatible_client
@@ -30,7 +30,7 @@ def build_template_analysis_prompt(documents: list[TemplateAnalysisDocument]) ->
 
 
 def build_template_sections_schema() -> ResponseFormat:
-    return cast(ResponseFormat, {"type": "json_object"})
+    return ResponseFormatJSONObject(type="json_object")
 
 
 async def synthesize_template_sections(

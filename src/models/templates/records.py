@@ -11,7 +11,7 @@ class CompanyTemplateRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     template_id: UUID | None
-    structure: StoredTemplateStructure | None = None
+    structure: StoredTemplateStructure = StoredTemplateStructure(sections=[])
 
 
 class TemplateAnalysisJobRecord(BaseModel):
@@ -22,6 +22,6 @@ class TemplateAnalysisJobRecord(BaseModel):
     template_id: UUID | None
     status: TemplateAnalysisJobStatus
     reports_count: int
-    structure: StoredTemplateStructure | None = None
-    error_message: str | None
+    structure: StoredTemplateStructure = StoredTemplateStructure(sections=[])
+    error_message: str = "Template analysis failed"
     created_at: datetime | None = None

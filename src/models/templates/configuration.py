@@ -47,3 +47,19 @@ class TemplateConfigurationFailed(BaseModel):
 
 class StoredTemplateStructure(BaseModel):
     sections: list[TemplateSection]
+
+
+TemplateConfiguration = (
+    TemplateConfigurationNotConfigured
+    | TemplateConfigurationExtracting
+    | TemplateConfigurationPendingReview
+    | TemplateConfigurationActive
+    | TemplateConfigurationFailed
+)
+
+TemplateAnalysisConfiguration = (
+    TemplateConfigurationExtracting
+    | TemplateConfigurationPendingReview
+    | TemplateConfigurationActive
+    | TemplateConfigurationFailed
+)

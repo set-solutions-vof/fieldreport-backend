@@ -3,8 +3,16 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from src.models.templates.configuration import StoredTemplateStructure
-from src.models.templates.pipeline import TemplateAnalysisJobStatus
+from src.models.templates.configuration import (
+    StoredTemplateStructure,
+    TemplateAnalysisConfiguration,
+    TemplateConfiguration,
+    TemplateConfigurationActive,
+    TemplateConfigurationExtracting,
+    TemplateConfigurationFailed,
+    TemplateConfigurationNotConfigured,
+    TemplateConfigurationPendingReview,
+)
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 TemplateViewStatus = Literal[
@@ -20,11 +28,11 @@ class TemplateCompanyState(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     view_status: TemplateViewStatus
-    structure: StoredTemplateStructure | None = None
+    structure: StoredTemplateStructure = StoredTemplateStructure(sections=[])
     job_id: UUID | None = None
     template_id: UUID | None = None
     reports_count: int = 0
-    error_message: str | None = None
+    error_message: str = "Template analysis failed"
 
 
 def resolve_template_company_state(
@@ -113,4 +121,69 @@ def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateCompan
         job_id=job.id,
         template_id=job.template_id,
         reports_count=job.reports_count,
+    )
+
+
+def build_template_configuration(state: TemplateCompanyState) -> TemplateConfiguration:
+    if state.view_status == "not_configured":
+        return TemplateConfigurationNotConfigured(status="not_configured")
+
+    if state.view_status == "extracting":
+        return TemplateConfigurationExtracting(
+            status="extracting",
+            jobId=str(state.job_id),
+            reports_count=state.reports_count,
+        )
+
+    if state.view_status == "pending_review":
+        return TemplateConfigurationPendingReview(
+            status="pending_review",
+            reports_count=state.reports_count,
+            sections=state.structure.sections,
+        )
+
+    if state.view_status == "failed":
+        return TemplateConfigurationFailed(
+            status="failed",
+            reports_count=state.reports_count,
+            error_message=state.error_message,
+        )
+
+    return TemplateConfigurationActive(
+        status="active",
+        reports_count=state.reports_count,
+        sections=state.structure.sections,
+    )
+
+
+def build_template_analysis_configuration(
+    job: TemplateAnalysisJobRecord,
+) -> TemplateAnalysisConfiguration:
+    state = resolve_template_job_state(job)
+
+    if state.view_status == "extracting":
+        return TemplateConfigurationExtracting(
+            status="extracting",
+            jobId=str(state.job_id),
+            reports_count=state.reports_count,
+        )
+
+    if state.view_status == "pending_review":
+        return TemplateConfigurationPendingReview(
+            status="pending_review",
+            reports_count=state.reports_count,
+            sections=state.structure.sections,
+        )
+
+    if state.view_status == "failed":
+        return TemplateConfigurationFailed(
+            status="failed",
+            reports_count=state.reports_count,
+            error_message=state.error_message,
+        )
+
+    return TemplateConfigurationActive(
+        status="active",
+        reports_count=state.reports_count,
+        sections=state.structure.sections,
     )

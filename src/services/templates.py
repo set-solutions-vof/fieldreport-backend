@@ -6,27 +6,20 @@ from src.db import template_repository
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
     StoredTemplateStructure,
+    TemplateAnalysisConfiguration,
+    TemplateConfiguration,
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
-    TemplateConfigurationFailed,
-    TemplateConfigurationNotConfigured,
-    TemplateConfigurationPendingReview,
     TemplateSection,
 )
-from src.models.templates.state import resolve_template_job_state
-from src.services.template_configuration import build_template_configuration
+from src.models.templates.state import (
+    build_template_analysis_configuration,
+    build_template_configuration,
+)
 from src.storage import template_file_storage
 
 
-async def get_template_configuration(
-    user: CurrentUser,
-) -> (
-    TemplateConfigurationNotConfigured
-    | TemplateConfigurationExtracting
-    | TemplateConfigurationPendingReview
-    | TemplateConfigurationActive
-    | TemplateConfigurationFailed
-):
+async def get_template_configuration(user: CurrentUser) -> TemplateConfiguration:
     state = await template_repository.get_template_company_state(str(user.company_id))
 
     return build_template_configuration(state)
@@ -56,18 +49,13 @@ async def start_template_analysis(
 async def get_template_analysis(
     user: CurrentUser,
     job_id: str,
-) -> (
-    TemplateConfigurationExtracting
-    | TemplateConfigurationPendingReview
-    | TemplateConfigurationActive
-    | TemplateConfigurationFailed
-):
+) -> TemplateAnalysisConfiguration:
     job_row = await template_repository.get_template_analysis_job(job_id, str(user.company_id))
 
     if job_row is None:
         raise LookupError
 
-    return build_template_configuration(resolve_template_job_state(job_row))
+    return build_template_analysis_configuration(job_row)
 
 
 async def confirm_template(

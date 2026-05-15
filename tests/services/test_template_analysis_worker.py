@@ -37,9 +37,12 @@ async def test_run_template_analysis_worker_sleeps_when_no_job_is_available() ->
 
 
 def test_main_runs_worker_with_cli_arguments() -> None:
+    def close_coroutine(coroutine):
+        coroutine.close()
+
     with (
         patch.object(template_analysis_worker.argparse.ArgumentParser, "parse_args") as parse_args,
-        patch.object(template_analysis_worker.asyncio, "run") as run,
+        patch.object(template_analysis_worker.asyncio, "run", side_effect=close_coroutine) as run,
     ):
         parse_args.return_value = SimpleNamespace(once=True)
         template_analysis_worker.main()
@@ -50,11 +53,14 @@ def test_main_runs_worker_with_cli_arguments() -> None:
 def test_module_main_branch_executes_worker_entrypoint() -> None:
     import runpy
 
+    def close_coroutine(coroutine):
+        coroutine.close()
+
     with (
         patch.object(template_analysis_worker.argparse.ArgumentParser, "parse_args") as parse_args,
-        patch("asyncio.run") as run,
+        patch("asyncio.run", side_effect=close_coroutine) as run,
     ):
         parse_args.return_value = SimpleNamespace(once=True)
-        runpy.run_module("src.workers.template_analysis_worker", run_name="__main__")
+        runpy.run_path(template_analysis_worker.__file__, run_name="__main__")
 
     run.assert_called_once()

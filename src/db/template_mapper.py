@@ -23,14 +23,25 @@ def parse_structure_column(value: object) -> StoredTemplateStructure | None:
 
 def map_company_template(row: asyncpg.Record) -> CompanyTemplateRecord:
     row_data = dict(row)
-    row_data["structure"] = parse_structure_column(row_data.get("structure"))
+    structure = parse_structure_column(row_data.get("structure"))
+    if structure is not None:
+        row_data["structure"] = structure
+    else:
+        row_data.pop("structure")
 
     return CompanyTemplateRecord.model_validate(row_data)
 
 
 def map_template_analysis_job(row: asyncpg.Record) -> TemplateAnalysisJobRecord:
     row_data = dict(row)
-    row_data["structure"] = parse_structure_column(row_data.get("structure"))
+    structure = parse_structure_column(row_data.get("structure"))
+    if structure is not None:
+        row_data["structure"] = structure
+    else:
+        row_data.pop("structure")
+
+    if row_data["error_message"] is None:
+        row_data.pop("error_message")
 
     return TemplateAnalysisJobRecord.model_validate(row_data)
 

@@ -41,9 +41,10 @@ async def test_fetch_company_template_context_returns_company_and_latest_job() -
         "src.db.template_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
-        result_company_row, result_job_row = await template_repository.fetch_company_template_context(
-            str(uuid4())
-        )
+        (
+            result_company_row,
+            result_job_row,
+        ) = await template_repository.fetch_company_template_context(str(uuid4()))
 
     assert result_company_row == CompanyTemplateRecord(
         template_id=company_row["template_id"],
@@ -60,7 +61,6 @@ async def test_fetch_company_template_context_returns_company_and_latest_job() -
                 TemplateSection(id="summary", label="Summary", type="text_block"),
             ]
         ),
-        error_message=None,
         created_at=created_at,
     )
     assert connection.fetchrow.await_count == 2
@@ -143,7 +143,6 @@ async def test_get_template_analysis_job_returns_company_scoped_job() -> None:
         status="queued",
         reports_count=2,
         structure=StoredTemplateStructure(sections=[]),
-        error_message=None,
         created_at=created_at,
     )
     connection.close.assert_awaited_once()
@@ -214,9 +213,10 @@ async def test_fetch_company_template_context_handles_pre_decoded_and_null_struc
         "src.db.template_repository.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
-        result_company_row, result_job_row = await template_repository.fetch_company_template_context(
-            str(uuid4())
-        )
+        (
+            result_company_row,
+            result_job_row,
+        ) = await template_repository.fetch_company_template_context(str(uuid4()))
 
     assert result_company_row == CompanyTemplateRecord(
         template_id=company_row["template_id"],
@@ -228,8 +228,6 @@ async def test_fetch_company_template_context_handles_pre_decoded_and_null_struc
         template_id=None,
         status="pending_review",
         reports_count=2,
-        structure=None,
-        error_message=None,
         created_at=created_at,
     )
 

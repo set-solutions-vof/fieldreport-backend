@@ -2,12 +2,18 @@ from uuid import uuid4
 
 from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
-from src.models.templates.state import resolve_template_company_state, resolve_template_job_state
+from src.models.templates.state import (
+    TemplateCompanyState,
+    build_template_analysis_configuration,
+    build_template_configuration,
+    resolve_template_company_state,
+    resolve_template_job_state,
+)
 
 
 def build_company(
     template_id=None,
-    structure: StoredTemplateStructure | None = None,
+    structure: StoredTemplateStructure = StoredTemplateStructure(sections=[]),
 ) -> CompanyTemplateRecord:
     return CompanyTemplateRecord(
         template_id=template_id,
@@ -18,8 +24,8 @@ def build_company(
 def build_job(
     *,
     status: str,
-    structure: StoredTemplateStructure | None = None,
-    error_message: str | None = None,
+    structure: StoredTemplateStructure = StoredTemplateStructure(sections=[]),
+    error_message: str = "Template analysis failed",
     reports_count: int = 1,
     template_id=None,
 ) -> TemplateAnalysisJobRecord:
@@ -99,9 +105,7 @@ def test_resolve_template_company_state_returns_active_from_active_job() -> None
     assert state.reports_count == 4
 
 
-def test_resolve_template_company_state_returns_failed_when_job_failed_without_active_template() -> (
-    None
-):
+def test_resolve_template_company_state_returns_failed_without_active_template() -> None:
     job = build_job(status="failed", error_message="model error", reports_count=2)
 
     state = resolve_template_company_state(build_company(), job)
@@ -152,3 +156,130 @@ def test_resolve_template_job_state_returns_active_from_job_structure() -> None:
     assert state.view_status == "active"
     assert state.structure == structure
     assert state.template_id == template_id
+
+
+def test_build_template_configuration_maps_not_configured_status() -> None:
+    result = build_template_configuration(TemplateCompanyState(view_status="not_configured"))
+
+    assert result.model_dump() == {"status": "not_configured"}
+
+
+def test_build_template_configuration_maps_pending_review_status() -> None:
+    structure = StoredTemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+    )
+    state = TemplateCompanyState(
+        view_status="pending_review",
+        structure=structure,
+        reports_count=2,
+    )
+
+    result = build_template_configuration(state)
+
+    assert result.model_dump(exclude_none=True) == {
+        "status": "pending_review",
+        "reports_count": 2,
+        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+    }
+
+
+def test_build_template_configuration_maps_failed_status() -> None:
+    state = TemplateCompanyState(
+        view_status="failed",
+        reports_count=1,
+        error_message="bad response",
+    )
+
+    result = build_template_configuration(state)
+
+    assert result.model_dump() == {
+        "status": "failed",
+        "reports_count": 1,
+        "error_message": "bad response",
+    }
+
+
+def test_build_template_configuration_maps_extracting_status() -> None:
+    job_id = uuid4()
+    state = TemplateCompanyState(
+        view_status="extracting",
+        job_id=job_id,
+        reports_count=4,
+    )
+
+    result = build_template_configuration(state)
+
+    assert result.model_dump() == {
+        "status": "extracting",
+        "jobId": str(job_id),
+        "reports_count": 4,
+    }
+
+
+def test_build_template_configuration_maps_active_status() -> None:
+    structure = StoredTemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+    )
+    state = TemplateCompanyState(view_status="active", structure=structure)
+
+    result = build_template_configuration(state)
+
+    assert result.model_dump(exclude_none=True) == {
+        "status": "active",
+        "reports_count": 0,
+        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+    }
+
+
+def test_build_template_analysis_configuration_maps_active_job() -> None:
+    structure = StoredTemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+    )
+    job = build_job(status="active", structure=structure, template_id=uuid4(), reports_count=5)
+
+    result = build_template_analysis_configuration(job)
+
+    assert result.model_dump(exclude_none=True) == {
+        "status": "active",
+        "reports_count": 5,
+        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+    }
+
+
+def test_build_template_analysis_configuration_maps_extracting_job() -> None:
+    job = build_job(status="queued", reports_count=3)
+
+    result = build_template_analysis_configuration(job)
+
+    assert result.model_dump() == {
+        "status": "extracting",
+        "jobId": str(job.id),
+        "reports_count": 3,
+    }
+
+
+def test_build_template_analysis_configuration_maps_pending_review_job() -> None:
+    structure = StoredTemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+    )
+    job = build_job(status="pending_review", structure=structure, reports_count=2)
+
+    result = build_template_analysis_configuration(job)
+
+    assert result.model_dump(exclude_none=True) == {
+        "status": "pending_review",
+        "reports_count": 2,
+        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+    }
+
+
+def test_build_template_analysis_configuration_maps_failed_job() -> None:
+    job = build_job(status="failed", error_message="model error", reports_count=1)
+
+    result = build_template_analysis_configuration(job)
+
+    assert result.model_dump() == {
+        "status": "failed",
+        "reports_count": 1,
+        "error_message": "model error",
+    }

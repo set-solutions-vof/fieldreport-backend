@@ -212,7 +212,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
             "status": "draft",
             "client_name": "ACME",
             "address": "Main Street 1",
-            "inspection_date": "2026-05-08T12:30:00+00:00",
+            "inspection_date": "2026-05-08T12:30:00Z",
             "inspector_name": "Jeroen van Dijk",
         }
     ]
@@ -278,9 +278,9 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         "status": "draft",
         "client_name": "ACME",
         "address": "Main Street 1",
-        "inspection_date": "2026-05-08T12:30:00+00:00",
+        "inspection_date": "2026-05-08T12:30:00Z",
         "inspector_name": "Jeroen van Dijk",
-        "updated_at": "2026-05-09T08:15:00+00:00",
+        "updated_at": "2026-05-09T08:15:00Z",
         "sections": [
             {
                 "id": str(fake_report.sections[0].id),
@@ -301,7 +301,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 "timeline_offset_seconds": 15.0,
                 "start_seconds": None,
                 "end_seconds": None,
-                "captured_at": "2026-05-08T12:45:00+00:00",
+                "captured_at": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
             }
         ],
@@ -363,7 +363,7 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
                 "type": "image",
                 "timestamp_start": None,
                 "timestamp_end": None,
-                "capture_time": "2026-05-08T12:45:00+00:00",
+                "capture_time": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
             }
         ],
