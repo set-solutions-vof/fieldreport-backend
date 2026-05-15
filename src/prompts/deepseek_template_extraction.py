@@ -7,13 +7,13 @@ Example json output:
     {
       "id": "project_details",
       "label": "Projectgegevens",
-      "type": "key_value_table",
+      "render_type": "key_value_table",
       "fields": ["DATUM RAPPORTAGE", "NAAM ONDERZOEKER"]
     },
     {
       "id": "conclusion",
       "label": "Conclusie",
-      "type": "text_block"
+      "render_type": "text_block"
     }
   ]
 }
@@ -22,8 +22,8 @@ Example json output:
 DEEPSEEK_TEMPLATE_EXTRACTION_PROMPT = """
 You analyze field report template documents.
 Return a json object with a top-level "sections" array.
-Each section must include "id", "label", "type", and optional "fields".
-Allowed type values are "text_block", "key_value_table", "measurement_table", and "photo_grid".
+Each section must include "id", "label", "render_type", and optional "fields".
+Allowed render_type values are "text_block", "key_value_table", "measurement_table", and "photo_grid".
 Use snake_case ids.
 Infer the canonical report sections from the combined text and visual analysis.
 

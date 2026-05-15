@@ -1,29 +1,16 @@
 import asyncpg
 
-from src.models.templates.configuration import StoredTemplateStructure
+from src.models.templates.configuration import (
+    StoredTemplateStructure,
+    parse_stored_template_structure,
+)
 from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysisJob
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
-def parse_structure_column(value: object) -> StoredTemplateStructure | None:
-    if value is None:
-        return None
-
-    if isinstance(value, StoredTemplateStructure):
-        return value
-
-    if isinstance(value, str):
-        return StoredTemplateStructure.model_validate_json(value)
-
-    if isinstance(value, dict):
-        return StoredTemplateStructure.model_validate(value)
-
-    raise TypeError(f"Unsupported structure value: {type(value)!r}")
-
-
 def map_company_template(row: asyncpg.Record) -> CompanyTemplateRecord:
     row_data = dict(row)
-    structure = parse_structure_column(row_data.get("structure"))
+    structure = parse_stored_template_structure(row_data.get("structure"))
     if structure is not None:
         row_data["structure"] = structure
     else:
@@ -34,7 +21,7 @@ def map_company_template(row: asyncpg.Record) -> CompanyTemplateRecord:
 
 def map_template_analysis_job(row: asyncpg.Record) -> TemplateAnalysisJobRecord:
     row_data = dict(row)
-    structure = parse_structure_column(row_data.get("structure"))
+    structure = parse_stored_template_structure(row_data.get("structure"))
     if structure is not None:
         row_data["structure"] = structure
     else:

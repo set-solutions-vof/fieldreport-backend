@@ -59,7 +59,7 @@ def test_resolve_template_company_state_maps_queued_job_to_extracting() -> None:
 
 def test_resolve_template_company_state_returns_active_template_when_no_job() -> None:
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     template_id = uuid4()
 
@@ -73,7 +73,7 @@ def test_resolve_template_company_state_returns_active_template_when_no_job() ->
 def test_resolve_template_company_state_prefers_active_template_over_failed_job() -> None:
     template_id = uuid4()
     active_structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     job = build_job(status="failed", error_message="model error")
 
@@ -86,12 +86,12 @@ def test_resolve_template_company_state_prefers_active_template_over_failed_job(
 def test_resolve_template_company_state_returns_active_from_active_job() -> None:
     template_id = uuid4()
     active_structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     job = build_job(
         status="active",
         structure=StoredTemplateStructure(
-            sections=[TemplateSection(id="draft", label="Draft", type="text_block")]
+            sections=[TemplateSection(id="draft", label="Draft", render_type="text_block")]
         ),
         template_id=template_id,
         reports_count=4,
@@ -124,7 +124,7 @@ def test_resolve_template_job_state_returns_extracting() -> None:
 
 def test_resolve_template_job_state_returns_pending_review() -> None:
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     job = build_job(status="pending_review", structure=structure)
 
@@ -146,7 +146,7 @@ def test_resolve_template_job_state_returns_failed() -> None:
 
 def test_resolve_template_job_state_returns_active_from_job_structure() -> None:
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     template_id = uuid4()
     job = build_job(status="active", structure=structure, template_id=template_id, reports_count=5)
@@ -166,7 +166,7 @@ def test_build_template_configuration_maps_not_configured_status() -> None:
 
 def test_build_template_configuration_maps_pending_review_status() -> None:
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     state = TemplateCompanyState(
         view_status="pending_review",
@@ -179,7 +179,7 @@ def test_build_template_configuration_maps_pending_review_status() -> None:
     assert result.model_dump(exclude_none=True) == {
         "status": "pending_review",
         "reports_count": 2,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
 
 
@@ -218,7 +218,7 @@ def test_build_template_configuration_maps_extracting_status() -> None:
 
 def test_build_template_configuration_maps_active_status() -> None:
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     state = TemplateCompanyState(view_status="active", structure=structure)
 
@@ -227,13 +227,13 @@ def test_build_template_configuration_maps_active_status() -> None:
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "reports_count": 0,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
 
 
 def test_build_template_analysis_configuration_maps_active_job() -> None:
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     job = build_job(status="active", structure=structure, template_id=uuid4(), reports_count=5)
 
@@ -242,7 +242,7 @@ def test_build_template_analysis_configuration_maps_active_job() -> None:
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "reports_count": 5,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
 
 
@@ -260,7 +260,7 @@ def test_build_template_analysis_configuration_maps_extracting_job() -> None:
 
 def test_build_template_analysis_configuration_maps_pending_review_job() -> None:
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     job = build_job(status="pending_review", structure=structure, reports_count=2)
 
@@ -269,7 +269,7 @@ def test_build_template_analysis_configuration_maps_pending_review_job() -> None
     assert result.model_dump(exclude_none=True) == {
         "status": "pending_review",
         "reports_count": 2,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
 
 

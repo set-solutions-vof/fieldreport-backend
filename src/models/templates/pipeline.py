@@ -35,6 +35,10 @@ class TemplateAnalysisDocument(BaseModel):
     visual_summary: str
 
 
+class TemplateAnalysisDocumentList(BaseModel):
+    documents: list[TemplateAnalysisDocument]
+
+
 class TemplateVisualAnalysis(BaseModel):
     document_type: str
     visual_summary: str

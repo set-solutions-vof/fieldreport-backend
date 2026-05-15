@@ -1,7 +1,4 @@
-import json
-
 from openai import AsyncOpenAI
-from openai.types.chat.completion_create_params import ResponseFormat
 from openai.types.shared_params.response_format_json_object import ResponseFormatJSONObject
 
 from src.config import settings
@@ -9,6 +6,7 @@ from src.llm.client_factory import create_openai_compatible_client
 from src.models.templates.configuration import TemplateSection
 from src.models.templates.pipeline import (
     TemplateAnalysisDocument,
+    TemplateAnalysisDocumentList,
     TemplateSectionList,
 )
 from src.prompts.deepseek_template_extraction import (
@@ -22,15 +20,11 @@ def get_deepseek_client() -> AsyncOpenAI:
 
 
 def build_template_analysis_prompt(documents: list[TemplateAnalysisDocument]) -> str:
-    documents_json = json.dumps(
-        [document.model_dump() for document in documents], ensure_ascii=True
+    documents_json = TemplateAnalysisDocumentList(documents=documents).model_dump_json(
+        ensure_ascii=True
     )
 
     return DEEPSEEK_TEMPLATE_EXTRACTION_PROMPT.format(documents_json=documents_json)
-
-
-def build_template_sections_schema() -> ResponseFormat:
-    return ResponseFormatJSONObject(type="json_object")
 
 
 async def synthesize_template_sections(
@@ -49,7 +43,7 @@ async def synthesize_template_sections(
                 "content": build_template_analysis_prompt(documents),
             },
         ],
-        response_format=build_template_sections_schema(),
+        response_format=ResponseFormatJSONObject(type="json_object"),
     )
     content = response.choices[0].message.content or ""
     payload = TemplateSectionList.model_validate_json(content)

@@ -30,7 +30,7 @@ async def test_fetch_company_template_context_returns_company_and_latest_job() -
         "status": "pending_review",
         "reports_count": 3,
         "structure": (
-            '{"sections": [{"id": "summary", "label": "Summary", "type": "text_block"}]}'
+            '{"sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}]}'
         ),
         "error_message": None,
         "created_at": created_at,
@@ -58,7 +58,7 @@ async def test_fetch_company_template_context_returns_company_and_latest_job() -
         reports_count=3,
         structure=StoredTemplateStructure(
             sections=[
-                TemplateSection(id="summary", label="Summary", type="text_block"),
+                TemplateSection(id="summary", label="Summary", render_type="text_block"),
             ]
         ),
         created_at=created_at,
@@ -171,7 +171,7 @@ async def test_get_template_company_state_resolves_pending_review_job() -> None:
         "status": "pending_review",
         "reports_count": 3,
         "structure": (
-            '{"sections": [{"id": "summary", "label": "Summary", "type": "text_block"}]}'
+            '{"sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}]}'
         ),
         "error_message": None,
         "created_at": datetime.now(UTC),
@@ -187,7 +187,7 @@ async def test_get_template_company_state_resolves_pending_review_job() -> None:
     assert result == TemplateCompanyState(
         view_status="pending_review",
         structure=StoredTemplateStructure(
-            sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+            sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
         ),
         job_id=job_row["id"],
         reports_count=3,

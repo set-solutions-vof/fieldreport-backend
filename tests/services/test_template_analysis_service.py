@@ -58,7 +58,7 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
         reports_count=1,
     )
     files = [TemplateAnalysisFile(file_name="report.pdf", storage_path="/tmp/report.pdf")]
-    sections = [TemplateSection(id="summary", label="Summary", type="text_block")]
+    sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
 
     with (
         patch.object(

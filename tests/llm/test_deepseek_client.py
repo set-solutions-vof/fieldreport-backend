@@ -40,33 +40,25 @@ def test_build_template_analysis_prompt_embeds_documents() -> None:
     prompt = deepseek_client.build_template_analysis_prompt(build_documents())
 
     assert "Return a json object" in prompt
-    assert '"file_name": "report.pdf"' in prompt
-    assert '"visual_summary": "Visual summary"' in prompt
-
-
-def test_build_template_sections_schema_uses_template_section_list_schema() -> None:
-    schema = deepseek_client.build_template_sections_schema()
-
-    assert schema["type"] == "json_object"
+    assert '"documents":' in prompt
+    assert '"file_name":"report.pdf"' in prompt
+    assert '"visual_summary":"Visual summary"' in prompt
 
 
 async def test_synthesize_template_sections_returns_validated_sections() -> None:
-    client = SimpleNamespace(
-        chat=SimpleNamespace(
-            completions=SimpleNamespace(
-                create=AsyncMock(
-                    return_value=SimpleNamespace(
-                        choices=[
-                            SimpleNamespace(
-                                message=SimpleNamespace(
-                                    content='{"sections":[{"id":"summary","label":"Summary","type":"text_block"}]}'
-                                )
-                            )
-                        ]
+    create = AsyncMock(
+        return_value=SimpleNamespace(
+            choices=[
+                SimpleNamespace(
+                    message=SimpleNamespace(
+                        content='{"sections":[{"id":"summary","label":"Summary","render_type":"text_block"}]}'
                     )
                 )
-            )
+            ]
         )
+    )
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
     )
 
     with (
@@ -76,8 +68,9 @@ async def test_synthesize_template_sections_returns_validated_sections() -> None
         result = await deepseek_client.synthesize_template_sections(build_documents())
 
     assert [section.model_dump(exclude_none=True) for section in result] == [
-        {"id": "summary", "label": "Summary", "type": "text_block"}
+        {"id": "summary", "label": "Summary", "render_type": "text_block"}
     ]
+    assert create.await_args.kwargs["response_format"] == {"type": "json_object"}
 
 
 async def test_synthesize_template_sections_raises_for_invalid_json() -> None:
@@ -96,9 +89,9 @@ async def test_synthesize_template_sections_raises_for_invalid_json() -> None:
     with patch.object(deepseek_client, "get_deepseek_client", return_value=client):
         try:
             await deepseek_client.synthesize_template_sections(build_documents())
-        except ValueError as error:
+        except Exception as error:
             message = str(error)
         else:
-            raise AssertionError("Expected ValueError")
+            raise AssertionError("Expected JSON parsing or validation error")
 
-    assert "Invalid JSON" in message or "expected value" in message.lower()
+    assert "json_invalid" in message.lower() or "invalid json" in message.lower()

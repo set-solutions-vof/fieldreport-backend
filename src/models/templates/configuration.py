@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-TemplateSectionType = Literal[
+TemplateSectionRenderType = Literal[
     "text_block",
     "key_value_table",
     "measurement_table",
@@ -13,7 +13,7 @@ TemplateSectionType = Literal[
 class TemplateSection(BaseModel):
     id: str
     label: str
-    type: TemplateSectionType
+    render_type: TemplateSectionRenderType
     fields: list[str] | None = None
 
 
@@ -47,6 +47,22 @@ class TemplateConfigurationFailed(BaseModel):
 
 class StoredTemplateStructure(BaseModel):
     sections: list[TemplateSection]
+
+
+def parse_stored_template_structure(value: object) -> StoredTemplateStructure | None:
+    if value is None:
+        return None
+
+    if isinstance(value, StoredTemplateStructure):
+        return value
+
+    if isinstance(value, str):
+        return StoredTemplateStructure.model_validate_json(value)
+
+    if isinstance(value, dict):
+        return StoredTemplateStructure.model_validate(value)
+
+    raise TypeError(f"Unsupported structure value: {type(value)!r}")
 
 
 TemplateConfiguration = (

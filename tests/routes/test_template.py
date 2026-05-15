@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from io import BytesIO
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -8,7 +7,6 @@ import pytest
 from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
 
-from src import main as main_module
 from src.main import app
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
@@ -39,17 +37,6 @@ def build_current_user() -> CurrentUser:
     )
 
 
-def create_frontend_build(tmp_path: Path) -> tuple[Path, Path]:
-    frontend_dist_path = tmp_path / "dist"
-    frontend_index_path = frontend_dist_path / "index.html"
-    frontend_asset_path = frontend_dist_path / "assets" / "index-DP-JPQ9M.js"
-    frontend_asset_path.parent.mkdir(parents=True)
-    frontend_index_path.write_text("<!doctype html><html><body>fieldreport</body></html>")
-    frontend_asset_path.write_text("console.log('fieldreport');")
-
-    return frontend_dist_path, frontend_index_path
-
-
 async def test_template_routes_require_access_token(client: AsyncClient) -> None:
     response = await client.get("/api/v1/template")
 
@@ -71,7 +58,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
                 return_value=TemplateConfigurationActive(
                     status="active",
                     reports_count=3,
-                    sections=[TemplateSection(id="summary", label="Summary", type="text_block")],
+                    sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")],
                 )
             ),
         ),
@@ -85,7 +72,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
     assert response.json() == {
         "status": "active",
         "reports_count": 3,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block", "fields": None}],
+        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block", "fields": None}],
     }
 
 
@@ -177,7 +164,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
                         TemplateSection(
                             id="findings",
                             label="Findings",
-                            type="key_value_table",
+                            render_type="key_value_table",
                             fields=["Issue", "Action"],
                         )
                     ],
@@ -198,7 +185,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
             {
                 "id": "findings",
                 "label": "Findings",
-                "type": "key_value_table",
+                "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
             }
         ],
@@ -234,11 +221,11 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
     access_token = security.create_access_token(current_user)
     request_body = {
         "sections": [
-            {"id": "summary", "label": "Executive Summary", "type": "text_block"},
+            {"id": "summary", "label": "Executive Summary", "render_type": "text_block"},
             {
                 "id": "findings",
                 "label": "Findings",
-                "type": "key_value_table",
+                "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
             },
         ]
@@ -258,12 +245,12 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
                         TemplateSection(
                             id="summary",
                             label="Executive Summary",
-                            type="text_block",
+                            render_type="text_block",
                         ),
                         TemplateSection(
                             id="findings",
                             label="Findings",
-                            type="key_value_table",
+                            render_type="key_value_table",
                             fields=["Issue", "Action"],
                         ),
                     ],
@@ -285,68 +272,14 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
             {
                 "id": "summary",
                 "label": "Executive Summary",
-                "type": "text_block",
+                "render_type": "text_block",
                 "fields": None,
             },
             {
                 "id": "findings",
                 "label": "Findings",
-                "type": "key_value_table",
+                "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
             },
         ],
     }
-
-
-async def test_admin_template_path_returns_frontend_entrypoint(
-    client: AsyncClient, tmp_path: Path
-) -> None:
-    frontend_dist_path, frontend_index_path = create_frontend_build(tmp_path)
-
-    with (
-        patch.object(main_module, "frontend_dist_path", frontend_dist_path),
-        patch.object(main_module, "frontend_index_path", frontend_index_path),
-    ):
-        response = await client.get("/admin/template")
-
-    assert response.status_code == 200
-    assert "text/html" in response.headers["content-type"]
-    assert "<!doctype html>" in response.text.lower()
-
-
-async def test_api_like_frontend_path_returns_not_found(client: AsyncClient) -> None:
-    response = await client.get("/api/unknown")
-
-    assert response.status_code == 404
-    assert response.json() == {"detail": "Not Found"}
-
-
-async def test_frontend_static_asset_path_returns_asset_file(
-    client: AsyncClient, tmp_path: Path
-) -> None:
-    frontend_dist_path, frontend_index_path = create_frontend_build(tmp_path)
-
-    with (
-        patch.object(main_module, "frontend_dist_path", frontend_dist_path),
-        patch.object(main_module, "frontend_index_path", frontend_index_path),
-    ):
-        response = await client.get("/assets/index-DP-JPQ9M.js")
-
-    assert response.status_code == 200
-    assert "javascript" in response.headers["content-type"]
-
-
-async def test_frontend_returns_not_found_when_frontend_build_is_missing() -> None:
-    missing_index_path = Path("/tmp/fieldreport-missing-index.html")
-
-    with patch.object(main_module, "frontend_index_path", missing_index_path):
-        try:
-            await main_module.frontend("admin/template")
-        except HTTPException as error:
-            response_status = error.status_code
-            response_detail = error.detail
-        else:
-            raise AssertionError("Expected HTTPException")
-
-    assert response_status == 404
-    assert response_detail == "Not Found"

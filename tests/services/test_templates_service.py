@@ -156,7 +156,7 @@ async def test_get_template_configuration_returns_active_company_template() -> N
                         TemplateSection(
                             id="findings",
                             label="Findings",
-                            type="key_value_table",
+                            render_type="key_value_table",
                             fields=["Issue", "Action"],
                         ),
                     ]
@@ -173,7 +173,7 @@ async def test_get_template_configuration_returns_active_company_template() -> N
             {
                 "id": "findings",
                 "label": "Findings",
-                "type": "key_value_table",
+                "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
             }
         ],
@@ -183,7 +183,7 @@ async def test_get_template_configuration_returns_active_company_template() -> N
 async def test_get_template_analysis_returns_active_job() -> None:
     current_user = build_current_user()
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="photos", label="Photos", type="photo_grid")]
+        sections=[TemplateSection(id="photos", label="Photos", render_type="photo_grid")]
     )
 
     with patch.object(
@@ -200,7 +200,7 @@ async def test_get_template_analysis_returns_active_job() -> None:
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "reports_count": 5,
-        "sections": [{"id": "photos", "label": "Photos", "type": "photo_grid"}],
+        "sections": [{"id": "photos", "label": "Photos", "render_type": "photo_grid"}],
     }
 
 
@@ -238,7 +238,7 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
 async def test_get_template_analysis_returns_pending_review_job() -> None:
     current_user = build_current_user()
     structure = StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", type="text_block")]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
 
     with patch.object(
@@ -255,7 +255,7 @@ async def test_get_template_analysis_returns_pending_review_job() -> None:
     assert result.model_dump(exclude_none=True) == {
         "status": "pending_review",
         "reports_count": 1,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
 
 
@@ -280,11 +280,11 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
     job_id = uuid4()
     template_id = uuid4()
     sections = [
-        TemplateSection(id="summary", label="Executive Summary", type="text_block"),
+        TemplateSection(id="summary", label="Executive Summary", render_type="text_block"),
         TemplateSection(
             id="findings",
             label="Findings",
-            type="key_value_table",
+            render_type="key_value_table",
             fields=["Issue", "Action"],
         ),
     ]
@@ -328,11 +328,11 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
         "status": "active",
         "reports_count": 3,
         "sections": [
-            {"id": "summary", "label": "Executive Summary", "type": "text_block"},
+            {"id": "summary", "label": "Executive Summary", "render_type": "text_block"},
             {
                 "id": "findings",
                 "label": "Findings",
-                "type": "key_value_table",
+                "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
             },
         ],
@@ -345,7 +345,7 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
 async def test_confirm_template_without_pending_job_returns_active_template() -> None:
     current_user = build_current_user()
     template_id = uuid4()
-    sections = [TemplateSection(id="summary", label="Summary", type="text_block")]
+    sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
 
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
@@ -370,5 +370,5 @@ async def test_confirm_template_without_pending_job_returns_active_template() ->
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "reports_count": 0,
-        "sections": [{"id": "summary", "label": "Summary", "type": "text_block"}],
+        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }

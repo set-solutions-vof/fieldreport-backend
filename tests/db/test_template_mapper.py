@@ -3,30 +3,34 @@ from uuid import uuid4
 
 import pytest
 
-from src.db.template_mapper import (
-    map_company_template,
-    map_template_analysis_job,
-    parse_structure_column,
+from src.db.template_mapper import map_company_template, map_template_analysis_job
+from src.models.templates.configuration import (
+    StoredTemplateStructure,
+    TemplateSection,
+    parse_stored_template_structure,
 )
-from src.models.templates.configuration import StoredTemplateStructure
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
-def test_parse_structure_column_parses_json_string() -> None:
-    structure = parse_structure_column('{"sections": []}')
-
-    assert structure == StoredTemplateStructure(sections=[])
-
-
-def test_parse_structure_column_returns_existing_model() -> None:
+def test_parse_stored_template_structure_returns_existing_model() -> None:
     structure = StoredTemplateStructure(sections=[])
 
-    assert parse_structure_column(structure) is structure
+    assert parse_stored_template_structure(structure) is structure
 
 
-def test_parse_structure_column_rejects_unsupported_value() -> None:
+def test_parse_stored_template_structure_parses_json_string() -> None:
+    structure = parse_stored_template_structure(
+        '{"sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}]}'
+    )
+
+    assert structure == StoredTemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
+    )
+
+
+def test_parse_stored_template_structure_rejects_unsupported_value() -> None:
     with pytest.raises(TypeError, match="Unsupported structure value"):
-        parse_structure_column(42)
+        parse_stored_template_structure(42)
 
 
 def test_map_company_template_parses_record() -> None:
