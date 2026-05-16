@@ -12,13 +12,6 @@ from src.db.template_mapper import (
 from src.models.templates.configuration import StoredTemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysisJob
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
-from src.models.templates.state import TemplateCompanyState, resolve_template_company_state
-
-
-async def get_template_company_state(company_id: str) -> TemplateCompanyState:
-    company, job = await fetch_company_template_context(company_id)
-
-    return resolve_template_company_state(company, job)
 
 
 async def fetch_company_template_context(

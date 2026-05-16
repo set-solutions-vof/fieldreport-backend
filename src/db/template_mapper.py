@@ -1,11 +1,24 @@
 import asyncpg
 
-from src.models.templates.configuration import (
-    StoredTemplateStructure,
-    parse_stored_template_structure,
-)
+from src.models.templates.configuration import StoredTemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysisJob
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
+
+
+def parse_stored_template_structure(value: object) -> StoredTemplateStructure | None:
+    if value is None:
+        return None
+
+    if isinstance(value, StoredTemplateStructure):
+        return value
+
+    if isinstance(value, str):
+        return StoredTemplateStructure.model_validate_json(value)
+
+    if isinstance(value, dict):
+        return StoredTemplateStructure.model_validate(value)
+
+    raise TypeError(f"Unsupported structure value: {type(value)!r}")
 
 
 def map_company_template(row: asyncpg.Record) -> CompanyTemplateRecord:

@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
 from src.http.v1.request.template import TemplateConfigurationRequest
+from src.http.v1.response.template import template_configuration_response
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
     TemplateAnalysisConfiguration,
@@ -10,7 +11,7 @@ from src.models.templates.configuration import (
     TemplateConfigurationActive,
 )
 from src.security.authentication import require_admin
-from src.services import templates
+from src.services import templates, templates_state
 
 router = APIRouter(prefix="/api/v1/template")
 
@@ -19,7 +20,9 @@ router = APIRouter(prefix="/api/v1/template")
 async def get_template_configuration(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateConfiguration:
-    return await templates.get_template_configuration(current_user)
+    state = await templates.load_template_company_state(str(current_user.company_id))
+
+    return template_configuration_response(state)
 
 
 @router.post("/analysis")
@@ -39,7 +42,9 @@ async def get_template_analysis(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateAnalysisConfiguration:
     try:
-        return await templates.get_template_analysis(current_user, job_id)
+        job = await templates.get_template_analysis_job(current_user, job_id)
+
+        return template_configuration_response(templates_state.resolve_template_job_state(job))
     except LookupError:
         raise HTTPException(status_code=404, detail="Template analysis not found")
 

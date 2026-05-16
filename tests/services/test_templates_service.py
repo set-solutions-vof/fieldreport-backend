@@ -82,112 +82,14 @@ def build_upload_file(name: str) -> UploadFile:
     return UploadFile(filename=name, file=BytesIO(b"%PDF-1.4"))
 
 
-async def test_get_template_configuration_returns_not_configured() -> None:
-    current_user = build_current_user()
-
-    with patch.object(
-        templates_service.template_repository,
-        "get_template_company_state",
-        AsyncMock(return_value=build_template_company_state()),
-    ):
-        result = await templates_service.get_template_configuration(current_user)
-
-    assert result.model_dump() == {"status": "not_configured"}
-
-
-async def test_get_template_configuration_maps_queued_job_to_extracting() -> None:
-    current_user = build_current_user()
-    job_id = uuid4()
-
-    with patch.object(
-        templates_service.template_repository,
-        "get_template_company_state",
-        AsyncMock(
-            return_value=build_template_company_state(
-                view_status="extracting",
-                job_id=job_id,
-                reports_count=3,
-            )
-        ),
-    ):
-        result = await templates_service.get_template_configuration(current_user)
-
-    assert result.model_dump() == {
-        "status": "extracting",
-        "jobId": str(job_id),
-        "reports_count": 3,
-    }
-
-
-async def test_get_template_configuration_returns_failed_job_state() -> None:
-    current_user = build_current_user()
-
-    with patch.object(
-        templates_service.template_repository,
-        "get_template_company_state",
-        AsyncMock(
-            return_value=build_template_company_state(
-                view_status="failed",
-                reports_count=2,
-                error_message="model error",
-            )
-        ),
-    ):
-        result = await templates_service.get_template_configuration(current_user)
-
-    assert result.model_dump() == {
-        "status": "failed",
-        "reports_count": 2,
-        "error_message": "model error",
-    }
-
-
-async def test_get_template_configuration_returns_active_company_template() -> None:
-    current_user = build_current_user()
-
-    with patch.object(
-        templates_service.template_repository,
-        "get_template_company_state",
-        AsyncMock(
-            return_value=build_template_company_state(
-                view_status="active",
-                structure=StoredTemplateStructure(
-                    sections=[
-                        TemplateSection(
-                            id="findings",
-                            label="Findings",
-                            render_type="key_value_table",
-                            fields=["Issue", "Action"],
-                        ),
-                    ]
-                ),
-            )
-        ),
-    ):
-        result = await templates_service.get_template_configuration(current_user)
-
-    assert result.model_dump(exclude_none=True) == {
-        "status": "active",
-        "reports_count": 0,
-        "sections": [
-            {
-                "id": "findings",
-                "label": "Findings",
-                "render_type": "key_value_table",
-                "fields": ["Issue", "Action"],
-            }
-        ],
-    }
-
-
-async def test_get_template_analysis_returns_active_job() -> None:
+async def test_get_template_analysis_job_returns_active_job() -> None:
     current_user = build_current_user()
     structure = StoredTemplateStructure(
         sections=[TemplateSection(id="photos", label="Photos", render_type="photo_grid")]
     )
 
     with patch.object(
-        templates_service.template_repository,
+        templates_service.template_queries,
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
@@ -195,13 +97,11 @@ async def test_get_template_analysis_returns_active_job() -> None:
             )
         ),
     ):
-        result = await templates_service.get_template_analysis(current_user, str(uuid4()))
+        result = await templates_service.get_template_analysis_job(current_user, str(uuid4()))
 
-    assert result.model_dump(exclude_none=True) == {
-        "status": "active",
-        "reports_count": 5,
-        "sections": [{"id": "photos", "label": "Photos", "render_type": "photo_grid"}],
-    }
+    assert result.status == "active"
+    assert result.reports_count == 5
+    assert result.structure == structure
 
 
 async def test_start_template_analysis_stores_files_and_creates_job() -> None:
@@ -222,7 +122,7 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
             AsyncMock(return_value=stored_files),
         ) as store_files,
         patch.object(
-            templates_service.template_repository,
+            templates_service.template_queries,
             "replace_template_analysis_job",
             AsyncMock(),
         ) as replace_job,
@@ -235,14 +135,14 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
     replace_job.assert_awaited_once_with(result.jobId, str(current_user.company_id), stored_files)
 
 
-async def test_get_template_analysis_returns_pending_review_job() -> None:
+async def test_get_template_analysis_job_returns_pending_review_job() -> None:
     current_user = build_current_user()
     structure = StoredTemplateStructure(
         sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
 
     with patch.object(
-        templates_service.template_repository,
+        templates_service.template_queries,
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
@@ -250,25 +150,23 @@ async def test_get_template_analysis_returns_pending_review_job() -> None:
             )
         ),
     ):
-        result = await templates_service.get_template_analysis(current_user, str(uuid4()))
+        result = await templates_service.get_template_analysis_job(current_user, str(uuid4()))
 
-    assert result.model_dump(exclude_none=True) == {
-        "status": "pending_review",
-        "reports_count": 1,
-        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
-    }
+    assert result.status == "pending_review"
+    assert result.reports_count == 1
+    assert result.structure == structure
 
 
-async def test_get_template_analysis_raises_for_missing_job() -> None:
+async def test_get_template_analysis_job_raises_for_missing_job() -> None:
     current_user = build_current_user()
 
     with patch.object(
-        templates_service.template_repository,
+        templates_service.template_queries,
         "get_template_analysis_job",
         AsyncMock(return_value=None),
     ):
         try:
-            await templates_service.get_template_analysis(current_user, str(uuid4()))
+            await templates_service.get_template_analysis_job(current_user, str(uuid4()))
         except LookupError:
             pass
         else:
@@ -296,8 +194,8 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             side_effect=[template_id],
         ),
         patch.object(
-            templates_service.template_repository,
-            "get_template_company_state",
+            templates_service,
+            "load_template_company_state",
             AsyncMock(
                 return_value=build_template_company_state(
                     view_status="pending_review",
@@ -307,17 +205,17 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             ),
         ),
         patch.object(
-            templates_service.template_repository,
+            templates_service.template_queries,
             "create_template",
             AsyncMock(),
         ) as create_template,
         patch.object(
-            templates_service.template_repository,
+            templates_service.template_queries,
             "set_active_template",
             AsyncMock(),
         ) as set_active_template,
         patch.object(
-            templates_service.template_repository,
+            templates_service.template_queries,
             "update_template_analysis_job",
             AsyncMock(),
         ) as update_job,
@@ -350,17 +248,17 @@ async def test_confirm_template_without_pending_job_returns_active_template() ->
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
-            templates_service.template_repository,
-            "get_template_company_state",
+            templates_service,
+            "load_template_company_state",
             AsyncMock(return_value=build_template_company_state(view_status="not_configured")),
         ),
         patch.object(
-            templates_service.template_repository,
+            templates_service.template_queries,
             "create_template",
             AsyncMock(),
         ),
         patch.object(
-            templates_service.template_repository,
+            templates_service.template_queries,
             "set_active_template",
             AsyncMock(),
         ),

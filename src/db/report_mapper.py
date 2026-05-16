@@ -98,8 +98,7 @@ def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
             sections_by_id[section_id] = section
             sections.append(section)
 
-        if row["source_type"] is not None:
-            sections_by_id[section_id].sources.append(map_report_section_source(row))
+        sections_by_id[section_id].sources.append(map_report_section_source(row))
 
     return sections
 
@@ -127,9 +126,6 @@ def map_report_detail_sections(
             )
             sections_by_id[section_id] = section
             sections.append(section)
-
-        if row["source_type"] is None:
-            continue
 
         timeline_item = map_report_timeline_item(row)
         sections_by_id[section_id].source_item_ids.append(timeline_item.id)

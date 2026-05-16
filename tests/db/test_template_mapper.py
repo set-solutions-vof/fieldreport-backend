@@ -3,12 +3,12 @@ from uuid import uuid4
 
 import pytest
 
-from src.db.template_mapper import map_company_template, map_template_analysis_job
-from src.models.templates.configuration import (
-    StoredTemplateStructure,
-    TemplateSection,
+from src.db.template_mapper import (
+    map_company_template,
+    map_template_analysis_job,
     parse_stored_template_structure,
 )
+from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
@@ -31,6 +31,14 @@ def test_parse_stored_template_structure_parses_json_string() -> None:
 def test_parse_stored_template_structure_rejects_unsupported_value() -> None:
     with pytest.raises(TypeError, match="Unsupported structure value"):
         parse_stored_template_structure(42)
+
+
+def test_map_company_template_omits_structure_when_missing() -> None:
+    template_id = uuid4()
+
+    record = map_company_template({"template_id": template_id, "structure": None})
+
+    assert record == CompanyTemplateRecord(template_id=template_id)
 
 
 def test_map_company_template_parses_record() -> None:

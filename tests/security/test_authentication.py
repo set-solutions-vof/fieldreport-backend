@@ -83,7 +83,7 @@ async def test_get_current_user_returns_repository_user() -> None:
     access_token = security.create_access_token(current_user)
 
     with patch.object(
-        security.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+        security.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
     ):
         user = await security.get_current_user(access_token)
 
@@ -94,7 +94,7 @@ async def test_get_current_user_raises_when_repository_returns_none() -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    with patch.object(security.auth_repository, "get_user_by_id", AsyncMock(return_value=None)):
+    with patch.object(security.auth_queries, "get_user_by_id", AsyncMock(return_value=None)):
         with pytest.raises(HTTPException) as error:
             await security.get_current_user(access_token)
 

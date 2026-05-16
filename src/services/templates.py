@@ -2,27 +2,36 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 
-from src.db import template_repository
+from src.db import template_queries
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
     StoredTemplateStructure,
-    TemplateAnalysisConfiguration,
-    TemplateConfiguration,
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
     TemplateSection,
 )
-from src.models.templates.state import (
-    build_template_analysis_configuration,
-    build_template_configuration,
-)
+from src.models.templates.records import TemplateAnalysisJobRecord
+from src.models.templates.state import TemplateCompanyState
+from src.services import templates_state
 from src.storage import template_file_storage
 
 
-async def get_template_configuration(user: CurrentUser) -> TemplateConfiguration:
-    state = await template_repository.get_template_company_state(str(user.company_id))
+async def load_template_company_state(company_id: str) -> TemplateCompanyState:
+    company, job = await template_queries.fetch_company_template_context(company_id)
 
-    return build_template_configuration(state)
+    return templates_state.resolve_template_company_state(company, job)
+
+
+async def get_template_analysis_job(
+    user: CurrentUser,
+    job_id: str,
+) -> TemplateAnalysisJobRecord:
+    job_row = await template_queries.get_template_analysis_job(job_id, str(user.company_id))
+
+    if job_row is None:
+        raise LookupError
+
+    return job_row
 
 
 async def start_template_analysis(
@@ -37,7 +46,7 @@ async def start_template_analysis(
         files,
     )
 
-    await template_repository.replace_template_analysis_job(job_id, company_id, stored_files)
+    await template_queries.replace_template_analysis_job(job_id, company_id, stored_files)
 
     return TemplateConfigurationExtracting(
         status="extracting",
@@ -46,32 +55,20 @@ async def start_template_analysis(
     )
 
 
-async def get_template_analysis(
-    user: CurrentUser,
-    job_id: str,
-) -> TemplateAnalysisConfiguration:
-    job_row = await template_repository.get_template_analysis_job(job_id, str(user.company_id))
-
-    if job_row is None:
-        raise LookupError
-
-    return build_template_analysis_configuration(job_row)
-
-
 async def confirm_template(
     user: CurrentUser,
     sections: list[TemplateSection],
 ) -> TemplateConfigurationActive:
     company_id = str(user.company_id)
-    state = await template_repository.get_template_company_state(company_id)
+    state = await load_template_company_state(company_id)
     structure = StoredTemplateStructure(sections=sections)
     template_id = str(uuid4())
 
-    await template_repository.create_template(company_id, template_id, structure)
-    await template_repository.set_active_template(company_id, template_id)
+    await template_queries.create_template(company_id, template_id, structure)
+    await template_queries.set_active_template(company_id, template_id)
 
     if state.job_id is not None:
-        await template_repository.update_template_analysis_job(
+        await template_queries.update_template_analysis_job(
             str(state.job_id),
             "active",
             structure,

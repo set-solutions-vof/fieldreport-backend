@@ -1,4 +1,4 @@
-from src.db import auth_repository
+from src.db import auth_queries
 from src.models.auth.authentication import (
     CurrentUser,
     LoginCredentials,
@@ -9,7 +9,7 @@ from src.security import authentication
 
 
 async def login(credentials: LoginCredentials) -> TokenPair:
-    user = await auth_repository.get_user_by_email(credentials.email)
+    user = await auth_queries.get_user_by_email(credentials.email)
 
     if user is None or not authentication.verify_password(credentials.password, user.password_hash):
         raise PermissionError
@@ -36,7 +36,7 @@ async def refresh(refresh_token: str) -> RefreshedAccessToken:
     if claims.type != "refresh":
         raise PermissionError
 
-    current_user = await auth_repository.get_user_by_id(str(claims.sub))
+    current_user = await auth_queries.get_user_by_id(str(claims.sub))
 
     if current_user is None:
         raise PermissionError

@@ -41,7 +41,7 @@ async def test_list_reports_for_user_returns_repository_reports() -> None:
     ]
 
     with patch.object(
-        reports_service.report_repository,
+        reports_service.report_queries,
         "list_report_summaries_by_company_id",
         AsyncMock(return_value=report_summaries),
     ) as list_reports:
@@ -132,13 +132,13 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
 
     with (
         patch.object(
-            reports_service.report_repository,
+            reports_service.report_queries,
             "get_report_by_id",
             AsyncMock(return_value=report),
         ) as get_report,
         patch.object(
-            reports_service.report_repository,
-            "get_report_detail_sections",
+            reports_service,
+            "load_report_detail_sections",
             AsyncMock(return_value=(sections, timeline_items)),
         ) as get_report_sections,
     ):
@@ -181,7 +181,7 @@ async def test_update_report_section_returns_repository_section() -> None:
     )
 
     with patch.object(
-        reports_service.report_repository,
+        reports_service.report_queries,
         "update_report_section",
         AsyncMock(return_value=section),
     ) as update_section:

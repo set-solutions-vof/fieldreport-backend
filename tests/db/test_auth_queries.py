@@ -1,7 +1,7 @@
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from src.db import auth_repository
+from src.db import auth_queries
 
 
 class FakeConnection:
@@ -23,8 +23,8 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
     }
     connection = FakeConnection(row)
 
-    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
-        user = await auth_repository.get_user_by_email("sanne.devries@lekk.nl")
+    with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        user = await auth_queries.get_user_by_email("sanne.devries@lekk.nl")
 
     assert user is not None
     assert user.email == "sanne.devries@lekk.nl"
@@ -36,8 +36,8 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
 async def test_get_user_by_email_returns_none_when_missing() -> None:
     connection = FakeConnection(None)
 
-    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
-        user = await auth_repository.get_user_by_email("missing@lekk.nl")
+    with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        user = await auth_queries.get_user_by_email("missing@lekk.nl")
 
     assert user is None
     connection.fetchrow.assert_awaited_once()
@@ -55,8 +55,8 @@ async def test_get_user_by_id_returns_current_user() -> None:
     }
     connection = FakeConnection(row)
 
-    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
-        user = await auth_repository.get_user_by_id(str(uuid4()))
+    with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        user = await auth_queries.get_user_by_id(str(uuid4()))
 
     assert user is not None
     assert user.email == "jeroen.vandijk@lekk.nl"
@@ -68,8 +68,8 @@ async def test_get_user_by_id_returns_current_user() -> None:
 async def test_get_user_by_id_returns_none_when_missing() -> None:
     connection = FakeConnection(None)
 
-    with patch("src.db.auth_repository.asyncpg.connect", AsyncMock(return_value=connection)):
-        user = await auth_repository.get_user_by_id(str(uuid4()))
+    with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        user = await auth_queries.get_user_by_id(str(uuid4()))
 
     assert user is None
     connection.fetchrow.assert_awaited_once()

@@ -68,7 +68,7 @@ async def test_login_json_returns_tokens_for_valid_credentials(client: AsyncClie
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login/json",
@@ -85,7 +85,7 @@ async def test_login_form_returns_tokens_for_valid_credentials(client: AsyncClie
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login",
@@ -100,7 +100,7 @@ async def test_login_returns_unauthorized_for_wrong_password(client: AsyncClient
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login/json",
@@ -115,7 +115,7 @@ async def test_login_form_returns_unauthorized_for_wrong_password(client: AsyncC
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login",
@@ -131,7 +131,7 @@ async def test_refresh_returns_new_access_token(client: AsyncClient) -> None:
     refresh_token = security.create_refresh_token(current_user)
 
     with patch.object(
-        service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+        service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
     ):
         response = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
 
@@ -159,7 +159,7 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     access_token = security.create_access_token(current_user)
 
     with patch.object(
-        service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+        service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
     ):
         response = await client.get(
             "/api/v1/auth/me",
@@ -192,7 +192,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
 
     with (
         patch.object(
-            service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+            service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
             "src.routes.reports.reports.list_reports_for_user",
@@ -260,7 +260,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
 
     with (
         patch.object(
-            service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+            service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
             "src.routes.reports.reports.get_report_detail",
@@ -335,7 +335,7 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
 
     with (
         patch.object(
-            service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+            service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
             "src.routes.reports.reports.update_report_section",

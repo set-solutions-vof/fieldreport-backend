@@ -49,22 +49,6 @@ class StoredTemplateStructure(BaseModel):
     sections: list[TemplateSection]
 
 
-def parse_stored_template_structure(value: object) -> StoredTemplateStructure | None:
-    if value is None:
-        return None
-
-    if isinstance(value, StoredTemplateStructure):
-        return value
-
-    if isinstance(value, str):
-        return StoredTemplateStructure.model_validate_json(value)
-
-    if isinstance(value, dict):
-        return StoredTemplateStructure.model_validate(value)
-
-    raise TypeError(f"Unsupported structure value: {type(value)!r}")
-
-
 TemplateConfiguration = (
     TemplateConfigurationNotConfigured
     | TemplateConfigurationExtracting

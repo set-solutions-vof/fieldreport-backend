@@ -3,16 +3,13 @@ import asyncpg
 from src.db.connection import get_connection_url
 from src.db.report_mapper import (
     map_report_detail,
-    map_report_detail_sections,
     map_report_sections,
     map_report_summary,
 )
 from src.models.reports.report import (
     ReportDetail,
-    ReportDetailSection,
     ReportSection,
     ReportSummary,
-    ReportTimelineItem,
 )
 
 
@@ -110,7 +107,7 @@ async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
             FROM report_sections
             JOIN reports ON reports.id = report_sections.report_id
             JOIN inspections ON inspections.id = reports.inspection_id
-            LEFT JOIN report_section_sources
+            JOIN report_section_sources
                 ON report_section_sources.report_section_id = report_sections.id
             LEFT JOIN transcription_segments
                 ON transcription_segments.id = report_section_sources.transcription_segment_id
@@ -123,20 +120,6 @@ async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
         )
     finally:
         await connection.close()
-
-
-async def get_report_detail_sections(
-    report_id: str,
-) -> tuple[list[ReportDetailSection], list[ReportTimelineItem]]:
-    rows = await fetch_report_section_rows(report_id)
-
-    return map_report_detail_sections(rows)
-
-
-async def get_sections_with_sources(report_id: str) -> list[ReportSection]:
-    rows = await fetch_report_section_rows(report_id)
-
-    return map_report_sections(rows)
 
 
 async def update_report_section(
@@ -206,7 +189,7 @@ async def update_report_section(
                 image_analyses.captured_at AS captured_at,
                 image_analyses.analysis_text AS image_analysis_text
             FROM report_sections
-            LEFT JOIN report_section_sources
+            JOIN report_section_sources
                 ON report_section_sources.report_section_id = report_sections.id
             LEFT JOIN transcription_segments
                 ON transcription_segments.id = report_section_sources.transcription_segment_id

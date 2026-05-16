@@ -2,7 +2,7 @@ import asyncio
 
 from loguru import logger
 
-from src.db import template_repository
+from src.db import template_queries
 from src.llm import deepseek_client, gpt4o_client
 from src.models.templates.configuration import StoredTemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisDocument, TemplateAnalysisJob
@@ -11,7 +11,7 @@ from src.storage import template_file_storage
 
 
 async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
-    job = await template_repository.claim_next_template_analysis_job()
+    job = await template_queries.claim_next_template_analysis_job()
 
     if job is None:
         return None
@@ -19,7 +19,7 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
     logger.info("Processing template analysis job {}", job.id)
 
     try:
-        files = await template_repository.get_template_analysis_job_files(job.id)
+        files = await template_queries.get_template_analysis_job_files(job.id)
         logger.debug("Job {} has {} file(s)", job.id, len(files))
 
         documents = await asyncio.gather(
@@ -30,7 +30,7 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
 
         structure = StoredTemplateStructure(sections=sections)
 
-        await template_repository.update_template_analysis_job(
+        await template_queries.update_template_analysis_job(
             job.id,
             "pending_review",
             structure,
@@ -38,7 +38,7 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
         logger.info("Job {} completed, status=pending_review", job.id)
     except Exception as error:
         logger.error("Job {} failed: {}", job.id, error)
-        await template_repository.update_template_analysis_job(
+        await template_queries.update_template_analysis_job(
             job.id,
             "failed",
             None,

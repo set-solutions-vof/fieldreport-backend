@@ -10,11 +10,13 @@ from httpx import ASGITransport, AsyncClient
 from src.main import app
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
+    StoredTemplateStructure,
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
-    TemplateConfigurationPendingReview,
     TemplateSection,
 )
+from src.models.templates.records import TemplateAnalysisJobRecord
+from src.models.templates.state import TemplateCompanyState
 from src.routes import template as template_route
 from src.security import authentication as security
 from src.services import authentication as auth_service
@@ -50,15 +52,19 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
 
     with (
         patch.object(
-            auth_service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
-            "src.routes.template.templates.get_template_configuration",
+            "src.routes.template.templates.load_template_company_state",
             AsyncMock(
-                return_value=TemplateConfigurationActive(
-                    status="active",
+                return_value=TemplateCompanyState(
+                    view_status="active",
+                    structure=StoredTemplateStructure(
+                        sections=[
+                            TemplateSection(id="summary", label="Summary", render_type="text_block")
+                        ]
+                    ),
                     reports_count=3,
-                    sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")],
                 )
             ),
         ),
@@ -82,7 +88,7 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
 
     with (
         patch.object(
-            auth_service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
             "src.routes.template.templates.start_template_analysis",
@@ -133,7 +139,7 @@ async def test_post_template_analysis_missing_files_returns_validation_error(
     access_token = security.create_access_token(current_user)
 
     with patch.object(
-        auth_service.auth_repository,
+        auth_service.auth_queries,
         "get_user_by_id",
         AsyncMock(return_value=current_user),
     ):
@@ -152,22 +158,27 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
 
     with (
         patch.object(
-            auth_service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
-            "src.routes.template.templates.get_template_analysis",
+            "src.routes.template.templates.get_template_analysis_job",
             AsyncMock(
-                return_value=TemplateConfigurationPendingReview(
+                return_value=TemplateAnalysisJobRecord(
+                    id=uuid4(),
+                    company_id=current_user.company_id,
+                    template_id=None,
                     status="pending_review",
                     reports_count=3,
-                    sections=[
-                        TemplateSection(
-                            id="findings",
-                            label="Findings",
-                            render_type="key_value_table",
-                            fields=["Issue", "Action"],
-                        )
-                    ],
+                    structure=StoredTemplateStructure(
+                        sections=[
+                            TemplateSection(
+                                id="findings",
+                                label="Findings",
+                                render_type="key_value_table",
+                                fields=["Issue", "Action"],
+                            )
+                        ]
+                    ),
                 )
             ),
         ),
@@ -198,12 +209,12 @@ async def test_get_template_analysis_returns_not_found_for_unknown_job(client: A
 
     with (
         patch.object(
-            auth_service.auth_repository,
+            auth_service.auth_queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.template.templates.get_template_analysis",
+            "src.routes.template.templates.get_template_analysis_job",
             AsyncMock(side_effect=LookupError),
         ),
     ):
@@ -233,7 +244,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
 
     with (
         patch.object(
-            auth_service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
             "src.routes.template.templates.confirm_template",

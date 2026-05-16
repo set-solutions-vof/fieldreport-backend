@@ -20,7 +20,7 @@ async def test_refresh_raises_when_repository_returns_none() -> None:
 
     with (
         patch.object(service.authentication, "decode_token", return_value=claims),
-        patch.object(service.auth_repository, "get_user_by_id", AsyncMock(return_value=None)),
+        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=None)),
     ):
         with pytest.raises(PermissionError):
             await service.refresh("token")
