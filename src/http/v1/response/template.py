@@ -23,6 +23,7 @@ def template_configuration_response(state: TemplateCompanyState) -> TemplateConf
     if state.view_status == "pending_review":
         return TemplateConfigurationPendingReview(
             status="pending_review",
+            job_id=str(state.job_id),
             reports_count=state.reports_count,
             sections=state.structure.sections,
         )

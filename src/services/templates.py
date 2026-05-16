@@ -82,3 +82,16 @@ async def confirm_template(
         reports_count=reports_count,
         sections=sections,
     )
+
+
+async def update_pending_template_structure(
+    user: CurrentUser,
+    job_id: str,
+    sections: list[TemplateSection],
+) -> None:
+    structure = StoredTemplateStructure(sections=sections)
+    await template_queries.update_pending_template_structure(
+        job_id,
+        str(user.company_id),
+        structure,
+    )

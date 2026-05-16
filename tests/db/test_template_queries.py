@@ -217,6 +217,32 @@ async def test_update_template_analysis_job_updates_status_structure_and_error_m
     connection.close.assert_awaited_once()
 
 
+async def test_update_pending_template_structure_updates_pending_review_job() -> None:
+    connection = FakeConnection()
+    job_id = str(uuid4())
+    company_id = str(uuid4())
+    structure = StoredTemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
+    )
+
+    with patch(
+        "src.db.template_queries.asyncpg.connect",
+        AsyncMock(return_value=connection),
+    ):
+        await template_queries.update_pending_template_structure(job_id, company_id, structure)
+
+    query = connection.execute.await_args.args[0]
+    assert "UPDATE template_analysis_jobs" in query
+    assert "AND company_id = $2::uuid" in query
+    assert "AND status = 'pending_review'::template_analysis_status_enum" in query
+    assert connection.execute.await_args.args[1:] == (
+        job_id,
+        company_id,
+        structure.model_dump_json(),
+    )
+    connection.close.assert_awaited_once()
+
+
 async def test_claim_next_template_analysis_job_returns_none_when_no_job_exists() -> None:
     connection = FakeConnection()
     connection.fetchrow = AsyncMock(return_value=None)

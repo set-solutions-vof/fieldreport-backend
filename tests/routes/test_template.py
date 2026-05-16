@@ -78,7 +78,9 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
     assert response.json() == {
         "status": "active",
         "reports_count": 3,
-        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block", "fields": None}],
+        "sections": [
+            {"id": "summary", "label": "Summary", "render_type": "text_block", "fields": None}
+        ],
     }
 
 
@@ -155,6 +157,7 @@ async def test_post_template_analysis_missing_files_returns_validation_error(
 async def test_get_template_analysis_returns_pending_review(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
+    job_id = uuid4()
 
     with (
         patch.object(
@@ -164,7 +167,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
             "src.routes.template.templates.get_template_analysis_job",
             AsyncMock(
                 return_value=TemplateAnalysisJobRecord(
-                    id=uuid4(),
+                    id=job_id,
                     company_id=current_user.company_id,
                     template_id=None,
                     status="pending_review",
@@ -191,6 +194,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
     assert response.status_code == 200
     assert response.json() == {
         "status": "pending_review",
+        "job_id": str(job_id),
         "reports_count": 3,
         "sections": [
             {
@@ -225,6 +229,41 @@ async def test_get_template_analysis_returns_not_found_for_unknown_job(client: A
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Template analysis not found"}
+
+
+async def test_patch_template_analysis_updates_pending_structure(client: AsyncClient) -> None:
+    current_user = build_current_user()
+    access_token = security.create_access_token(current_user)
+    request_body = {
+        "sections": [
+            {"id": "summary", "label": "Executive Summary", "render_type": "text_block"},
+        ]
+    }
+
+    with (
+        patch.object(
+            auth_service.auth_queries,
+            "get_user_by_id",
+            AsyncMock(return_value=current_user),
+        ),
+        patch(
+            "src.routes.template.templates.update_pending_template_structure",
+            AsyncMock(),
+        ) as update_structure,
+    ):
+        response = await client.patch(
+            "/api/v1/template/analysis/job-123",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json=request_body,
+        )
+
+    assert response.status_code == 204
+    assert response.content == b""
+    update_structure.assert_awaited_once_with(
+        current_user,
+        "job-123",
+        [TemplateSection(id="summary", label="Executive Summary", render_type="text_block")],
+    )
 
 
 async def test_confirm_template_returns_active_template(client: AsyncClient) -> None:

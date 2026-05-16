@@ -270,3 +270,22 @@ async def test_confirm_template_without_pending_job_returns_active_template() ->
         "reports_count": 0,
         "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
+
+
+async def test_update_pending_template_structure_updates_company_scoped_job() -> None:
+    current_user = build_current_user()
+    job_id = str(uuid4())
+    sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
+
+    with patch.object(
+        templates_service.template_queries,
+        "update_pending_template_structure",
+        AsyncMock(),
+    ) as update_structure:
+        await templates_service.update_pending_template_structure(current_user, job_id, sections)
+
+    update_structure.assert_awaited_once_with(
+        job_id,
+        str(current_user.company_id),
+        StoredTemplateStructure(sections=sections),
+    )

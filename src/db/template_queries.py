@@ -203,6 +203,30 @@ async def update_template_analysis_job(
         await connection.close()
 
 
+async def update_pending_template_structure(
+    job_id: str,
+    company_id: str,
+    structure: StoredTemplateStructure,
+) -> None:
+    connection = await asyncpg.connect(get_connection_url())
+
+    try:
+        await connection.execute(
+            """
+            UPDATE template_analysis_jobs
+            SET structure = $3::jsonb
+            WHERE id = $1::uuid
+            AND company_id = $2::uuid
+            AND status = 'pending_review'::template_analysis_status_enum
+            """,
+            job_id,
+            company_id,
+            structure.model_dump_json(),
+        )
+    finally:
+        await connection.close()
+
+
 async def claim_next_template_analysis_job() -> TemplateAnalysisJob | None:
     connection = await asyncpg.connect(get_connection_url())
 

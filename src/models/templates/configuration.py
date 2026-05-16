@@ -29,6 +29,7 @@ class TemplateConfigurationExtracting(BaseModel):
 
 class TemplateConfigurationPendingReview(BaseModel):
     status: Literal["pending_review"]
+    job_id: str
     reports_count: int
     sections: list[TemplateSection]
 

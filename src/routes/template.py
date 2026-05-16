@@ -2,7 +2,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from src.http.v1.request.template import TemplateConfigurationRequest
+from src.http.v1.request.template import (
+    TemplateConfigurationRequest,
+    UpdateTemplateStructureRequest,
+)
 from src.http.v1.response.template import template_configuration_response
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
@@ -47,6 +50,19 @@ async def get_template_analysis(
         return template_configuration_response(templates_state.resolve_template_job_state(job))
     except LookupError:
         raise HTTPException(status_code=404, detail="Template analysis not found")
+
+
+@router.patch("/analysis/{job_id}", status_code=204)
+async def update_template_analysis_structure(
+    job_id: str,
+    request_body: UpdateTemplateStructureRequest,
+    current_user: Annotated[CurrentUser, Depends(require_admin)],
+) -> None:
+    await templates.update_pending_template_structure(
+        current_user,
+        job_id,
+        request_body.sections,
+    )
 
 
 @router.post("")

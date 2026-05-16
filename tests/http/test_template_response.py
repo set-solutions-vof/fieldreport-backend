@@ -34,11 +34,13 @@ def test_template_configuration_response_maps_not_configured_status() -> None:
 
 
 def test_template_configuration_response_maps_pending_review_status() -> None:
+    job_id = uuid4()
     structure = StoredTemplateStructure(
         sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
     state = TemplateCompanyState(
         view_status="pending_review",
+        job_id=job_id,
         structure=structure,
         reports_count=2,
     )
@@ -47,6 +49,7 @@ def test_template_configuration_response_maps_pending_review_status() -> None:
 
     assert result.model_dump(exclude_none=True) == {
         "status": "pending_review",
+        "job_id": str(job_id),
         "reports_count": 2,
         "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
@@ -137,6 +140,7 @@ def test_template_configuration_response_maps_pending_review_job() -> None:
 
     assert result.model_dump(exclude_none=True) == {
         "status": "pending_review",
+        "job_id": str(job.id),
         "reports_count": 2,
         "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
     }
