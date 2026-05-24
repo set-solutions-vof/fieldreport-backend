@@ -341,7 +341,7 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
             "label": "Advies",
             "render_type": "text_block",
             "fields": None,
-            "measurement_groups": None,
+            "groups": None,
             "ai_draft": "Advice",
             "field_expert_content": "Expert advice",
             "is_approved": False,

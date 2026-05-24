@@ -37,7 +37,7 @@ def apply_template_to_section(
         update={
             "label": template_section.label,
             "fields": template_section.fields,
-            "measurement_groups": template_section.measurement_groups,
+            "groups": template_section.groups,
         }
     )
 

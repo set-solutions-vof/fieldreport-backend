@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from src.models.templates.configuration import TemplateMeasurementGroup, TemplateSectionRenderType
+from src.models.templates.configuration import TemplateSectionGroup, TemplateSectionRenderType
 
 ReportStatus = Literal["generating", "draft", "approved", "failed"]
 ReportSourceType = Literal["transcription_segment", "image_analysis"]
@@ -49,7 +49,7 @@ class ReportSectionBase(BaseModel):
     confidence_score: float
     render_type: TemplateSectionRenderType = "text_block"
     fields: list[str] | None = None
-    measurement_groups: list[TemplateMeasurementGroup] | None = None
+    groups: list[TemplateSectionGroup] | None = None
 
 
 class ReportSection(ReportSectionBase):

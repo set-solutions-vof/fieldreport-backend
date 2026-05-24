@@ -46,7 +46,7 @@ class ReportSectionResponseBase(BaseModel):
     confidence_score: float
     render_type: str = "text_block"
     fields: list[str] | None = None
-    measurement_groups: list[dict] | None = None
+    groups: list[dict] | None = None
 
 
 class ReportSectionResponse(ReportSectionResponseBase):

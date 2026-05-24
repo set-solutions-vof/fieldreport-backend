@@ -74,7 +74,7 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
                 confidence_score=0.91,
                 render_type="measurement_table",
                 fields=["Visuele inspectie"],
-                measurement_groups=[
+                groups=[
                     {
                         "id": "algemene_inspectie",
                         "label": "Algemene inspectie",
@@ -90,7 +90,7 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
 
     assert response["sections"][0]["render_type"] == "measurement_table"
     assert response["sections"][0]["fields"] == ["Visuele inspectie"]
-    assert response["sections"][0]["measurement_groups"] == [
+    assert response["sections"][0]["groups"] == [
         {
             "id": "algemene_inspectie",
             "label": "Algemene inspectie",

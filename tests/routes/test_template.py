@@ -13,7 +13,7 @@ from src.models.templates.configuration import (
     StoredTemplateStructure,
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
-    TemplateMeasurementGroup,
+    TemplateSectionGroup,
     TemplateSection,
 )
 from src.models.templates.records import TemplateAnalysisJobRecord
@@ -87,7 +87,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
                 "render_type": "text_block",
                 "fields": None,
                 "found_in": 0,
-                "measurement_groups": None,
+                "groups": None,
             }
         ],
     }
@@ -213,7 +213,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
                 "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
                 "found_in": 0,
-                "measurement_groups": None,
+                "groups": None,
             }
         ],
     }
@@ -278,7 +278,7 @@ async def test_patch_template_analysis_updates_pending_structure(client: AsyncCl
     )
 
 
-async def test_patch_template_analysis_accepts_measurement_groups(client: AsyncClient) -> None:
+async def test_patch_template_analysis_accepts_groups(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
     request_body = {
@@ -290,7 +290,7 @@ async def test_patch_template_analysis_accepts_measurement_groups(client: AsyncC
                 "render_type": "measurement_table",
                 "fields": ["Visuele inspectie", "Thermografie", "Druktest"],
                 "found_in": 3,
-                "measurement_groups": [
+                "groups": [
                     {
                         "id": "algemene_inspectie",
                         "label": "Algemene inspectie schadebeeld/ leidingwerk",
@@ -335,13 +335,13 @@ async def test_patch_template_analysis_accepts_measurement_groups(client: AsyncC
                 render_type="measurement_table",
                 fields=["Visuele inspectie", "Thermografie", "Druktest"],
                 found_in=3,
-                measurement_groups=[
-                    TemplateMeasurementGroup(
+                groups=[
+                    TemplateSectionGroup(
                         id="algemene_inspectie",
                         label="Algemene inspectie schadebeeld/ leidingwerk",
                         fields=["Visuele inspectie", "Thermografie"],
                     ),
-                    TemplateMeasurementGroup(
+                    TemplateSectionGroup(
                         id="waterleidingen",
                         label="Waterleidingen",
                         fields=["Druktest"],
@@ -412,7 +412,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
                 "render_type": "text_block",
                 "fields": None,
                 "found_in": 0,
-                "measurement_groups": None,
+                "groups": None,
             },
             {
                 "id": "findings",
@@ -421,7 +421,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
                 "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
                 "found_in": 0,
-                "measurement_groups": None,
+                "groups": None,
             },
         ],
     }

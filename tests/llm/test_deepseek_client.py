@@ -39,7 +39,7 @@ def test_get_deepseek_client_returns_configured_client() -> None:
 def test_build_template_analysis_prompt_embeds_documents() -> None:
     prompt = deepseek_client.build_template_analysis_prompt(build_documents())
 
-    assert "measurement_groups" in prompt
+    assert "groups" in prompt
     assert '"documents":' in prompt
     assert '"file_name":"report.pdf"' in prompt
     assert '"visual_summary":"Visual summary"' in prompt

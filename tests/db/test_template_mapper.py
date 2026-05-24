@@ -10,7 +10,7 @@ from src.db.template_mapper import (
 )
 from src.models.templates.configuration import (
     StoredTemplateStructure,
-    TemplateMeasurementGroup,
+    TemplateSectionGroup,
     TemplateSection,
 )
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
@@ -34,7 +34,7 @@ def test_parse_stored_template_structure_parses_json_string() -> None:
     )
 
 
-def test_parse_stored_template_structure_parses_measurement_groups() -> None:
+def test_parse_stored_template_structure_parses_groups() -> None:
     structure = parse_stored_template_structure(
         """
         {
@@ -46,7 +46,7 @@ def test_parse_stored_template_structure_parses_measurement_groups() -> None:
               "render_type": "measurement_table",
               "fields": ["Visuele inspectie", "Thermografie", "Druktest"],
               "found_in": 3,
-              "measurement_groups": [
+              "groups": [
                 {
                   "id": "algemene_inspectie",
                   "label": "Algemene inspectie schadebeeld/ leidingwerk",
@@ -73,13 +73,13 @@ def test_parse_stored_template_structure_parses_measurement_groups() -> None:
                 render_type="measurement_table",
                 fields=["Visuele inspectie", "Thermografie", "Druktest"],
                 found_in=3,
-                measurement_groups=[
-                    TemplateMeasurementGroup(
+                groups=[
+                    TemplateSectionGroup(
                         id="algemene_inspectie",
                         label="Algemene inspectie schadebeeld/ leidingwerk",
                         fields=["Visuele inspectie", "Thermografie"],
                     ),
-                    TemplateMeasurementGroup(
+                    TemplateSectionGroup(
                         id="waterleidingen",
                         label="Waterleidingen",
                         fields=["Druktest"],

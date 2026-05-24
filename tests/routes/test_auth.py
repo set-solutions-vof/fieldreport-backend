@@ -294,7 +294,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 "confidence_score": 0.95,
                 "render_type": "text_block",
                 "fields": None,
-                "measurement_groups": None,
+                "groups": None,
                 "source_item_ids": [str(image_analysis_id)],
             }
         ],
@@ -365,7 +365,7 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
         "confidence_score": 0.76,
         "render_type": "text_block",
         "fields": None,
-        "measurement_groups": None,
+        "groups": None,
         "sources": [
             {
                 "type": "image",
