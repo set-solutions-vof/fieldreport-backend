@@ -1,4 +1,4 @@
-from src.db import report_queries
+from src.db import report_queries, template_queries
 from src.db.report_mapper import map_report_detail_sections
 from src.models.auth.authentication import CurrentUser
 from src.models.reports.report import (
@@ -8,6 +8,7 @@ from src.models.reports.report import (
     ReportSummary,
     ReportTimelineItem,
 )
+from src.models.templates.configuration import TemplateSection
 
 
 async def list_reports_for_user(user: CurrentUser) -> list[ReportSummary]:
@@ -22,9 +23,32 @@ async def load_report_detail_sections(
     return map_report_detail_sections(rows)
 
 
+async def load_template_sections_by_id(company_id: str) -> dict[str, TemplateSection]:
+    company_template, _ = await template_queries.fetch_company_template_context(company_id)
+    return {section.id: section for section in company_template.structure.sections}
+
+
+def apply_template_to_section(
+    section: ReportSection | ReportDetailSection,
+    template_sections_by_id: dict[str, TemplateSection],
+) -> ReportSection | ReportDetailSection:
+    template_section = template_sections_by_id[section.section_id]
+    return section.model_copy(
+        update={
+            "label": template_section.label,
+            "fields": template_section.fields,
+            "measurement_groups": template_section.measurement_groups,
+        }
+    )
+
+
 async def get_report_detail(report_id: str, user: CurrentUser) -> ReportDetail:
     report = await report_queries.get_report_by_id(report_id, str(user.company_id))
     sections, timeline_items = await load_report_detail_sections(report_id)
+    template_sections_by_id = await load_template_sections_by_id(str(user.company_id))
+    sections = [
+        apply_template_to_section(section, template_sections_by_id) for section in sections
+    ]
 
     return report.model_copy(update={"sections": sections, "timeline_items": timeline_items})
 
@@ -36,10 +60,13 @@ async def update_report_section(
     field_expert_content: str | None,
     is_approved: bool | None,
 ) -> ReportSection:
-    return await report_queries.update_report_section(
+    section = await report_queries.update_report_section(
         report_id,
         section_id,
         str(user.company_id),
         field_expert_content,
         is_approved,
     )
+    template_sections_by_id = await load_template_sections_by_id(str(user.company_id))
+
+    return apply_template_to_section(section, template_sections_by_id)

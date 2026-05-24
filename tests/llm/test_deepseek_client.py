@@ -39,7 +39,7 @@ def test_get_deepseek_client_returns_configured_client() -> None:
 def test_build_template_analysis_prompt_embeds_documents() -> None:
     prompt = deepseek_client.build_template_analysis_prompt(build_documents())
 
-    assert "Return a json object" in prompt
+    assert "measurement_groups" in prompt
     assert '"documents":' in prompt
     assert '"file_name":"report.pdf"' in prompt
     assert '"visual_summary":"Visual summary"' in prompt
@@ -57,9 +57,7 @@ async def test_synthesize_template_sections_returns_validated_sections() -> None
             ]
         )
     )
-    client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
-    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
 
     with (
         patch.object(deepseek_client, "get_deepseek_client", return_value=client),
@@ -68,7 +66,13 @@ async def test_synthesize_template_sections_returns_validated_sections() -> None
         result = await deepseek_client.synthesize_template_sections(build_documents())
 
     assert [section.model_dump(exclude_none=True) for section in result] == [
-        {"id": "summary", "label": "Summary", "render_type": "text_block"}
+        {
+            "id": "summary",
+            "label": "Summary",
+            "order": 0,
+            "render_type": "text_block",
+            "found_in": 0,
+        }
     ]
     assert create.await_args.kwargs["response_format"] == {"type": "json_object"}
 

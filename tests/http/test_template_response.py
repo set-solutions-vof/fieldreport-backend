@@ -51,7 +51,15 @@ def test_template_configuration_response_maps_pending_review_status() -> None:
         "status": "pending_review",
         "job_id": str(job_id),
         "reports_count": 2,
-        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
+        "sections": [
+            {
+                "id": "summary",
+                "label": "Summary",
+                "order": 0,
+                "render_type": "text_block",
+                "found_in": 0,
+            }
+        ],
     }
 
 
@@ -99,7 +107,15 @@ def test_template_configuration_response_maps_active_status() -> None:
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "reports_count": 0,
-        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
+        "sections": [
+            {
+                "id": "summary",
+                "label": "Summary",
+                "order": 0,
+                "render_type": "text_block",
+                "found_in": 0,
+            }
+        ],
     }
 
 
@@ -114,7 +130,15 @@ def test_template_configuration_response_maps_active_job() -> None:
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "reports_count": 5,
-        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
+        "sections": [
+            {
+                "id": "summary",
+                "label": "Summary",
+                "order": 0,
+                "render_type": "text_block",
+                "found_in": 0,
+            }
+        ],
     }
 
 
@@ -142,7 +166,15 @@ def test_template_configuration_response_maps_pending_review_job() -> None:
         "status": "pending_review",
         "job_id": str(job.id),
         "reports_count": 2,
-        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
+        "sections": [
+            {
+                "id": "summary",
+                "label": "Summary",
+                "order": 0,
+                "render_type": "text_block",
+                "found_in": 0,
+            }
+        ],
     }
 
 

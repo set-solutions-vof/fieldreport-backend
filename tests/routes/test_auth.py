@@ -236,7 +236,8 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         sections=[
             ReportDetailSection(
                 id=uuid4(),
-                section_key="technische_bevindingen",
+                section_id="technische_bevindingen",
+                label="Technische Bevindingen",
                 ai_draft="Draft",
                 field_expert_content=None,
                 is_approved=False,
@@ -284,13 +285,16 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         "sections": [
             {
                 "id": str(fake_report.sections[0].id),
-                "section_key": "technische_bevindingen",
+                "section_id": "technische_bevindingen",
                 "label": "Technische Bevindingen",
                 "ai_draft": "Draft",
                 "field_expert_content": None,
                 "is_approved": False,
                 "confidence_level": "high",
                 "confidence_score": 0.95,
+                "render_type": "text_block",
+                "fields": None,
+                "measurement_groups": None,
                 "source_item_ids": [str(image_analysis_id)],
             }
         ],
@@ -316,7 +320,8 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
     capture_time = datetime(2026, 5, 8, 12, 45, tzinfo=UTC)
     fake_section = ReportSection(
         id=section_id,
-        section_key="advies",
+        section_id="advies",
+        label="Advies",
         ai_draft="Advice",
         field_expert_content="Updated advice",
         is_approved=True,
@@ -351,13 +356,16 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
     assert response.status_code == 200
     assert response.json() == {
         "id": str(section_id),
-        "section_key": "advies",
+        "section_id": "advies",
         "label": "Advies",
         "ai_draft": "Advice",
         "field_expert_content": "Updated advice",
         "is_approved": True,
         "confidence_level": "medium",
         "confidence_score": 0.76,
+        "render_type": "text_block",
+        "fields": None,
+        "measurement_groups": None,
         "sources": [
             {
                 "type": "image",

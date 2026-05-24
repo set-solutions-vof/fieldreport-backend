@@ -104,7 +104,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     rows = [
         {
             "id": first_section_id,
-            "section_key": "bevindingen",
+            "section_id": "bevindingen",
             "section_order": 1,
             "ai_draft": "Draft text",
             "field_expert_content": None,
@@ -123,7 +123,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         },
         {
             "id": first_section_id,
-            "section_key": "bevindingen",
+            "section_id": "bevindingen",
             "section_order": 1,
             "ai_draft": "Draft text",
             "field_expert_content": None,
@@ -142,7 +142,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         },
         {
             "id": second_section_id,
-            "section_key": "advies",
+            "section_id": "advies",
             "section_order": 2,
             "ai_draft": "Advice",
             "field_expert_content": None,
@@ -161,7 +161,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         },
         {
             "id": second_section_id,
-            "section_key": "advies",
+            "section_id": "advies",
             "section_order": 2,
             "ai_draft": "Advice",
             "field_expert_content": None,
@@ -180,7 +180,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         },
         {
             "id": second_section_id,
-            "section_key": "advies",
+            "section_id": "advies",
             "section_order": 2,
             "ai_draft": "Advice",
             "field_expert_content": None,
@@ -199,7 +199,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         },
         {
             "id": third_section_id,
-            "section_key": "samenvatting",
+            "section_id": "samenvatting",
             "section_order": 3,
             "ai_draft": "Summary",
             "field_expert_content": None,
@@ -217,6 +217,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "timeline_offset_seconds": 30.0,
         },
     ]
+    for row in rows:
+        row["render_type"] = "text_block"
+    rows[0]["render_type"] = "measurement_table"
     connection = FakeConnection(rows)
 
     with patch(
@@ -231,6 +234,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         second_section_id,
         third_section_id,
     ]
+    assert sections[0].render_type == "measurement_table"
     assert sections[0].source_item_ids == [
         shared_image_analysis_id,
         shared_transcription_segment_id,
@@ -271,8 +275,9 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
     rows = [
         {
             "id": section_id,
-            "section_key": "advies",
+            "section_id": "advies",
             "section_order": 2,
+            "render_type": "key_value_table",
             "ai_draft": "Advice",
             "field_expert_content": "Updated advice",
             "is_approved": True,
@@ -302,7 +307,8 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
 
     assert section is not None
     assert section.id == section_id
-    assert section.section_key == "advies"
+    assert section.section_id == "advies"
+    assert section.render_type == "key_value_table"
     assert section.field_expert_content == "Updated advice"
     assert section.is_approved is True
     assert section.confidence_level == "low"
@@ -330,8 +336,12 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
     rows = [
         {
             "id": section_id,
-            "section_key": "advies",
+            "section_id": "advies",
             "section_order": 2,
+            "label": "Advies",
+            "render_type": "text_block",
+            "fields": None,
+            "measurement_groups": None,
             "ai_draft": "Advice",
             "field_expert_content": "Expert advice",
             "is_approved": False,

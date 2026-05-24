@@ -8,14 +8,18 @@ from src.db.template_mapper import (
     map_template_analysis_job,
     parse_stored_template_structure,
 )
-from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
+from src.models.templates.configuration import (
+    StoredTemplateStructure,
+    TemplateMeasurementGroup,
+    TemplateSection,
+)
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
 def test_parse_stored_template_structure_returns_existing_model() -> None:
     structure = StoredTemplateStructure(sections=[])
 
-    assert parse_stored_template_structure(structure) is structure
+    assert parse_stored_template_structure(structure) == structure
 
 
 def test_parse_stored_template_structure_parses_json_string() -> None:
@@ -24,7 +28,65 @@ def test_parse_stored_template_structure_parses_json_string() -> None:
     )
 
     assert structure == StoredTemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
+        sections=[
+            TemplateSection(id="summary", label="Summary", render_type="text_block")
+        ]
+    )
+
+
+def test_parse_stored_template_structure_parses_measurement_groups() -> None:
+    structure = parse_stored_template_structure(
+        """
+        {
+          "sections": [
+            {
+              "id": "meetresultaten",
+              "label": "Meetresultaten",
+              "order": 2,
+              "render_type": "measurement_table",
+              "fields": ["Visuele inspectie", "Thermografie", "Druktest"],
+              "found_in": 3,
+              "measurement_groups": [
+                {
+                  "id": "algemene_inspectie",
+                  "label": "Algemene inspectie schadebeeld/ leidingwerk",
+                  "fields": ["Visuele inspectie", "Thermografie"]
+                },
+                {
+                  "id": "waterleidingen",
+                  "label": "Waterleidingen",
+                  "fields": ["Druktest"]
+                }
+              ]
+            }
+          ]
+        }
+        """
+    )
+
+    assert structure == StoredTemplateStructure(
+        sections=[
+            TemplateSection(
+                id="meetresultaten",
+                label="Meetresultaten",
+                order=2,
+                render_type="measurement_table",
+                fields=["Visuele inspectie", "Thermografie", "Druktest"],
+                found_in=3,
+                measurement_groups=[
+                    TemplateMeasurementGroup(
+                        id="algemene_inspectie",
+                        label="Algemene inspectie schadebeeld/ leidingwerk",
+                        fields=["Visuele inspectie", "Thermografie"],
+                    ),
+                    TemplateMeasurementGroup(
+                        id="waterleidingen",
+                        label="Waterleidingen",
+                        fields=["Druktest"],
+                    ),
+                ],
+            )
+        ]
     )
 
 

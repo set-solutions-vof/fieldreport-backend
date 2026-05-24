@@ -11,6 +11,7 @@ from src.models.reports.report import (
     ReportSummary,
     ReportTimelineItem,
 )
+from src.models.templates.configuration import TemplateSection
 from src.services import reports as reports_service
 
 
@@ -77,7 +78,8 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
     sections = [
         ReportDetailSection(
             id=uuid4(),
-            section_key="bevindingen",
+            section_id="bevindingen",
+            label="Bevindingen",
             ai_draft="Draft",
             field_expert_content=None,
             is_approved=False,
@@ -87,7 +89,8 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
         ),
         ReportDetailSection(
             id=uuid4(),
-            section_key="advies",
+            section_id="advies",
+            label="Advies",
             ai_draft="Advice",
             field_expert_content=None,
             is_approved=False,
@@ -130,6 +133,13 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
         ),
     ]
 
+    template_sections_by_id = {
+        "bevindingen": TemplateSection(
+            id="bevindingen", label="Bevindingen", render_type="text_block"
+        ),
+        "advies": TemplateSection(id="advies", label="Advies", render_type="text_block"),
+    }
+
     with (
         patch.object(
             reports_service.report_queries,
@@ -141,6 +151,11 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
             "load_report_detail_sections",
             AsyncMock(return_value=(sections, timeline_items)),
         ) as get_report_sections,
+        patch.object(
+            reports_service,
+            "load_template_sections_by_id",
+            AsyncMock(return_value=template_sections_by_id),
+        ),
     ):
         result = await reports_service.get_report_detail(str(report_id), current_user)
 
@@ -163,7 +178,8 @@ async def test_update_report_section_returns_repository_section() -> None:
     section_id = uuid4()
     section = ReportSection(
         id=section_id,
-        section_key="advies",
+        section_id="advies",
+        label="Advies",
         ai_draft="Advice",
         field_expert_content="Updated advice",
         is_approved=True,
@@ -180,11 +196,24 @@ async def test_update_report_section_returns_repository_section() -> None:
         ],
     )
 
-    with patch.object(
-        reports_service.report_queries,
-        "update_report_section",
-        AsyncMock(return_value=section),
-    ) as update_section:
+    with (
+        patch.object(
+            reports_service.report_queries,
+            "update_report_section",
+            AsyncMock(return_value=section),
+        ) as update_section,
+        patch.object(
+            reports_service,
+            "load_template_sections_by_id",
+            AsyncMock(
+                return_value={
+                    "advies": TemplateSection(
+                        id="advies", label="Advies", render_type="text_block"
+                    )
+                }
+            ),
+        ),
+    ):
         result = await reports_service.update_report_section(
             str(report_id),
             str(section_id),

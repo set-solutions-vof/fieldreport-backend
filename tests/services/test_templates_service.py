@@ -226,12 +226,20 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
         "status": "active",
         "reports_count": 3,
         "sections": [
-            {"id": "summary", "label": "Executive Summary", "render_type": "text_block"},
+            {
+                "id": "summary",
+                "label": "Executive Summary",
+                "order": 0,
+                "render_type": "text_block",
+                "found_in": 0,
+            },
             {
                 "id": "findings",
                 "label": "Findings",
+                "order": 0,
                 "render_type": "key_value_table",
                 "fields": ["Issue", "Action"],
+                "found_in": 0,
             },
         ],
     }
@@ -268,7 +276,15 @@ async def test_confirm_template_without_pending_job_returns_active_template() ->
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "reports_count": 0,
-        "sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}],
+        "sections": [
+            {
+                "id": "summary",
+                "label": "Summary",
+                "order": 0,
+                "render_type": "text_block",
+                "found_in": 0,
+            }
+        ],
     }
 
 
@@ -287,5 +303,9 @@ async def test_update_pending_template_structure_updates_company_scoped_job() ->
     update_structure.assert_awaited_once_with(
         job_id,
         str(current_user.company_id),
-        StoredTemplateStructure(sections=sections),
+        StoredTemplateStructure(
+            sections=[
+                TemplateSection(id="summary", label="Summary", render_type="text_block")
+            ]
+        ),
     )

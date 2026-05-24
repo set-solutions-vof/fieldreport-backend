@@ -37,13 +37,16 @@ class ReportSectionResponseBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    section_key: str
+    section_id: str
     label: str
     ai_draft: str
     field_expert_content: str | None
     is_approved: bool
     confidence_level: str
     confidence_score: float
+    render_type: str = "text_block"
+    fields: list[str] | None = None
+    measurement_groups: list[dict] | None = None
 
 
 class ReportSectionResponse(ReportSectionResponseBase):
@@ -89,19 +92,8 @@ def report_summary_responses(report_summaries: list[ReportSummary]) -> list[Repo
 
 
 def report_section_response(section: ReportSection) -> ReportSectionResponse:
-    section_data = section.model_dump()
-    section_data["label"] = section.section_key.replace("_", " ").title()
-
-    return ReportSectionResponse.model_validate(section_data)
+    return ReportSectionResponse.model_validate(section.model_dump(mode="json"))
 
 
 def report_detail_response(report_detail: ReportDetail) -> ReportDetailResponse:
-    report_data = report_detail.model_dump()
-    report_data["sections"] = []
-
-    for section in report_detail.sections:
-        section_data = section.model_dump()
-        section_data["label"] = section.section_key.replace("_", " ").title()
-        report_data["sections"].append(section_data)
-
-    return ReportDetailResponse.model_validate(report_data)
+    return ReportDetailResponse.model_validate(report_detail.model_dump(mode="json"))

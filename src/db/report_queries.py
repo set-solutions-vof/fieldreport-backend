@@ -78,8 +78,9 @@ async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
             """
             SELECT
                 report_sections.id,
-                report_sections.section_key,
+                report_sections.section_id,
                 report_sections.section_order,
+                report_sections.render_type,
                 report_sections.ai_content ->> 0 AS ai_draft,
                 report_sections.expert_content ->> 0 AS field_expert_content,
                 report_sections.is_approved,
@@ -175,8 +176,9 @@ async def update_report_section(
             """
             SELECT
                 report_sections.id,
-                report_sections.section_key,
+                report_sections.section_id,
                 report_sections.section_order,
+                report_sections.render_type,
                 report_sections.ai_content ->> 0 AS ai_draft,
                 report_sections.expert_content ->> 0 AS field_expert_content,
                 report_sections.is_approved,

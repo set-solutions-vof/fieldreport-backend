@@ -87,12 +87,14 @@ def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
         if section_id not in sections_by_id:
             section = ReportSection(
                 id=section_id,
-                section_key=row["section_key"],
+                section_id=row["section_id"],
+                label=row["section_id"].replace("_", " ").title(),
                 ai_draft=row["ai_draft"],
                 field_expert_content=row["field_expert_content"],
                 is_approved=row["is_approved"],
                 confidence_level=row["confidence_level"],
                 confidence_score=float(row["confidence_score"]),
+                render_type=row["render_type"],
                 sources=[],
             )
             sections_by_id[section_id] = section
@@ -116,12 +118,14 @@ def map_report_detail_sections(
         if section_id not in sections_by_id:
             section = ReportDetailSection(
                 id=section_id,
-                section_key=row["section_key"],
+                section_id=row["section_id"],
+                label=row["section_id"].replace("_", " ").title(),
                 ai_draft=row["ai_draft"],
                 field_expert_content=row["field_expert_content"],
                 is_approved=row["is_approved"],
                 confidence_level=row["confidence_level"],
                 confidence_score=float(row["confidence_score"]),
+                render_type=row["render_type"],
                 source_item_ids=[],
             )
             sections_by_id[section_id] = section

@@ -10,11 +10,20 @@ TemplateSectionRenderType = Literal[
 ]
 
 
+class TemplateMeasurementGroup(BaseModel):
+    id: str
+    label: str
+    fields: list[str]
+
+
 class TemplateSection(BaseModel):
     id: str
     label: str
+    order: int = 0
     render_type: TemplateSectionRenderType
     fields: list[str] | None = None
+    found_in: int = 0
+    measurement_groups: list[TemplateMeasurementGroup] | None = None
 
 
 class TemplateConfigurationNotConfigured(BaseModel):

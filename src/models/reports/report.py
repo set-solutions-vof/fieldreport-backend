@@ -4,6 +4,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from src.models.templates.configuration import TemplateMeasurementGroup, TemplateSectionRenderType
+
 ReportStatus = Literal["generating", "draft", "approved", "failed"]
 ReportSourceType = Literal["transcription_segment", "image_analysis"]
 
@@ -38,12 +40,16 @@ class ReportTimelineItem(BaseModel):
 
 class ReportSectionBase(BaseModel):
     id: UUID
-    section_key: str
+    section_id: str
+    label: str
     ai_draft: str
     field_expert_content: str | None
     is_approved: bool
     confidence_level: Literal["high", "medium", "low"]
     confidence_score: float
+    render_type: TemplateSectionRenderType = "text_block"
+    fields: list[str] | None = None
+    measurement_groups: list[TemplateMeasurementGroup] | None = None
 
 
 class ReportSection(ReportSectionBase):
