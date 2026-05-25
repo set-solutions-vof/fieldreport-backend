@@ -15,36 +15,6 @@ def build_documents() -> list[TemplateAnalysisDocument]:
     ]
 
 
-def test_get_deepseek_client_returns_configured_client() -> None:
-    client = object()
-
-    with (
-        patch.object(
-            deepseek_client.settings, "deepseek_endpoint", "https://deepseek.example/openai/v1/"
-        ),
-        patch.object(deepseek_client.settings, "deepseek_api_key", "deepseek-key"),
-        patch.object(
-            deepseek_client, "create_openai_compatible_client", return_value=client
-        ) as factory,
-    ):
-        result = deepseek_client.get_deepseek_client()
-
-    assert result is client
-    factory.assert_called_once_with(
-        "https://deepseek.example/openai/v1/",
-        "deepseek-key",
-    )
-
-
-def test_build_template_analysis_prompt_embeds_documents() -> None:
-    prompt = deepseek_client.build_template_analysis_prompt(build_documents())
-
-    assert "groups" in prompt
-    assert '"documents":' in prompt
-    assert '"file_name":"report.pdf"' in prompt
-    assert '"visual_summary":"Visual summary"' in prompt
-
-
 async def test_synthesize_template_sections_returns_validated_sections() -> None:
     create = AsyncMock(
         return_value=SimpleNamespace(
@@ -75,6 +45,11 @@ async def test_synthesize_template_sections_returns_validated_sections() -> None
         }
     ]
     assert create.await_args.kwargs["response_format"] == {"type": "json_object"}
+    user_content = create.await_args.kwargs["messages"][1]["content"]
+    assert "groups" in user_content
+    assert '"documents":' in user_content
+    assert '"file_name":"report.pdf"' in user_content
+    assert '"visual_summary":"Visual summary"' in user_content
 
 
 async def test_synthesize_template_sections_raises_for_invalid_json() -> None:

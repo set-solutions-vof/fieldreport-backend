@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from src.db import report_queries
 from src.db.report_mapper import map_report_detail_sections
+from src.models.reports.transcription import TranscriptionSegment
 
 
 class FakeConnection:
@@ -12,6 +13,7 @@ class FakeConnection:
         self.row = row
         self.fetch = AsyncMock(return_value=rows)
         self.fetchrow = AsyncMock(return_value=row)
+        self.execute = AsyncMock()
         self.close = AsyncMock()
 
 
@@ -263,7 +265,206 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         20.0,
         30.0,
     ]
+
+
+async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None:
+    row = {
+        "id": uuid4(),
+        "inspection_id": uuid4(),
+        "company_id": uuid4(),
+        "template_id": uuid4(),
+    }
+    connection = FakeConnection(row=row)
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        result = await report_queries.claim_next_audio_pipeline_report()
+
+    assert result == row
+    connection.fetchrow.assert_awaited_once()
+    connection.close.assert_awaited_once()
+
+
+async def test_get_report_for_pipeline_returns_report_context() -> None:
+    row = {
+        "id": uuid4(),
+        "inspection_id": uuid4(),
+        "company_id": uuid4(),
+        "template_id": uuid4(),
+        "status": "generating",
+        "extra_context": "",
+        "investigation_type": "Lekdetectie",
+        "client_type": "Zakelijk",
+    }
+    connection = FakeConnection(row=row)
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        result = await report_queries.get_report_for_pipeline(str(row["id"]))
+
+    assert result == row
+    connection.fetchrow.assert_awaited_once()
+    connection.close.assert_awaited_once()
+
+
+async def test_set_report_status_executes_update() -> None:
+    connection = FakeConnection()
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        await report_queries.set_report_status("report-id", "draft")
+
+    connection.execute.assert_awaited_once()
+    assert connection.execute.await_args.args[-2:] == ("report-id", "draft")
+    connection.close.assert_awaited_once()
+
+
+async def test_insert_transcription_executes_insert_and_returns_id() -> None:
+    connection = FakeConnection()
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        transcription_id = await report_queries.insert_transcription(
+            "inspection-id",
+            "company-id",
+            "/tmp/audio.m4a",
+            "Tekst",
+            12.5,
+        )
+
+    assert transcription_id
+    connection.execute.assert_awaited_once()
+    assert connection.execute.await_args.args[-4:] == (
+        "inspection-id",
+        "company-id",
+        "/tmp/audio.m4a",
+        "Tekst",
+    )
+    connection.close.assert_awaited_once()
+
+
+async def test_insert_transcription_segments_executes_inserts_and_returns_ids() -> None:
+    connection = FakeConnection()
+    segments = [
+        TranscriptionSegment(
+            segment_index=0,
+            start_seconds=0.0,
+            end_seconds=1.5,
+            text="Segment",
+        )
+    ]
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        segment_ids = await report_queries.insert_transcription_segments(
+            "transcription-id",
+            "inspection-id",
+            segments,
+        )
+
+    assert len(segment_ids) == 1
+    connection.execute.assert_awaited_once()
+    assert connection.execute.await_args.args[-4:] == (
+        0,
+        0.0,
+        1.5,
+        "Segment",
+    )
+    connection.close.assert_awaited_once()
+
+
+async def test_fetch_transcription_segments_for_inspection_returns_rows() -> None:
+    rows = [{"text": "Segment"}]
+    connection = FakeConnection(rows=rows)
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        result = await report_queries.fetch_transcription_segments_for_inspection("inspection-id")
+
+    assert result == rows
     connection.fetch.assert_awaited_once()
+    connection.close.assert_awaited_once()
+
+
+async def test_insert_image_analysis_executes_insert_and_returns_id() -> None:
+    connection = FakeConnection()
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        image_analysis_id = await report_queries.insert_image_analysis(
+            "inspection-id",
+            "company-id",
+            "/tmp/photo.jpg",
+            "Fotoanalyse",
+        )
+
+    assert image_analysis_id
+    connection.execute.assert_awaited_once()
+    assert connection.execute.await_args.args[-4:] == (
+        "inspection-id",
+        "company-id",
+        "/tmp/photo.jpg",
+        "Fotoanalyse",
+    )
+    connection.close.assert_awaited_once()
+
+
+async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
+    rows = [{"analysis_text": "Fotoanalyse"}]
+    connection = FakeConnection(rows=rows)
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        result = await report_queries.fetch_image_analyses_for_inspection("inspection-id")
+
+    assert result == rows
+    connection.fetch.assert_awaited_once()
+    connection.close.assert_awaited_once()
+
+
+async def test_insert_report_section_executes_insert_and_returns_id() -> None:
+    connection = FakeConnection()
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        report_section_id = await report_queries.insert_report_section(
+            "report-id",
+            "company-id",
+            "conclusie",
+            1,
+            "text_block",
+            "Concept",
+            "high",
+            0.9,
+        )
+
+    assert report_section_id
+    connection.execute.assert_awaited_once()
+    assert "to_jsonb(ARRAY[$7::text])" in connection.execute.await_args.args[0]
+    assert connection.execute.await_args.args[-6:] == (
+        "conclusie",
+        1,
+        "text_block",
+        "Concept",
+        "high",
+        0.9,
+    )
+    connection.close.assert_awaited_once()
+
+
+async def test_insert_report_section_source_transcription_executes_insert() -> None:
+    connection = FakeConnection()
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        await report_queries.insert_report_section_source_transcription(
+            "section-id",
+            "segment-id",
+        )
+
+    connection.execute.assert_awaited_once()
+    assert connection.execute.await_args.args[-2:] == ("section-id", "segment-id")
+    connection.close.assert_awaited_once()
+
+
+async def test_insert_report_section_source_image_executes_insert() -> None:
+    connection = FakeConnection()
+
+    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+        await report_queries.insert_report_section_source_image("section-id", "image-id")
+
+    connection.execute.assert_awaited_once()
+    assert connection.execute.await_args.args[-2:] == ("section-id", "image-id")
     connection.close.assert_awaited_once()
 
 

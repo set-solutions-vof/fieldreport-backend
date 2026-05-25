@@ -8,6 +8,7 @@ from src.db.template_mapper import (
     map_company_template,
     map_template_analysis_file,
     map_template_analysis_job,
+    parse_stored_template_structure,
 )
 from src.models.templates.configuration import StoredTemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysisJob
@@ -279,6 +280,24 @@ async def get_template_analysis_job_files(job_id: str) -> list[TemplateAnalysisF
         await connection.close()
 
     return [map_template_analysis_file(row) for row in rows]
+
+
+async def fetch_template_structure(template_id: str) -> StoredTemplateStructure:
+    connection = await asyncpg.connect(get_connection_url())
+
+    try:
+        row = await connection.fetchrow(
+            """
+            SELECT structure
+            FROM templates
+            WHERE id = $1::uuid
+            """,
+            template_id,
+        )
+    finally:
+        await connection.close()
+
+    return parse_stored_template_structure(row["structure"])
 
 
 async def create_template(

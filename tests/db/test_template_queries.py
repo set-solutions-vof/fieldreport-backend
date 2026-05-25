@@ -114,6 +114,32 @@ async def test_get_template_analysis_job_files_returns_stored_files() -> None:
     connection.close.assert_awaited_once()
 
 
+async def test_fetch_template_structure_returns_stored_structure() -> None:
+    row = {
+        "structure": {
+            "sections": [
+                {
+                    "id": "conclusie",
+                    "label": "Conclusie",
+                    "render_type": "text_block",
+                }
+            ]
+        }
+    }
+    connection = FakeConnection()
+    connection.fetchrow = AsyncMock(return_value=row)
+
+    with patch(
+        "src.db.template_queries.asyncpg.connect",
+        AsyncMock(return_value=connection),
+    ):
+        structure = await template_queries.fetch_template_structure("template-id")
+
+    assert structure.sections[0].id == "conclusie"
+    connection.fetchrow.assert_awaited_once()
+    connection.close.assert_awaited_once()
+
+
 async def test_get_template_analysis_job_returns_company_scoped_job() -> None:
     created_at = datetime.now(UTC)
     job_row = {

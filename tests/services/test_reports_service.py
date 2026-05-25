@@ -11,7 +11,8 @@ from src.models.reports.report import (
     ReportSummary,
     ReportTimelineItem,
 )
-from src.models.templates.configuration import TemplateSection
+from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
+from src.models.templates.records import CompanyTemplateRecord
 from src.services import reports as reports_service
 
 
@@ -163,6 +164,25 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
     assert result.timeline_items == timeline_items
     get_report.assert_awaited_once_with(str(report_id), str(current_user.company_id))
     get_report_sections.assert_awaited_once_with(str(report_id))
+
+
+async def test_load_template_sections_by_id_returns_sections_by_id() -> None:
+    company_id = uuid4()
+    section = TemplateSection(id="advies", label="Advies", render_type="text_block")
+    company_template = CompanyTemplateRecord(
+        template_id=uuid4(),
+        structure=StoredTemplateStructure(sections=[section]),
+    )
+
+    with patch.object(
+        reports_service.template_queries,
+        "fetch_company_template_context",
+        AsyncMock(return_value=(company_template, None)),
+    ) as fetch_template:
+        result = await reports_service.load_template_sections_by_id(str(company_id))
+
+    assert result == {"advies": section}
+    fetch_template.assert_awaited_once_with(str(company_id))
 
 
 async def test_update_report_section_returns_repository_section() -> None:

@@ -1,17 +1,65 @@
-from openai import AsyncAzureOpenAI, AsyncOpenAI
+from unittest.mock import patch
 
-from src.llm.client_factory import create_azure_openai_client, create_openai_compatible_client
+from openai import AsyncOpenAI
+
+from src.llm import client_factory
 
 
 def test_create_openai_compatible_client_returns_async_openai() -> None:
-    client = create_openai_compatible_client("https://example.com/v1/", "test-key")
+    client = client_factory.create_openai_compatible_client("https://example.com/v1/", "test-key")
 
     assert isinstance(client, AsyncOpenAI)
 
 
-def test_create_azure_openai_client_returns_async_azure_openai() -> None:
-    client = create_azure_openai_client(
-        "https://example.azure.com/", "test-key", "2024-12-01-preview"
-    )
+def test_get_gpt4o_client_returns_configured_client() -> None:
+    client = object()
 
-    assert isinstance(client, AsyncAzureOpenAI)
+    with (
+        patch.object(client_factory.settings, "azure_openai_endpoint", "https://ai.example/openai/v1/"),
+        patch.object(client_factory.settings, "azure_openai_api_key", "shared-key"),
+        patch.object(
+            client_factory,
+            "create_openai_compatible_client",
+            return_value=client,
+        ) as factory,
+    ):
+        result = client_factory.get_gpt4o_client()
+
+    assert result is client
+    factory.assert_called_once_with("https://ai.example/openai/v1/", "shared-key")
+
+
+def test_get_deepseek_client_returns_configured_client() -> None:
+    client = object()
+
+    with (
+        patch.object(client_factory.settings, "azure_openai_endpoint", "https://ai.example/openai/v1/"),
+        patch.object(client_factory.settings, "azure_openai_api_key", "shared-key"),
+        patch.object(
+            client_factory,
+            "create_openai_compatible_client",
+            return_value=client,
+        ) as factory,
+    ):
+        result = client_factory.get_deepseek_client()
+
+    assert result is client
+    factory.assert_called_once_with("https://ai.example/openai/v1/", "shared-key")
+
+
+def test_get_gpt4o_transcribe_client_returns_configured_client() -> None:
+    client = object()
+
+    with (
+        patch.object(client_factory.settings, "azure_openai_endpoint", "https://ai.example/openai/v1/"),
+        patch.object(client_factory.settings, "azure_openai_api_key", "shared-key"),
+        patch.object(
+            client_factory,
+            "create_openai_compatible_client",
+            return_value=client,
+        ) as factory,
+    ):
+        result = client_factory.get_gpt4o_transcribe_client()
+
+    assert result is client
+    factory.assert_called_once_with("https://ai.example/openai/v1/", "shared-key")
