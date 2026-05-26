@@ -1,5 +1,3 @@
-from typing import TypeGuard
-
 from src.models.templates.configuration import (
     TemplateConfiguration,
     TemplateConfigurationActive,
@@ -16,11 +14,12 @@ def resolve_template_company_state(
     company: CompanyTemplateRecord,
     job: TemplateAnalysisJobRecord | None,
 ) -> TemplateConfiguration:
-    if _is_unfinished_job(job):
+    if job is not None and job.status in {"queued", "processing", "pending_review"}:
         return resolve_template_job_state(job)
 
     if company.template_id is not None:
-        return _active_state(company.structure, _active_template_reports_count(job))
+        reports_count = job.reports_count if job is not None and job.status == "active" else 0
+        return _active_state(company.structure, reports_count)
 
     if job is not None and job.status == "failed":
         return _failed_state(job)
@@ -75,16 +74,3 @@ def _active_state(
         reports_count=reports_count,
         sections=structure.sections,
     )
-
-
-def _is_unfinished_job(
-    job: TemplateAnalysisJobRecord | None,
-) -> TypeGuard[TemplateAnalysisJobRecord]:
-    return job is not None and job.status in {"queued", "processing", "pending_review"}
-
-
-def _active_template_reports_count(job: TemplateAnalysisJobRecord | None) -> int:
-    if job is None or job.status != "active":
-        return 0
-
-    return job.reports_count
