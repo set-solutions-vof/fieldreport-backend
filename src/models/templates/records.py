@@ -1,17 +1,23 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from src.models.templates.configuration import StoredTemplateStructure
-from src.models.templates.pipeline import TemplateAnalysisJobStatus
+from src.models.templates.domain import TemplateAnalysisJobStatus, TemplateStructure
 
 
 class CompanyTemplateRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 
-    template_id: UUID | None
-    structure: StoredTemplateStructure = StoredTemplateStructure(sections=[])
+    template_id: UUID | None = None
+    structure: TemplateStructure = Field(default_factory=lambda: TemplateStructure(sections=[]))
+
+
+class ActiveCompanyTemplateRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    template_id: UUID
+    structure: TemplateStructure
 
 
 class TemplateAnalysisJobRecord(BaseModel):
@@ -22,6 +28,6 @@ class TemplateAnalysisJobRecord(BaseModel):
     template_id: UUID | None
     status: TemplateAnalysisJobStatus
     reports_count: int
-    structure: StoredTemplateStructure = StoredTemplateStructure(sections=[])
+    structure: TemplateStructure = Field(default_factory=lambda: TemplateStructure(sections=[]))
     error_message: str = "Template analysis failed"
-    created_at: datetime | None = None
+    created_at: datetime

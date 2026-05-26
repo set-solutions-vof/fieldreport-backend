@@ -12,14 +12,14 @@ async def run_audio_pipeline_worker() -> None:
     while True:
         report = await report_queries.claim_next_audio_pipeline_report()
 
-        if report is not None:
-            try:
-                await audio_pipeline.run_audio_pipeline(str(report["id"]))
-            except Exception as error:
-                logger.exception("Audio pipeline report {} failed: {}", report["id"], error)
-
         if report is None:
             await asyncio.sleep(settings.audio_pipeline_worker_poll_seconds)
+            continue
+
+        try:
+            await audio_pipeline.run_audio_pipeline(str(report["id"]))
+        except Exception as error:
+            logger.exception("Audio pipeline report {} failed: {}", report["id"], error)
 
 
 def main() -> None:

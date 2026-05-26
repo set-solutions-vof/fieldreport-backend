@@ -8,7 +8,7 @@ from src.models.reports.report import (
     ReportSummary,
     ReportTimelineItem,
 )
-from src.models.templates.configuration import TemplateSection
+from src.models.templates.domain import TemplateSection
 
 
 async def list_reports_for_user(user: CurrentUser) -> list[ReportSummary]:
@@ -24,7 +24,7 @@ async def load_report_detail_sections(
 
 
 async def load_template_sections_by_id(company_id: str) -> dict[str, TemplateSection]:
-    company_template, _ = await template_queries.fetch_company_template_context(company_id)
+    company_template = await template_queries.fetch_active_company_template(company_id)
     return {section.id: section for section in company_template.structure.sections}
 
 

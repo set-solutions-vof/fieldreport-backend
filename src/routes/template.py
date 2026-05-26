@@ -2,11 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 
-from src.http.v1.request.template import (
-    TemplateConfigurationRequest,
-    UpdateTemplateStructureRequest,
-)
-from src.http.v1.response.template import template_configuration_response
+from src.http.v1.request.template import TemplateStructureRequest
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
     TemplateConfiguration,
@@ -22,9 +18,7 @@ router = APIRouter(prefix="/api/v1/template")
 async def get_template_configuration(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateConfiguration:
-    state = await templates.load_template_company_state(str(current_user.company_id))
-
-    return template_configuration_response(state)
+    return await templates.load_template_configuration(str(current_user.company_id))
 
 
 @router.post("/analysis")
@@ -46,27 +40,14 @@ async def get_template_analysis(
     try:
         job = await templates.get_template_analysis_job(current_user, job_id)
 
-        return template_configuration_response(templates_state.resolve_template_job_state(job))
+        return templates_state.resolve_template_job_state(job)
     except LookupError:
         raise HTTPException(status_code=404, detail="Template analysis not found")
 
 
-@router.patch("/analysis/{job_id}", status_code=204)
-async def update_template_analysis_structure(
-    job_id: str,
-    request_body: UpdateTemplateStructureRequest,
-    current_user: Annotated[CurrentUser, Depends(require_admin)],
-) -> None:
-    await templates.update_pending_template_structure(
-        current_user,
-        job_id,
-        request_body.sections,
-    )
-
-
 @router.post("")
 async def confirm_template(
-    request_body: TemplateConfigurationRequest,
+    request_body: TemplateStructureRequest,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateConfigurationActive:
     return await templates.confirm_template(current_user, request_body.sections)

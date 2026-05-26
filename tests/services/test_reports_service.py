@@ -11,8 +11,8 @@ from src.models.reports.report import (
     ReportSummary,
     ReportTimelineItem,
 )
-from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
-from src.models.templates.records import CompanyTemplateRecord
+from src.models.templates.domain import TemplateSection, TemplateStructure
+from src.models.templates.records import ActiveCompanyTemplateRecord
 from src.services import reports as reports_service
 
 
@@ -169,15 +169,15 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
 async def test_load_template_sections_by_id_returns_sections_by_id() -> None:
     company_id = uuid4()
     section = TemplateSection(id="advies", label="Advies", render_type="text_block")
-    company_template = CompanyTemplateRecord(
+    company_template = ActiveCompanyTemplateRecord(
         template_id=uuid4(),
-        structure=StoredTemplateStructure(sections=[section]),
+        structure=TemplateStructure(sections=[section]),
     )
 
     with patch.object(
         reports_service.template_queries,
-        "fetch_company_template_context",
-        AsyncMock(return_value=(company_template, None)),
+        "fetch_active_company_template",
+        AsyncMock(return_value=company_template),
     ) as fetch_template:
         result = await reports_service.load_template_sections_by_id(str(company_id))
 

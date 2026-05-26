@@ -1,91 +1,90 @@
+from typing import TypeGuard
+
+from src.models.templates.configuration import (
+    TemplateConfiguration,
+    TemplateConfigurationActive,
+    TemplateConfigurationFailed,
+    TemplateConfigurationNotConfigured,
+    TemplateConfigurationPendingReview,
+    TemplateConfigurationProcessing,
+)
+from src.models.templates.domain import TemplateStructure
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
-from src.models.templates.state import TemplateCompanyState
 
 
 def resolve_template_company_state(
     company: CompanyTemplateRecord,
     job: TemplateAnalysisJobRecord | None,
-) -> TemplateCompanyState:
-    if job is not None:
-        if job.status in {"queued", "processing", "extracting"}:
-            return TemplateCompanyState(
-                view_status="extracting",
-                job_id=job.id,
-                reports_count=job.reports_count,
-            )
-
-        if job.status == "pending_review":
-            return TemplateCompanyState(
-                view_status="pending_review",
-                structure=job.structure,
-                job_id=job.id,
-                reports_count=job.reports_count,
-            )
-
-        if job.status == "failed":
-            if company.template_id is not None:
-                return TemplateCompanyState(
-                    view_status="active",
-                    structure=company.structure,
-                    template_id=company.template_id,
-                )
-
-            return TemplateCompanyState(
-                view_status="failed",
-                job_id=job.id,
-                reports_count=job.reports_count,
-                error_message=job.error_message,
-            )
-
-        if job.status == "active":
-            structure = company.structure if company.template_id is not None else job.structure
-
-            return TemplateCompanyState(
-                view_status="active",
-                structure=structure,
-                job_id=job.id,
-                template_id=company.template_id or job.template_id,
-                reports_count=job.reports_count,
-            )
+) -> TemplateConfiguration:
+    if _is_unfinished_job(job):
+        return resolve_template_job_state(job)
 
     if company.template_id is not None:
-        return TemplateCompanyState(
-            view_status="active",
-            structure=company.structure,
-            template_id=company.template_id,
-        )
+        return _active_state(company.structure, _active_template_reports_count(job))
 
-    return TemplateCompanyState(view_status="not_configured")
+    if job is not None and job.status == "failed":
+        return _failed_state(job)
+
+    return TemplateConfigurationNotConfigured(status="not_configured")
 
 
-def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateCompanyState:
-    if job.status in {"queued", "processing", "extracting"}:
-        return TemplateCompanyState(
-            view_status="extracting",
-            job_id=job.id,
-            reports_count=job.reports_count,
-        )
+def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateConfiguration:
+    if job.status in {"queued", "processing"}:
+        return _processing_state(job)
 
     if job.status == "pending_review":
-        return TemplateCompanyState(
-            view_status="pending_review",
-            structure=job.structure,
-            job_id=job.id,
-            reports_count=job.reports_count,
-        )
+        return _pending_review_state(job)
 
     if job.status == "failed":
-        return TemplateCompanyState(
-            view_status="failed",
-            job_id=job.id,
-            reports_count=job.reports_count,
-            error_message=job.error_message,
-        )
+        return _failed_state(job)
 
-    return TemplateCompanyState(
-        view_status="active",
-        structure=job.structure,
-        job_id=job.id,
-        template_id=job.template_id,
+    return _active_state(job.structure, job.reports_count)
+
+
+def _processing_state(job: TemplateAnalysisJobRecord) -> TemplateConfigurationProcessing:
+    return TemplateConfigurationProcessing(
+        status="processing",
+        job_id=str(job.id),
         reports_count=job.reports_count,
     )
+
+
+def _pending_review_state(job: TemplateAnalysisJobRecord) -> TemplateConfigurationPendingReview:
+    return TemplateConfigurationPendingReview(
+        status="pending_review",
+        job_id=str(job.id),
+        reports_count=job.reports_count,
+        sections=job.structure.sections,
+    )
+
+
+def _failed_state(job: TemplateAnalysisJobRecord) -> TemplateConfigurationFailed:
+    return TemplateConfigurationFailed(
+        status="failed",
+        reports_count=job.reports_count,
+        error_message=job.error_message,
+    )
+
+
+def _active_state(
+    structure: TemplateStructure,
+    reports_count: int,
+) -> TemplateConfigurationActive:
+    return TemplateConfigurationActive(
+        status="active",
+        reports_count=reports_count,
+        sections=structure.sections,
+    )
+
+
+def _is_unfinished_job(
+    job: TemplateAnalysisJobRecord | None,
+) -> TypeGuard[TemplateAnalysisJobRecord]:
+    return job is not None and job.status in {"queued", "processing", "pending_review"}
+
+
+def _active_template_reports_count(job: TemplateAnalysisJobRecord | None) -> int:
+    if job is None or job.status != "active":
+        return 0
+
+    return job.reports_count

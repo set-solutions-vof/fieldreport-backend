@@ -1,32 +1,11 @@
-from typing import Literal
-
 from pydantic import BaseModel
 
-from src.models.templates.configuration import TemplateSection
-
-TemplateAnalysisJobStatus = Literal[
-    "queued",
-    "processing",
-    "extracting",
-    "pending_review",
-    "active",
-    "failed",
-]
+from src.models.templates.domain import TemplateSection
 
 
 class TemplateAnalysisFile(BaseModel):
     file_name: str
     storage_path: str
-
-
-class TemplateAnalysisJob(BaseModel):
-    id: str
-    company_id: str
-    status: TemplateAnalysisJobStatus
-    reports_count: int
-    structure: list[TemplateSection] | None = None
-    template_id: str | None = None
-    error_message: str | None = None
 
 
 class TemplateAnalysisDocument(BaseModel):

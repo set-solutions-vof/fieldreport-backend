@@ -4,7 +4,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from src.models.templates.configuration import TemplateSectionGroup, TemplateSectionRenderType
+from src.models.templates.domain import TemplateSectionGroup, TemplateSectionRenderType
 
 ReportStatus = Literal["generating", "draft", "approved", "failed"]
 ReportSourceType = Literal["transcription_segment", "image_analysis"]

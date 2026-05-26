@@ -4,13 +4,14 @@ from loguru import logger
 
 from src.db import template_queries
 from src.llm import deepseek_client, gpt4o_client
-from src.models.templates.configuration import StoredTemplateStructure
-from src.models.templates.pipeline import TemplateAnalysisDocument, TemplateAnalysisJob
+from src.models.templates.domain import TemplateStructure
+from src.models.templates.pipeline import TemplateAnalysisDocument
+from src.models.templates.records import TemplateAnalysisJobRecord
 from src.pdf import extractor as pdf_extractor
 from src.storage import template_file_storage
 
 
-async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
+async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | None:
     job = await template_queries.claim_next_template_analysis_job()
 
     if job is None:
@@ -19,7 +20,8 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
     logger.info("Processing template analysis job {}", job.id)
 
     try:
-        files = await template_queries.get_template_analysis_job_files(job.id)
+        job_id = str(job.id)
+        files = await template_queries.get_template_analysis_job_files(job_id)
         logger.debug("Job {} has {} file(s)", job.id, len(files))
 
         documents = await asyncio.gather(
@@ -28,10 +30,10 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
         sections = await deepseek_client.synthesize_template_sections(documents)
         logger.debug("DeepSeek synthesized {} section(s) for job {}", len(sections), job.id)
 
-        structure = StoredTemplateStructure(sections=sections)
+        structure = TemplateStructure(sections=sections)
 
         await template_queries.update_template_analysis_job(
-            job.id,
+            job_id,
             "pending_review",
             structure,
         )
@@ -39,7 +41,7 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJob | None:
     except Exception as error:
         logger.error("Job {} failed: {}", job.id, error)
         await template_queries.update_template_analysis_job(
-            job.id,
+            job_id,
             "failed",
             None,
             error_message=str(error),

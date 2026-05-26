@@ -1,38 +1,17 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-TemplateSectionRenderType = Literal[
-    "text_block",
-    "key_value_table",
-    "measurement_table",
-    "photo_grid",
-]
-
-
-class TemplateSectionGroup(BaseModel):
-    id: str
-    label: str
-    fields: list[str]
-
-
-class TemplateSection(BaseModel):
-    id: str
-    label: str
-    order: int = 0
-    render_type: TemplateSectionRenderType
-    fields: list[str] | None = None
-    found_in: int = 0
-    groups: list[TemplateSectionGroup] | None = None
+from src.models.templates.domain import TemplateSection
 
 
 class TemplateConfigurationNotConfigured(BaseModel):
     status: Literal["not_configured"]
 
 
-class TemplateConfigurationExtracting(BaseModel):
-    status: Literal["extracting"]
-    jobId: str
+class TemplateConfigurationProcessing(BaseModel):
+    status: Literal["processing"]
+    job_id: str = Field(serialization_alias="jobId")
     reports_count: int
 
 
@@ -55,20 +34,9 @@ class TemplateConfigurationFailed(BaseModel):
     error_message: str
 
 
-class StoredTemplateStructure(BaseModel):
-    sections: list[TemplateSection]
-
-
 TemplateConfiguration = (
     TemplateConfigurationNotConfigured
-    | TemplateConfigurationExtracting
-    | TemplateConfigurationPendingReview
-    | TemplateConfigurationActive
-    | TemplateConfigurationFailed
-)
-
-TemplateAnalysisConfiguration = (
-    TemplateConfigurationExtracting
+    | TemplateConfigurationProcessing
     | TemplateConfigurationPendingReview
     | TemplateConfigurationActive
     | TemplateConfigurationFailed

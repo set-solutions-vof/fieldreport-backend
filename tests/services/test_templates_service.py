@@ -1,41 +1,19 @@
 from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import AsyncMock, patch
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from starlette.datastructures import UploadFile
 
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
-from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysisJobStatus
+from src.models.templates.domain import (
+    TemplateAnalysisJobStatus,
+    TemplateSection,
+    TemplateStructure,
+)
+from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.models.templates.state import TemplateCompanyState
 from src.services import templates as templates_service
-
-
-def build_template_company_state(
-    *,
-    view_status: str = "not_configured",
-    structure: StoredTemplateStructure | None = None,
-    job_id: UUID | None = None,
-    template_id: UUID | None = None,
-    reports_count: int = 0,
-    error_message: str | None = None,
-) -> TemplateCompanyState:
-    state_data = {
-        "view_status": view_status,
-        "job_id": job_id,
-        "template_id": template_id,
-        "reports_count": reports_count,
-    }
-
-    if structure is not None:
-        state_data["structure"] = structure
-
-    if error_message is not None:
-        state_data["error_message"] = error_message
-
-    return TemplateCompanyState.model_validate(state_data)
 
 
 def build_analysis_job_record(
@@ -45,7 +23,7 @@ def build_analysis_job_record(
     template_id=None,
     status: TemplateAnalysisJobStatus | None = None,
     reports_count: int | None = None,
-    structure: StoredTemplateStructure | None = None,
+    structure: TemplateStructure | None = None,
     error_message: str | None = None,
     created_at: datetime | None = None,
 ) -> TemplateAnalysisJobRecord:
@@ -84,7 +62,7 @@ def build_upload_file(name: str) -> UploadFile:
 
 async def test_get_template_analysis_job_returns_active_job() -> None:
     current_user = build_current_user()
-    structure = StoredTemplateStructure(
+    structure = TemplateStructure(
         sections=[TemplateSection(id="photos", label="Photos", render_type="photo_grid")]
     )
 
@@ -129,15 +107,15 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
     ):
         result = await templates_service.start_template_analysis(current_user, files)
 
-    assert result.status == "extracting"
+    assert result.status == "processing"
     assert result.reports_count == 2
-    store_files.assert_awaited_once_with(str(current_user.company_id), result.jobId, files)
-    replace_job.assert_awaited_once_with(result.jobId, str(current_user.company_id), stored_files)
+    store_files.assert_awaited_once_with(str(current_user.company_id), result.job_id, files)
+    replace_job.assert_awaited_once_with(result.job_id, str(current_user.company_id), stored_files)
 
 
 async def test_get_template_analysis_job_returns_pending_review_job() -> None:
     current_user = build_current_user()
-    structure = StoredTemplateStructure(
+    structure = TemplateStructure(
         sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
 
@@ -186,23 +164,14 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             fields=["Issue", "Action"],
         ),
     ]
+    job = build_analysis_job_record(job_id=job_id, status="pending_review", reports_count=3)
 
     with (
+        patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
-            templates_service,
-            "uuid4",
-            side_effect=[template_id],
-        ),
-        patch.object(
-            templates_service,
-            "load_template_company_state",
-            AsyncMock(
-                return_value=build_template_company_state(
-                    view_status="pending_review",
-                    job_id=job_id,
-                    reports_count=3,
-                )
-            ),
+            templates_service.template_queries,
+            "fetch_latest_template_analysis_job",
+            AsyncMock(return_value=job),
         ),
         patch.object(
             templates_service.template_queries,
@@ -216,9 +185,9 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
         ) as set_active_template,
         patch.object(
             templates_service.template_queries,
-            "update_template_analysis_job",
+            "delete_template_analysis_job",
             AsyncMock(),
-        ) as update_job,
+        ) as delete_job,
     ):
         result = await templates_service.confirm_template(current_user, sections)
 
@@ -245,65 +214,4 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
     }
     create_template.assert_awaited_once()
     set_active_template.assert_awaited_once_with(str(current_user.company_id), str(template_id))
-    update_job.assert_awaited_once()
-
-
-async def test_confirm_template_without_pending_job_returns_active_template() -> None:
-    current_user = build_current_user()
-    template_id = uuid4()
-    sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
-
-    with (
-        patch.object(templates_service, "uuid4", side_effect=[template_id]),
-        patch.object(
-            templates_service,
-            "load_template_company_state",
-            AsyncMock(return_value=build_template_company_state(view_status="not_configured")),
-        ),
-        patch.object(
-            templates_service.template_queries,
-            "create_template",
-            AsyncMock(),
-        ),
-        patch.object(
-            templates_service.template_queries,
-            "set_active_template",
-            AsyncMock(),
-        ),
-    ):
-        result = await templates_service.confirm_template(current_user, sections)
-
-    assert result.model_dump(exclude_none=True) == {
-        "status": "active",
-        "reports_count": 0,
-        "sections": [
-            {
-                "id": "summary",
-                "label": "Summary",
-                "order": 0,
-                "render_type": "text_block",
-                "found_in": 0,
-            }
-        ],
-    }
-
-
-async def test_update_pending_template_structure_updates_company_scoped_job() -> None:
-    current_user = build_current_user()
-    job_id = str(uuid4())
-    sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
-
-    with patch.object(
-        templates_service.template_queries,
-        "update_pending_template_structure",
-        AsyncMock(),
-    ) as update_structure:
-        await templates_service.update_pending_template_structure(current_user, job_id, sections)
-
-    update_structure.assert_awaited_once_with(
-        job_id,
-        str(current_user.company_id),
-        StoredTemplateStructure(
-            sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
-        ),
-    )
+    delete_job.assert_awaited_once_with(str(job_id), str(current_user.company_id))

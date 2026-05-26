@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -10,14 +11,11 @@ from httpx import ASGITransport, AsyncClient
 from src.main import app
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
-    StoredTemplateStructure,
     TemplateConfigurationActive,
-    TemplateConfigurationExtracting,
-    TemplateSection,
-    TemplateSectionGroup,
+    TemplateConfigurationProcessing,
 )
+from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.models.templates.state import TemplateCompanyState
 from src.routes import template as template_route
 from src.security import authentication as security
 from src.services import authentication as auth_service
@@ -56,15 +54,13 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
             auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
         ),
         patch(
-            "src.routes.template.templates.load_template_company_state",
+            "src.routes.template.templates.load_template_configuration",
             AsyncMock(
-                return_value=TemplateCompanyState(
-                    view_status="active",
-                    structure=StoredTemplateStructure(
-                        sections=[
-                            TemplateSection(id="summary", label="Summary", render_type="text_block")
-                        ]
-                    ),
+                return_value=TemplateConfigurationActive(
+                    status="active",
+                    sections=[
+                        TemplateSection(id="summary", label="Summary", render_type="text_block")
+                    ],
                     reports_count=3,
                 )
             ),
@@ -104,9 +100,9 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
         patch(
             "src.routes.template.templates.start_template_analysis",
             AsyncMock(
-                return_value=TemplateConfigurationExtracting(
-                    status="extracting",
-                    jobId="job-123",
+                return_value=TemplateConfigurationProcessing(
+                    status="processing",
+                    job_id="job-123",
                     reports_count=3,
                 )
             ),
@@ -123,7 +119,7 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
         )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "extracting", "jobId": "job-123", "reports_count": 3}
+    assert response.json() == {"status": "processing", "jobId": "job-123", "reports_count": 3}
     start_analysis.assert_awaited_once()
     assert len(start_analysis.await_args.args[1]) == 3
 
@@ -181,7 +177,8 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
                     template_id=None,
                     status="pending_review",
                     reports_count=3,
-                    structure=StoredTemplateStructure(
+                    created_at=datetime.now(UTC),
+                    structure=TemplateStructure(
                         sections=[
                             TemplateSection(
                                 id="findings",
@@ -241,115 +238,6 @@ async def test_get_template_analysis_returns_not_found_for_unknown_job(client: A
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Template analysis not found"}
-
-
-async def test_patch_template_analysis_updates_pending_structure(client: AsyncClient) -> None:
-    current_user = build_current_user()
-    access_token = security.create_access_token(current_user)
-    request_body = {
-        "sections": [
-            {"id": "summary", "label": "Executive Summary", "render_type": "text_block"},
-        ]
-    }
-
-    with (
-        patch.object(
-            auth_service.auth_queries,
-            "get_user_by_id",
-            AsyncMock(return_value=current_user),
-        ),
-        patch(
-            "src.routes.template.templates.update_pending_template_structure",
-            AsyncMock(),
-        ) as update_structure,
-    ):
-        response = await client.patch(
-            "/api/v1/template/analysis/job-123",
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=request_body,
-        )
-
-    assert response.status_code == 204
-    assert response.content == b""
-    update_structure.assert_awaited_once_with(
-        current_user,
-        "job-123",
-        [TemplateSection(id="summary", label="Executive Summary", render_type="text_block")],
-    )
-
-
-async def test_patch_template_analysis_accepts_groups(client: AsyncClient) -> None:
-    current_user = build_current_user()
-    access_token = security.create_access_token(current_user)
-    request_body = {
-        "sections": [
-            {
-                "id": "meetresultaten",
-                "label": "Meetresultaten",
-                "order": 2,
-                "render_type": "measurement_table",
-                "fields": ["Visuele inspectie", "Thermografie", "Druktest"],
-                "found_in": 3,
-                "groups": [
-                    {
-                        "id": "algemene_inspectie",
-                        "label": "Algemene inspectie schadebeeld/ leidingwerk",
-                        "fields": ["Visuele inspectie", "Thermografie"],
-                    },
-                    {
-                        "id": "waterleidingen",
-                        "label": "Waterleidingen",
-                        "fields": ["Druktest"],
-                    },
-                ],
-            },
-        ]
-    }
-
-    with (
-        patch.object(
-            auth_service.auth_queries,
-            "get_user_by_id",
-            AsyncMock(return_value=current_user),
-        ),
-        patch(
-            "src.routes.template.templates.update_pending_template_structure",
-            AsyncMock(),
-        ) as update_structure,
-    ):
-        response = await client.patch(
-            "/api/v1/template/analysis/job-123",
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=request_body,
-        )
-
-    assert response.status_code == 204
-    update_structure.assert_awaited_once_with(
-        current_user,
-        "job-123",
-        [
-            TemplateSection(
-                id="meetresultaten",
-                label="Meetresultaten",
-                order=2,
-                render_type="measurement_table",
-                fields=["Visuele inspectie", "Thermografie", "Druktest"],
-                found_in=3,
-                groups=[
-                    TemplateSectionGroup(
-                        id="algemene_inspectie",
-                        label="Algemene inspectie schadebeeld/ leidingwerk",
-                        fields=["Visuele inspectie", "Thermografie"],
-                    ),
-                    TemplateSectionGroup(
-                        id="waterleidingen",
-                        label="Waterleidingen",
-                        fields=["Druktest"],
-                    ),
-                ],
-            ),
-        ],
-    )
 
 
 async def test_confirm_template_returns_active_template(client: AsyncClient) -> None:

@@ -5,7 +5,8 @@ from uuid import uuid4
 from starlette.datastructures import UploadFile
 
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.records import CompanyTemplateRecord
+from src.models.templates.domain import TemplateStructure
+from src.models.templates.records import ActiveCompanyTemplateRecord
 from src.routes import inspections
 
 
@@ -28,8 +29,13 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
 
     with (
         patch(
-            "src.routes.inspections.template_queries.fetch_company_template_context",
-            AsyncMock(return_value=(CompanyTemplateRecord(template_id=template_id), None)),
+            "src.routes.inspections.template_queries.fetch_active_company_template",
+            AsyncMock(
+                return_value=ActiveCompanyTemplateRecord(
+                    template_id=template_id,
+                    structure=TemplateStructure(sections=[]),
+                )
+            ),
         ),
         patch(
             "src.routes.inspections.inspection_file_storage.store_inspection_files",

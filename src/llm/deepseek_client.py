@@ -2,7 +2,7 @@ from openai.types.shared_params.response_format_json_object import ResponseForma
 
 from src.config import settings
 from src.llm.client_factory import get_deepseek_client
-from src.models.templates.configuration import TemplateSection
+from src.models.templates.domain import TemplateSection
 from src.models.templates.pipeline import (
     TemplateAnalysisDocument,
     TemplateAnalysisDocumentList,

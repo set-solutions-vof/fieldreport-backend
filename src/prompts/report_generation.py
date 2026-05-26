@@ -1,4 +1,4 @@
-from src.models.templates.configuration import TemplateSection
+from src.models.templates.domain import TemplateSection
 
 
 def build_report_generation_prompt(

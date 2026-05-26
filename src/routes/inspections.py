@@ -25,7 +25,7 @@ async def create_inspection(
     extra_context: Annotated[str | None, Form()] = None,
     photo_files: Annotated[list[UploadFile], File()] = [],
 ) -> CreateInspectionResponse:
-    company_template, _ = await template_queries.fetch_company_template_context(
+    company_template = await template_queries.fetch_active_company_template(
         str(current_user.company_id)
     )
 

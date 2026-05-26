@@ -13,10 +13,6 @@ from src.storage import inspection_file_storage
 async def run_audio_pipeline(report_id: str) -> None:
     report = await report_queries.get_report_for_pipeline(report_id)
 
-    if report["status"] != "generating":
-        logger.info("Skipping report {} with status {}", report_id, report["status"])
-        return
-
     inspection_id = str(report["inspection_id"])
     company_id = str(report["company_id"])
     template_id = str(report["template_id"])

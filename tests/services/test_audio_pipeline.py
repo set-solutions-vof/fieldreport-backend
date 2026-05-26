@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from src.models.reports.transcription import TranscriptionResult, TranscriptionSegment
-from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
+from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.services import audio_pipeline
 
 
@@ -20,20 +20,9 @@ def build_report(status: str = "generating") -> dict:
     }
 
 
-async def test_run_audio_pipeline_skips_non_generating_report() -> None:
-    report = build_report(status="draft")
-
-    with patch.object(
-        audio_pipeline.report_queries,
-        "get_report_for_pipeline",
-        AsyncMock(return_value=report),
-    ):
-        await audio_pipeline.run_audio_pipeline("report-id")
-
-
 async def test_run_audio_pipeline_processes_media_and_persists_sections() -> None:
     report = build_report()
-    template_structure = StoredTemplateStructure(
+    template_structure = TemplateStructure(
         sections=[
             TemplateSection(
                 id="conclusie",
@@ -174,7 +163,7 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
 
 async def test_run_audio_pipeline_continues_after_media_file_failures() -> None:
     report = build_report()
-    template_structure = StoredTemplateStructure(
+    template_structure = TemplateStructure(
         sections=[TemplateSection(id="conclusie", label="Conclusie", render_type="text_block")]
     )
     response = SimpleNamespace(
@@ -235,7 +224,7 @@ async def test_run_audio_pipeline_continues_after_media_file_failures() -> None:
 
 async def test_run_audio_pipeline_marks_failed_when_report_generation_fails() -> None:
     report = build_report()
-    template_structure = StoredTemplateStructure(
+    template_structure = TemplateStructure(
         sections=[TemplateSection(id="conclusie", label="Conclusie", render_type="text_block")]
     )
     client = SimpleNamespace(

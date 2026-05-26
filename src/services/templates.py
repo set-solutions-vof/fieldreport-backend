@@ -5,18 +5,17 @@ from fastapi import UploadFile
 from src.db import template_queries
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
-    StoredTemplateStructure,
+    TemplateConfiguration,
     TemplateConfigurationActive,
-    TemplateConfigurationExtracting,
-    TemplateSection,
+    TemplateConfigurationProcessing,
 )
+from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.models.templates.state import TemplateCompanyState
 from src.services import templates_state
 from src.storage import template_file_storage
 
 
-async def load_template_company_state(company_id: str) -> TemplateCompanyState:
+async def load_template_configuration(company_id: str) -> TemplateConfiguration:
     company, job = await template_queries.fetch_company_template_context(company_id)
 
     return templates_state.resolve_template_company_state(company, job)
@@ -37,7 +36,7 @@ async def get_template_analysis_job(
 async def start_template_analysis(
     user: CurrentUser,
     files: list[UploadFile],
-) -> TemplateConfigurationExtracting:
+) -> TemplateConfigurationProcessing:
     company_id = str(user.company_id)
     job_id = str(uuid4())
     stored_files = await template_file_storage.store_template_analysis_files(
@@ -48,9 +47,9 @@ async def start_template_analysis(
 
     await template_queries.replace_template_analysis_job(job_id, company_id, stored_files)
 
-    return TemplateConfigurationExtracting(
-        status="extracting",
-        jobId=job_id,
+    return TemplateConfigurationProcessing(
+        status="processing",
+        job_id=job_id,
         reports_count=len(files),
     )
 
@@ -60,38 +59,16 @@ async def confirm_template(
     sections: list[TemplateSection],
 ) -> TemplateConfigurationActive:
     company_id = str(user.company_id)
-    state = await load_template_company_state(company_id)
-    structure = StoredTemplateStructure(sections=sections)
+    job = await template_queries.fetch_latest_template_analysis_job(company_id)
+    structure = TemplateStructure(sections=sections)
     template_id = str(uuid4())
 
     await template_queries.create_template(company_id, template_id, structure)
     await template_queries.set_active_template(company_id, template_id)
-
-    if state.job_id is not None:
-        await template_queries.update_template_analysis_job(
-            str(state.job_id),
-            "active",
-            structure,
-            template_id,
-        )
-
-    reports_count = state.reports_count if state.job_id is not None else 0
+    await template_queries.delete_template_analysis_job(str(job.id), company_id)
 
     return TemplateConfigurationActive(
         status="active",
-        reports_count=reports_count,
+        reports_count=job.reports_count,
         sections=sections,
-    )
-
-
-async def update_pending_template_structure(
-    user: CurrentUser,
-    job_id: str,
-    sections: list[TemplateSection],
-) -> None:
-    structure = StoredTemplateStructure(sections=sections)
-    await template_queries.update_pending_template_structure(
-        job_id,
-        str(user.company_id),
-        structure,
     )

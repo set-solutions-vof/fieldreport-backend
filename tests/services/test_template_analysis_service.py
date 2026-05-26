@@ -1,11 +1,10 @@
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
-from src.models.templates.configuration import StoredTemplateStructure, TemplateSection
-from src.models.templates.pipeline import (
-    TemplateAnalysisDocument,
-    TemplateAnalysisFile,
-    TemplateAnalysisJob,
-)
+from src.models.templates.domain import TemplateSection, TemplateStructure
+from src.models.templates.pipeline import TemplateAnalysisDocument, TemplateAnalysisFile
+from src.models.templates.records import TemplateAnalysisJobRecord
 from src.services import template_analysis as template_analysis_service
 
 
@@ -51,11 +50,13 @@ async def test_process_next_template_analysis_job_returns_none_when_queue_is_emp
 
 
 async def test_process_next_template_analysis_job_updates_pending_review_structure() -> None:
-    job = TemplateAnalysisJob(
-        id="job-1",
-        company_id="company-1",
+    job = TemplateAnalysisJobRecord(
+        id=uuid4(),
+        company_id=uuid4(),
+        template_id=None,
         status="processing",
         reports_count=1,
+        created_at=datetime.now(UTC),
     )
     files = [TemplateAnalysisFile(file_name="report.pdf", storage_path="/tmp/report.pdf")]
     sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
@@ -97,18 +98,20 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
 
     assert result == job
     update_job.assert_awaited_once_with(
-        "job-1",
+        str(job.id),
         "pending_review",
-        StoredTemplateStructure(sections=sections),
+        TemplateStructure(sections=sections),
     )
 
 
 async def test_process_next_template_analysis_job_marks_failed_when_model_call_fails() -> None:
-    job = TemplateAnalysisJob(
-        id="job-1",
-        company_id="company-1",
+    job = TemplateAnalysisJobRecord(
+        id=uuid4(),
+        company_id=uuid4(),
+        template_id=None,
         status="processing",
         reports_count=1,
+        created_at=datetime.now(UTC),
     )
     files = [TemplateAnalysisFile(file_name="report.pdf", storage_path="/tmp/report.pdf")]
 
@@ -153,7 +156,7 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
             raise AssertionError("Expected ValueError")
 
     update_job.assert_awaited_once_with(
-        "job-1",
+        str(job.id),
         "failed",
         None,
         error_message="bad json",

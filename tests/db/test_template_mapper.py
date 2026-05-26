@@ -1,39 +1,36 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-import pytest
-
 from src.db.template_mapper import (
+    map_active_company_template,
     map_company_template,
     map_template_analysis_job,
-    parse_stored_template_structure,
+    parse_template_structure,
 )
-from src.models.templates.configuration import (
-    StoredTemplateStructure,
+from src.models.templates.domain import (
     TemplateSection,
     TemplateSectionGroup,
+    TemplateStructure,
 )
-from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
+from src.models.templates.records import (
+    ActiveCompanyTemplateRecord,
+    CompanyTemplateRecord,
+    TemplateAnalysisJobRecord,
+)
 
 
-def test_parse_stored_template_structure_returns_existing_model() -> None:
-    structure = StoredTemplateStructure(sections=[])
-
-    assert parse_stored_template_structure(structure) == structure
-
-
-def test_parse_stored_template_structure_parses_json_string() -> None:
-    structure = parse_stored_template_structure(
+def test_parse_template_structure_parses_json_string() -> None:
+    structure = parse_template_structure(
         '{"sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}]}'
     )
 
-    assert structure == StoredTemplateStructure(
+    assert structure == TemplateStructure(
         sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
 
 
-def test_parse_stored_template_structure_parses_groups() -> None:
-    structure = parse_stored_template_structure(
+def test_parse_template_structure_parses_groups() -> None:
+    structure = parse_template_structure(
         """
         {
           "sections": [
@@ -62,7 +59,7 @@ def test_parse_stored_template_structure_parses_groups() -> None:
         """
     )
 
-    assert structure == StoredTemplateStructure(
+    assert structure == TemplateStructure(
         sections=[
             TemplateSection(
                 id="meetresultaten",
@@ -88,9 +85,10 @@ def test_parse_stored_template_structure_parses_groups() -> None:
     )
 
 
-def test_parse_stored_template_structure_rejects_unsupported_value() -> None:
-    with pytest.raises(TypeError, match="Unsupported structure value"):
-        parse_stored_template_structure(42)
+def test_map_company_template_returns_no_template_when_template_id_is_none() -> None:
+    record = map_company_template({"template_id": None, "structure": None})
+
+    assert record == CompanyTemplateRecord()
 
 
 def test_map_company_template_omits_structure_when_missing() -> None:
@@ -113,7 +111,23 @@ def test_map_company_template_parses_record() -> None:
 
     assert record == CompanyTemplateRecord(
         template_id=template_id,
-        structure=StoredTemplateStructure(sections=[]),
+        structure=TemplateStructure(sections=[]),
+    )
+
+
+def test_map_active_company_template_parses_record() -> None:
+    template_id = uuid4()
+
+    record = map_active_company_template(
+        {
+            "template_id": template_id,
+            "structure": '{"sections": []}',
+        }
+    )
+
+    assert record == ActiveCompanyTemplateRecord(
+        template_id=template_id,
+        structure=TemplateStructure(sections=[]),
     )
 
 

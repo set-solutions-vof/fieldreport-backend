@@ -1,11 +1,7 @@
 from pydantic import BaseModel
 
-from src.models.templates.configuration import TemplateSection
+from src.models.templates.domain import TemplateSection
 
 
-class TemplateConfigurationRequest(BaseModel):
-    sections: list[TemplateSection]
-
-
-class UpdateTemplateStructureRequest(BaseModel):
+class TemplateStructureRequest(BaseModel):
     sections: list[TemplateSection]
