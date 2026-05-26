@@ -1,7 +1,6 @@
 import base64
 import mimetypes
 
-from loguru import logger
 from openai.types.shared_params.response_format_json_schema import (
     JSONSchema,
     ResponseFormatJSONSchema,
@@ -49,9 +48,9 @@ async def analyze_pdf_visuals(file_name: str, file_content: bytes) -> str:
             ),
         ),
     )
-    parsed_content = TemplateVisualAnalysis.model_validate_json(
-        response.choices[0].message.content
-    )
+    content = response.choices[0].message.content
+    assert content is not None
+    parsed_content = TemplateVisualAnalysis.model_validate_json(content)
 
     return parsed_content.model_dump_json()
 
@@ -82,4 +81,7 @@ async def analyze_inspection_photo(file_name: str, file_content: bytes) -> str:
         ],
     )
 
-    return response.choices[0].message.content
+    content = response.choices[0].message.content
+    assert content is not None
+
+    return content

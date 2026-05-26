@@ -9,7 +9,6 @@ from src.http.v1.request.template import (
 from src.http.v1.response.template import template_configuration_response
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
-    TemplateAnalysisConfiguration,
     TemplateConfiguration,
     TemplateConfigurationActive,
 )
@@ -43,7 +42,7 @@ async def start_template_analysis(
 async def get_template_analysis(
     job_id: str,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
-) -> TemplateAnalysisConfiguration:
+) -> TemplateConfiguration:
     try:
         job = await templates.get_template_analysis_job(current_user, job_id)
 

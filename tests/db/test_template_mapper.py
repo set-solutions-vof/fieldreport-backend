@@ -10,8 +10,8 @@ from src.db.template_mapper import (
 )
 from src.models.templates.configuration import (
     StoredTemplateStructure,
-    TemplateSectionGroup,
     TemplateSection,
+    TemplateSectionGroup,
 )
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
@@ -28,9 +28,7 @@ def test_parse_stored_template_structure_parses_json_string() -> None:
     )
 
     assert structure == StoredTemplateStructure(
-        sections=[
-            TemplateSection(id="summary", label="Summary", render_type="text_block")
-        ]
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
 
 

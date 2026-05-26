@@ -59,9 +59,7 @@ async def test_transcribe_audio_uses_json_for_gpt_4o_transcribe() -> None:
     response = SimpleNamespace(text="Transcriptie")
     client = SimpleNamespace(
         audio=SimpleNamespace(
-            transcriptions=SimpleNamespace(
-                create=AsyncMock(return_value=response)
-            )
+            transcriptions=SimpleNamespace(create=AsyncMock(return_value=response))
         )
     )
 
@@ -75,9 +73,7 @@ async def test_transcribe_audio_uses_json_for_gpt_4o_transcribe() -> None:
         patch.object(
             gpt4o_transcribe_client,
             "split_audio_sync",
-            return_value=[
-                AudioChunk(filename="audio.m4a", content=b"audio", duration_seconds=5.0)
-            ],
+            return_value=[AudioChunk(filename="audio.m4a", content=b"audio", duration_seconds=5.0)],
         ),
     ):
         result = await gpt4o_transcribe_client.transcribe_audio(b"audio", "audio.m4a")

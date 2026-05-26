@@ -227,9 +227,7 @@ async def test_update_report_section_returns_repository_section() -> None:
             "load_template_sections_by_id",
             AsyncMock(
                 return_value={
-                    "advies": TemplateSection(
-                        id="advies", label="Advies", render_type="text_block"
-                    )
+                    "advies": TemplateSection(id="advies", label="Advies", render_type="text_block")
                 }
             ),
         ),

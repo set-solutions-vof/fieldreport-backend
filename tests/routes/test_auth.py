@@ -130,9 +130,7 @@ async def test_refresh_returns_new_access_token(client: AsyncClient) -> None:
     current_user = build_current_user()
     refresh_token = security.create_refresh_token(current_user)
 
-    with patch.object(
-        service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-    ):
+    with patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)):
         response = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
 
     assert response.status_code == 200
@@ -158,9 +156,7 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    with patch.object(
-        service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-    ):
+    with patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)):
         response = await client.get(
             "/api/v1/auth/me",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -191,9 +187,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
     fake_report = build_report_summary(current_user.company_id)
 
     with (
-        patch.object(
-            service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.list_reports_for_user",
             AsyncMock(return_value=[fake_report]),
@@ -260,9 +254,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     )
 
     with (
-        patch.object(
-            service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.get_report_detail",
             AsyncMock(return_value=fake_report),
@@ -339,9 +331,7 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
     )
 
     with (
-        patch.object(
-            service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.update_report_section",
             AsyncMock(return_value=fake_section),

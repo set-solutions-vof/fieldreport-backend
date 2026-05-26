@@ -36,8 +36,8 @@ async def synthesize_template_sections(
         ],
         response_format=ResponseFormatJSONObject(type="json_object"),
     )
-    payload = TemplateSectionList.model_validate_json(
-        response.choices[0].message.content
-    )
+    content = response.choices[0].message.content
+    assert content is not None
+    payload = TemplateSectionList.model_validate_json(content)
 
     return payload.sections

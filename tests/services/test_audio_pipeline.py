@@ -87,18 +87,14 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
             audio_pipeline.inspection_queries,
             "fetch_inspection_audio_files",
             AsyncMock(
-                return_value=[
-                    {"storage_key": "/tmp/audio.m4a", "original_filename": "audio.m4a"}
-                ]
+                return_value=[{"storage_key": "/tmp/audio.m4a", "original_filename": "audio.m4a"}]
             ),
         ),
         patch.object(
             audio_pipeline.inspection_queries,
             "fetch_inspection_photo_files",
             AsyncMock(
-                return_value=[
-                    {"storage_key": "/tmp/photo.jpg", "original_filename": "photo.jpg"}
-                ]
+                return_value=[{"storage_key": "/tmp/photo.jpg", "original_filename": "photo.jpg"}]
             ),
         ),
         patch.object(
@@ -204,18 +200,14 @@ async def test_run_audio_pipeline_continues_after_media_file_failures() -> None:
             audio_pipeline.inspection_queries,
             "fetch_inspection_audio_files",
             AsyncMock(
-                return_value=[
-                    {"storage_key": "/tmp/audio.m4a", "original_filename": "audio.m4a"}
-                ]
+                return_value=[{"storage_key": "/tmp/audio.m4a", "original_filename": "audio.m4a"}]
             ),
         ),
         patch.object(
             audio_pipeline.inspection_queries,
             "fetch_inspection_photo_files",
             AsyncMock(
-                return_value=[
-                    {"storage_key": "/tmp/photo.jpg", "original_filename": "photo.jpg"}
-                ]
+                return_value=[{"storage_key": "/tmp/photo.jpg", "original_filename": "photo.jpg"}]
             ),
         ),
         patch.object(
@@ -247,7 +239,9 @@ async def test_run_audio_pipeline_marks_failed_when_report_generation_fails() ->
         sections=[TemplateSection(id="conclusie", label="Conclusie", render_type="text_block")]
     )
     client = SimpleNamespace(
-        chat=SimpleNamespace(completions=SimpleNamespace(create=AsyncMock(side_effect=ValueError("bad"))))
+        chat=SimpleNamespace(
+            completions=SimpleNamespace(create=AsyncMock(side_effect=ValueError("bad")))
+        )
     )
 
     with (

@@ -28,10 +28,10 @@ async def load_template_sections_by_id(company_id: str) -> dict[str, TemplateSec
     return {section.id: section for section in company_template.structure.sections}
 
 
-def apply_template_to_section(
-    section: ReportSection | ReportDetailSection,
+def apply_template_to_section[ReportSectionType: (ReportSection, ReportDetailSection)](
+    section: ReportSectionType,
     template_sections_by_id: dict[str, TemplateSection],
-) -> ReportSection | ReportDetailSection:
+) -> ReportSectionType:
     template_section = template_sections_by_id[section.section_id]
     return section.model_copy(
         update={
@@ -46,9 +46,7 @@ async def get_report_detail(report_id: str, user: CurrentUser) -> ReportDetail:
     report = await report_queries.get_report_by_id(report_id, str(user.company_id))
     sections, timeline_items = await load_report_detail_sections(report_id)
     template_sections_by_id = await load_template_sections_by_id(str(user.company_id))
-    sections = [
-        apply_template_to_section(section, template_sections_by_id) for section in sections
-    ]
+    sections = [apply_template_to_section(section, template_sections_by_id) for section in sections]
 
     return report.model_copy(update={"sections": sections, "timeline_items": timeline_items})
 

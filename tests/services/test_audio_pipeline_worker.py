@@ -70,7 +70,9 @@ async def test_run_audio_pipeline_worker_sleeps_when_no_report_is_available() ->
             raised = False
 
     assert raised is True
-    sleep.assert_awaited_once_with(audio_pipeline_worker.settings.audio_pipeline_worker_poll_seconds)
+    sleep.assert_awaited_once_with(
+        audio_pipeline_worker.settings.audio_pipeline_worker_poll_seconds
+    )
 
 
 def test_audio_pipeline_worker_main_starts_worker() -> None:

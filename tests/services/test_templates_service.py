@@ -304,8 +304,6 @@ async def test_update_pending_template_structure_updates_company_scoped_job() ->
         job_id,
         str(current_user.company_id),
         StoredTemplateStructure(
-            sections=[
-                TemplateSection(id="summary", label="Summary", render_type="text_block")
-            ]
+            sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
         ),
     )

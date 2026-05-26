@@ -13,8 +13,8 @@ from src.models.templates.configuration import (
     StoredTemplateStructure,
     TemplateConfigurationActive,
     TemplateConfigurationExtracting,
-    TemplateSectionGroup,
     TemplateSection,
+    TemplateSectionGroup,
 )
 from src.models.templates.records import TemplateAnalysisJobRecord
 from src.models.templates.state import TemplateCompanyState

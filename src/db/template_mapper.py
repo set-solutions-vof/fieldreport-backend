@@ -5,10 +5,7 @@ from src.models.templates.pipeline import TemplateAnalysisFile, TemplateAnalysis
 from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
-def parse_stored_template_structure(value: object) -> StoredTemplateStructure | None:
-    if value is None:
-        return None
-
+def parse_stored_template_structure(value: object) -> StoredTemplateStructure:
     if isinstance(value, StoredTemplateStructure):
         return value
 
@@ -23,22 +20,20 @@ def parse_stored_template_structure(value: object) -> StoredTemplateStructure | 
 
 def map_company_template(row: asyncpg.Record) -> CompanyTemplateRecord:
     row_data = dict(row)
-    structure = parse_stored_template_structure(row_data.get("structure"))
-    if structure is not None:
-        row_data["structure"] = structure
-    else:
+    if row_data.get("structure") is None:
         row_data.pop("structure")
+    else:
+        row_data["structure"] = parse_stored_template_structure(row_data["structure"])
 
     return CompanyTemplateRecord.model_validate(row_data)
 
 
 def map_template_analysis_job(row: asyncpg.Record) -> TemplateAnalysisJobRecord:
     row_data = dict(row)
-    structure = parse_stored_template_structure(row_data.get("structure"))
-    if structure is not None:
-        row_data["structure"] = structure
-    else:
+    if row_data.get("structure") is None:
         row_data.pop("structure")
+    else:
+        row_data["structure"] = parse_stored_template_structure(row_data["structure"])
 
     if row_data["error_message"] is None:
         row_data.pop("error_message")

@@ -71,7 +71,9 @@ def test_resolve_template_company_state_returns_active_template_when_no_job() ->
     )
     template_id = uuid4()
 
-    state = templates_state.resolve_template_company_state(build_company(template_id, structure), None)
+    state = templates_state.resolve_template_company_state(
+        build_company(template_id, structure), None
+    )
 
     assert state.view_status == "active"
     assert state.structure == structure
@@ -85,7 +87,9 @@ def test_resolve_template_company_state_prefers_active_template_over_failed_job(
     )
     job = build_job(status="failed", error_message="model error")
 
-    state = templates_state.resolve_template_company_state(build_company(template_id, active_structure), job)
+    state = templates_state.resolve_template_company_state(
+        build_company(template_id, active_structure), job
+    )
 
     assert state.view_status == "active"
     assert state.structure == active_structure
@@ -105,7 +109,9 @@ def test_resolve_template_company_state_returns_active_from_active_job() -> None
         reports_count=4,
     )
 
-    state = templates_state.resolve_template_company_state(build_company(template_id, active_structure), job)
+    state = templates_state.resolve_template_company_state(
+        build_company(template_id, active_structure), job
+    )
 
     assert state.view_status == "active"
     assert state.structure == active_structure
