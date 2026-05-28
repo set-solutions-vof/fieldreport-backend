@@ -108,12 +108,12 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "id": first_section_id,
             "section_id": "bevindingen",
             "section_order": 1,
-            "ai_draft": "Draft text",
-            "field_expert_content": None,
-            "is_approved": False,
+            "generated_content": "Draft text",
+            "reviewed_content": None,
+            "approved": False,
             "confidence_level": "high",
             "confidence_score": 0.95,
-            "source_type": "image_analysis",
+            "evidence_type": "image_analysis",
             "transcription_segment_id": None,
             "start_seconds": None,
             "end_seconds": None,
@@ -121,18 +121,18 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "image_analysis_id": shared_image_analysis_id,
             "captured_at": capture_time,
             "image_analysis_text": "Thermal image",
-            "timeline_offset_seconds": 20.0,
+            "timeline_seconds": 20.0,
         },
         {
             "id": first_section_id,
             "section_id": "bevindingen",
             "section_order": 1,
-            "ai_draft": "Draft text",
-            "field_expert_content": None,
-            "is_approved": False,
+            "generated_content": "Draft text",
+            "reviewed_content": None,
+            "approved": False,
             "confidence_level": "high",
             "confidence_score": 0.95,
-            "source_type": "transcription_segment",
+            "evidence_type": "transcription_segment",
             "transcription_segment_id": shared_transcription_segment_id,
             "start_seconds": 12.0,
             "end_seconds": 15.0,
@@ -140,18 +140,18 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "image_analysis_id": None,
             "captured_at": None,
             "image_analysis_text": None,
-            "timeline_offset_seconds": 12.0,
+            "timeline_seconds": 12.0,
         },
         {
             "id": second_section_id,
             "section_id": "advies",
             "section_order": 2,
-            "ai_draft": "Advice",
-            "field_expert_content": None,
-            "is_approved": False,
+            "generated_content": "Advice",
+            "reviewed_content": None,
+            "approved": False,
             "confidence_level": "medium",
             "confidence_score": 0.71,
-            "source_type": "transcription_segment",
+            "evidence_type": "transcription_segment",
             "transcription_segment_id": shared_transcription_segment_id,
             "start_seconds": 12.0,
             "end_seconds": 15.0,
@@ -159,18 +159,18 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "image_analysis_id": None,
             "captured_at": None,
             "image_analysis_text": None,
-            "timeline_offset_seconds": 12.0,
+            "timeline_seconds": 12.0,
         },
         {
             "id": second_section_id,
             "section_id": "advies",
             "section_order": 2,
-            "ai_draft": "Advice",
-            "field_expert_content": None,
-            "is_approved": False,
+            "generated_content": "Advice",
+            "reviewed_content": None,
+            "approved": False,
             "confidence_level": "medium",
             "confidence_score": 0.71,
-            "source_type": "transcription_segment",
+            "evidence_type": "transcription_segment",
             "transcription_segment_id": first_unique_segment_id,
             "start_seconds": 5.0,
             "end_seconds": 8.0,
@@ -178,18 +178,18 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "image_analysis_id": None,
             "captured_at": None,
             "image_analysis_text": None,
-            "timeline_offset_seconds": 5.0,
+            "timeline_seconds": 5.0,
         },
         {
             "id": second_section_id,
             "section_id": "advies",
             "section_order": 2,
-            "ai_draft": "Advice",
-            "field_expert_content": None,
-            "is_approved": False,
+            "generated_content": "Advice",
+            "reviewed_content": None,
+            "approved": False,
             "confidence_level": "medium",
             "confidence_score": 0.71,
-            "source_type": "image_analysis",
+            "evidence_type": "image_analysis",
             "transcription_segment_id": None,
             "start_seconds": None,
             "end_seconds": None,
@@ -197,18 +197,18 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "image_analysis_id": shared_image_analysis_id,
             "captured_at": capture_time,
             "image_analysis_text": "Thermal image",
-            "timeline_offset_seconds": 20.0,
+            "timeline_seconds": 20.0,
         },
         {
             "id": third_section_id,
             "section_id": "samenvatting",
             "section_order": 3,
-            "ai_draft": "Summary",
-            "field_expert_content": None,
-            "is_approved": False,
+            "generated_content": "Summary",
+            "reviewed_content": None,
+            "approved": False,
             "confidence_level": "low",
             "confidence_score": 0.42,
-            "source_type": "transcription_segment",
+            "evidence_type": "transcription_segment",
             "transcription_segment_id": third_section_segment_id,
             "start_seconds": 30.0,
             "end_seconds": 35.0,
@@ -216,7 +216,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "image_analysis_id": None,
             "captured_at": None,
             "image_analysis_text": None,
-            "timeline_offset_seconds": 30.0,
+            "timeline_seconds": 30.0,
         },
     ]
     for row in rows:
@@ -229,7 +229,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         AsyncMock(return_value=connection),
     ):
         rows = await report_queries.fetch_report_section_rows(str(uuid4()))
-        sections, timeline_items = map_report_detail_sections(rows)
+        sections, evidence_items = map_report_detail_sections(rows)
 
     assert [section.id for section in sections] == [
         first_section_id,
@@ -237,29 +237,29 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         third_section_id,
     ]
     assert sections[0].render_type == "measurement_table"
-    assert sections[0].source_item_ids == [
+    assert sections[0].evidence_item_ids == [
         shared_image_analysis_id,
         shared_transcription_segment_id,
     ]
-    assert sections[1].source_item_ids == [
+    assert sections[1].evidence_item_ids == [
         shared_transcription_segment_id,
         first_unique_segment_id,
         shared_image_analysis_id,
     ]
-    assert sections[2].source_item_ids == [third_section_segment_id]
-    assert [timeline_item.id for timeline_item in timeline_items] == [
+    assert sections[2].evidence_item_ids == [third_section_segment_id]
+    assert [evidence_item.id for evidence_item in evidence_items] == [
         first_unique_segment_id,
         shared_transcription_segment_id,
         shared_image_analysis_id,
         third_section_segment_id,
     ]
-    assert [timeline_item.source_type for timeline_item in timeline_items] == [
+    assert [evidence_item.evidence_type for evidence_item in evidence_items] == [
         "transcription_segment",
         "transcription_segment",
         "image_analysis",
         "transcription_segment",
     ]
-    assert [timeline_item.timeline_offset_seconds for timeline_item in timeline_items] == [
+    assert [evidence_item.timeline_seconds for evidence_item in evidence_items] == [
         5.0,
         12.0,
         20.0,
@@ -479,12 +479,12 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
             "section_id": "advies",
             "section_order": 2,
             "render_type": "key_value_table",
-            "ai_draft": "Advice",
-            "field_expert_content": "Updated advice",
-            "is_approved": True,
+            "generated_content": "Advice",
+            "reviewed_content": "Updated advice",
+            "approved": True,
             "confidence_level": "low",
             "confidence_score": 0.32,
-            "source_type": "image_analysis",
+            "evidence_type": "image_analysis",
             "start_seconds": None,
             "end_seconds": None,
             "transcription_text": None,
@@ -510,13 +510,13 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
     assert section.id == section_id
     assert section.section_id == "advies"
     assert section.render_type == "key_value_table"
-    assert section.field_expert_content == "Updated advice"
-    assert section.is_approved is True
+    assert section.reviewed_content == "Updated advice"
+    assert section.approved is True
     assert section.confidence_level == "low"
     assert section.confidence_score == 0.32
-    assert section.sources[0].type == "image"
-    assert section.sources[0].capture_time == capture_time
-    assert section.sources[0].content_summary == "Image summary"
+    assert section.evidence_sources[0].type == "image"
+    assert section.evidence_sources[0].captured_at == capture_time
+    assert section.evidence_sources[0].content_summary == "Image summary"
     connection.fetch.assert_awaited_once()
     connection.fetchrow.assert_awaited_once()
     assert connection.fetchrow.await_args.args[1:] == (
@@ -543,12 +543,12 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
             "render_type": "text_block",
             "fields": None,
             "groups": None,
-            "ai_draft": "Advice",
-            "field_expert_content": "Expert advice",
-            "is_approved": False,
+            "generated_content": "Advice",
+            "reviewed_content": "Expert advice",
+            "approved": False,
             "confidence_level": "high",
             "confidence_score": 0.95,
-            "source_type": "transcription_segment",
+            "evidence_type": "transcription_segment",
             "start_seconds": 2.0,
             "end_seconds": 4.0,
             "transcription_text": "Advice audio",
@@ -572,9 +572,9 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
 
     assert section is not None
     assert section.id == section_id
-    assert section.field_expert_content == "Expert advice"
-    assert section.is_approved is False
-    assert section.sources[0].type == "audio"
+    assert section.reviewed_content == "Expert advice"
+    assert section.approved is False
+    assert section.evidence_sources[0].type == "audio"
     connection.fetchrow.assert_awaited_once()
     assert "SELECT report_sections.id" in connection.fetchrow.await_args.args[0]
     assert connection.fetchrow.await_args.args[1:] == (

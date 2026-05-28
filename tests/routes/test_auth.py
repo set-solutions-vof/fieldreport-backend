@@ -12,10 +12,10 @@ from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 from src.models.reports.report import (
     ReportDetail,
     ReportDetailSection,
+    ReportEvidenceItem,
+    ReportEvidenceSource,
     ReportSection,
-    ReportSectionSource,
     ReportSummary,
-    ReportTimelineItem,
 )
 from src.security import authentication as security
 from src.services import authentication as service
@@ -232,19 +232,19 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 id=uuid4(),
                 section_id="technische_bevindingen",
                 label="Technische Bevindingen",
-                ai_draft="Draft",
-                field_expert_content=None,
-                is_approved=False,
+                generated_content="Draft",
+                reviewed_content=None,
+                approved=False,
                 confidence_level="high",
                 confidence_score=0.95,
-                source_item_ids=[image_analysis_id],
+                evidence_item_ids=[image_analysis_id],
             )
         ],
-        timeline_items=[
-            ReportTimelineItem(
+        evidence_items=[
+            ReportEvidenceItem(
                 id=image_analysis_id,
-                source_type="image_analysis",
-                timeline_offset_seconds=15.0,
+                evidence_type="image_analysis",
+                timeline_seconds=15.0,
                 start_seconds=None,
                 end_seconds=None,
                 captured_at=capture_time,
@@ -279,22 +279,22 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 "id": str(fake_report.sections[0].id),
                 "section_id": "technische_bevindingen",
                 "label": "Technische Bevindingen",
-                "ai_draft": "Draft",
-                "field_expert_content": None,
-                "is_approved": False,
+                "generated_content": "Draft",
+                "reviewed_content": None,
+                "approved": False,
                 "confidence_level": "high",
                 "confidence_score": 0.95,
                 "render_type": "text_block",
                 "fields": None,
                 "groups": None,
-                "source_item_ids": [str(image_analysis_id)],
+                "evidence_item_ids": [str(image_analysis_id)],
             }
         ],
-        "timeline_items": [
+        "evidence_items": [
             {
                 "id": str(image_analysis_id),
-                "source_type": "image_analysis",
-                "timeline_offset_seconds": 15.0,
+                "evidence_type": "image_analysis",
+                "timeline_seconds": 15.0,
                 "start_seconds": None,
                 "end_seconds": None,
                 "captured_at": "2026-05-08T12:45:00Z",
@@ -314,17 +314,17 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
         id=section_id,
         section_id="advies",
         label="Advies",
-        ai_draft="Advice",
-        field_expert_content="Updated advice",
-        is_approved=True,
+        generated_content="Advice",
+        reviewed_content="Updated advice",
+        approved=True,
         confidence_level="medium",
         confidence_score=0.76,
-        sources=[
-            ReportSectionSource(
+        evidence_sources=[
+            ReportEvidenceSource(
                 type="image",
-                timestamp_start=None,
-                timestamp_end=None,
-                capture_time=capture_time,
+                start_seconds=None,
+                end_seconds=None,
+                captured_at=capture_time,
                 content_summary="Image summary",
             )
         ],
@@ -339,7 +339,7 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
     ):
         response = await client.patch(
             f"/api/v1/reports/{report_id}/sections/{section_id}",
-            json={"field_expert_content": "Updated advice", "is_approved": True},
+            json={"reviewed_content": "Updated advice", "approved": True},
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
@@ -348,20 +348,20 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
         "id": str(section_id),
         "section_id": "advies",
         "label": "Advies",
-        "ai_draft": "Advice",
-        "field_expert_content": "Updated advice",
-        "is_approved": True,
+        "generated_content": "Advice",
+        "reviewed_content": "Updated advice",
+        "approved": True,
         "confidence_level": "medium",
         "confidence_score": 0.76,
         "render_type": "text_block",
         "fields": None,
         "groups": None,
-        "sources": [
+        "evidence_sources": [
             {
                 "type": "image",
-                "timestamp_start": None,
-                "timestamp_end": None,
-                "capture_time": "2026-05-08T12:45:00Z",
+                "start_seconds": None,
+                "end_seconds": None,
+                "captured_at": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
             }
         ],

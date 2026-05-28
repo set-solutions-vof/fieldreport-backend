@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from src.db.template_mapper import (
     map_active_company_template,
-    map_company_template,
+    map_optional_active_company_template,
     map_template_analysis_job,
     parse_template_structure,
 )
@@ -14,7 +14,6 @@ from src.models.templates.domain import (
 )
 from src.models.templates.records import (
     ActiveCompanyTemplateRecord,
-    CompanyTemplateRecord,
     TemplateAnalysisJobRecord,
 )
 
@@ -85,32 +84,24 @@ def test_parse_template_structure_parses_groups() -> None:
     )
 
 
-def test_map_company_template_returns_no_template_when_template_id_is_none() -> None:
-    record = map_company_template({"template_id": None, "structure": None})
+def test_map_optional_active_company_template_returns_none_without_template_id() -> None:
+    record = map_optional_active_company_template({"current_template_id": None, "structure": None})
 
-    assert record == CompanyTemplateRecord()
+    assert record is None
 
 
-def test_map_company_template_omits_structure_when_missing() -> None:
+def test_map_optional_active_company_template_parses_record() -> None:
     template_id = uuid4()
 
-    record = map_company_template({"template_id": template_id, "structure": None})
-
-    assert record == CompanyTemplateRecord(template_id=template_id)
-
-
-def test_map_company_template_parses_record() -> None:
-    template_id = uuid4()
-
-    record = map_company_template(
+    record = map_optional_active_company_template(
         {
-            "template_id": template_id,
+            "current_template_id": template_id,
             "structure": '{"sections": []}',
         }
     )
 
-    assert record == CompanyTemplateRecord(
-        template_id=template_id,
+    assert record == ActiveCompanyTemplateRecord(
+        current_template_id=template_id,
         structure=TemplateStructure(sections=[]),
     )
 
@@ -120,13 +111,13 @@ def test_map_active_company_template_parses_record() -> None:
 
     record = map_active_company_template(
         {
-            "template_id": template_id,
+            "current_template_id": template_id,
             "structure": '{"sections": []}',
         }
     )
 
     assert record == ActiveCompanyTemplateRecord(
-        template_id=template_id,
+        current_template_id=template_id,
         structure=TemplateStructure(sections=[]),
     )
 
@@ -140,11 +131,10 @@ def test_map_template_analysis_job_parses_record() -> None:
         {
             "id": job_id,
             "company_id": company_id,
-            "template_id": None,
             "status": "queued",
-            "reports_count": 2,
+            "source_reports_count": 2,
             "structure": None,
-            "error_message": None,
+            "failure_message": None,
             "created_at": created_at,
         }
     )
@@ -152,8 +142,8 @@ def test_map_template_analysis_job_parses_record() -> None:
     assert record == TemplateAnalysisJobRecord(
         id=job_id,
         company_id=company_id,
-        template_id=None,
         status="queued",
-        reports_count=2,
+        source_reports_count=2,
+        structure=TemplateStructure(sections=[]),
         created_at=created_at,
     )

@@ -5,10 +5,18 @@ from src.llm import deepseek_client
 from src.models.templates.pipeline import TemplateAnalysisDocument
 
 
+class FakeOpenAIMessage:
+    def __init__(self, content: str):
+        self.content = content
+
+    def model_dump(self) -> dict[str, str]:
+        return {"content": self.content}
+
+
 def build_documents() -> list[TemplateAnalysisDocument]:
     return [
         TemplateAnalysisDocument(
-            file_name="report.pdf",
+            original_file_name="report.pdf",
             extracted_text="Summary text",
             visual_summary="Visual summary",
         )
@@ -20,8 +28,8 @@ async def test_synthesize_template_sections_returns_validated_sections() -> None
         return_value=SimpleNamespace(
             choices=[
                 SimpleNamespace(
-                    message=SimpleNamespace(
-                        content='{"sections":[{"id":"summary","label":"Summary","render_type":"text_block"}]}'
+                    message=FakeOpenAIMessage(
+                        '{"sections":[{"id":"summary","label":"Summary","render_type":"text_block"}]}'
                     )
                 )
             ]
@@ -48,7 +56,7 @@ async def test_synthesize_template_sections_returns_validated_sections() -> None
     user_content = create.await_args.kwargs["messages"][1]["content"]
     assert "groups" in user_content
     assert '"documents":' in user_content
-    assert '"file_name":"report.pdf"' in user_content
+    assert '"original_file_name":"report.pdf"' in user_content
     assert '"visual_summary":"Visual summary"' in user_content
 
 
@@ -58,7 +66,7 @@ async def test_synthesize_template_sections_raises_for_invalid_json() -> None:
             completions=SimpleNamespace(
                 create=AsyncMock(
                     return_value=SimpleNamespace(
-                        choices=[SimpleNamespace(message=SimpleNamespace(content="not-json"))]
+                        choices=[SimpleNamespace(message=FakeOpenAIMessage("not-json"))]
                     )
                 )
             )

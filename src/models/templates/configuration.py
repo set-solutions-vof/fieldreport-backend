@@ -1,43 +1,43 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from src.models.templates.domain import TemplateSection
 
 
-class TemplateConfigurationNotConfigured(BaseModel):
+class TemplateStatusNotConfigured(BaseModel):
     status: Literal["not_configured"]
 
 
-class TemplateConfigurationProcessing(BaseModel):
+class TemplateStatusProcessing(BaseModel):
     status: Literal["processing"]
-    job_id: str = Field(serialization_alias="jobId")
-    reports_count: int
+    job_id: str
+    source_reports_count: int
 
 
-class TemplateConfigurationPendingReview(BaseModel):
+class TemplateStatusPendingReview(BaseModel):
     status: Literal["pending_review"]
     job_id: str
-    reports_count: int
+    source_reports_count: int
     sections: list[TemplateSection]
 
 
-class TemplateConfigurationActive(BaseModel):
+class TemplateStatusActive(BaseModel):
     status: Literal["active"]
-    reports_count: int
+    source_reports_count: int
     sections: list[TemplateSection]
 
 
-class TemplateConfigurationFailed(BaseModel):
+class TemplateStatusFailed(BaseModel):
     status: Literal["failed"]
-    reports_count: int
-    error_message: str
+    source_reports_count: int
+    failure_message: str
 
 
-TemplateConfiguration = (
-    TemplateConfigurationNotConfigured
-    | TemplateConfigurationProcessing
-    | TemplateConfigurationPendingReview
-    | TemplateConfigurationActive
-    | TemplateConfigurationFailed
+TemplateStatus = (
+    TemplateStatusNotConfigured
+    | TemplateStatusProcessing
+    | TemplateStatusPendingReview
+    | TemplateStatusActive
+    | TemplateStatusFailed
 )

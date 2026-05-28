@@ -13,7 +13,7 @@ from src.prompts.gpt4o_pdf_analysis import GPT4O_PDF_ANALYSIS_PROMPT
 from src.prompts.image_analysis import IMAGE_ANALYSIS_PROMPT
 
 
-async def analyze_pdf_visuals(file_name: str, file_content: bytes) -> str:
+async def analyze_pdf_visuals(original_file_name: str, file_content: bytes) -> str:
     client = get_gpt4o_client()
     encoded_file = base64.b64encode(file_content).decode("utf-8")
     schema: dict[str, object] = TemplateVisualAnalysis.model_json_schema()
@@ -28,7 +28,7 @@ async def analyze_pdf_visuals(file_name: str, file_content: bytes) -> str:
                     {
                         "type": "file",
                         "file": {
-                            "filename": file_name,
+                            "filename": original_file_name,
                             "file_data": f"data:application/pdf;base64,{encoded_file}",
                         },
                     },
@@ -48,17 +48,16 @@ async def analyze_pdf_visuals(file_name: str, file_content: bytes) -> str:
             ),
         ),
     )
-    content = response.choices[0].message.content
-    assert content is not None
+    content = response.choices[0].message.model_dump()["content"]
     parsed_content = TemplateVisualAnalysis.model_validate_json(content)
 
     return parsed_content.model_dump_json()
 
 
-async def analyze_inspection_photo(file_name: str, file_content: bytes) -> str:
+async def analyze_inspection_photo(original_file_name: str, file_content: bytes) -> str:
     client = get_gpt4o_client()
     encoded_file = base64.b64encode(file_content).decode("utf-8")
-    mime_type = mimetypes.guess_type(file_name)[0]
+    mime_type = mimetypes.guess_type(original_file_name)[0]
 
     response = await client.chat.completions.create(
         model=settings.gpt4o_deployment,
@@ -81,7 +80,4 @@ async def analyze_inspection_photo(file_name: str, file_content: bytes) -> str:
         ],
     )
 
-    content = response.choices[0].message.content
-    assert content is not None
-
-    return content
+    return response.choices[0].message.model_dump()["content"]

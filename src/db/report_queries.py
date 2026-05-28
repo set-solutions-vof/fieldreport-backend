@@ -84,12 +84,12 @@ async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
                 report_sections.section_id,
                 report_sections.section_order,
                 report_sections.render_type,
-                report_sections.ai_content ->> 0 AS ai_draft,
-                report_sections.expert_content ->> 0 AS field_expert_content,
-                report_sections.is_approved,
+                report_sections.generated_content ->> 0 AS generated_content,
+                report_sections.reviewed_content ->> 0 AS reviewed_content,
+                report_sections.approved AS approved,
                 report_sections.confidence_level,
                 report_sections.confidence_score,
-                report_section_sources.source_type,
+                report_section_evidence.evidence_type AS evidence_type,
                 transcription_segments.id AS transcription_segment_id,
                 transcription_segments.start_seconds AS start_seconds,
                 transcription_segments.end_seconds AS end_seconds,
@@ -98,27 +98,27 @@ async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
                 image_analyses.captured_at AS captured_at,
                 image_analyses.analysis_text AS image_analysis_text,
                 CASE
-                    WHEN report_section_sources.source_type = 'transcription_segment'
+                    WHEN report_section_evidence.evidence_type = 'transcription_segment'
                         THEN transcription_segments.start_seconds
-                    WHEN report_section_sources.source_type = 'image_analysis'
+                    WHEN report_section_evidence.evidence_type = 'image_analysis'
                         THEN EXTRACT(
                             EPOCH FROM (
                                 COALESCE(image_analyses.captured_at, image_analyses.created_at)
                                 - inspections.created_at
                             )
                         )::double precision
-                END AS timeline_offset_seconds
+                END AS timeline_seconds
             FROM report_sections
             JOIN reports ON reports.id = report_sections.report_id
             JOIN inspections ON inspections.id = reports.inspection_id
-            JOIN report_section_sources
-                ON report_section_sources.report_section_id = report_sections.id
+            JOIN report_section_evidence
+                ON report_section_evidence.report_section_id = report_sections.id
             LEFT JOIN transcription_segments
-                ON transcription_segments.id = report_section_sources.transcription_segment_id
+                ON transcription_segments.id = report_section_evidence.transcription_segment_id
             LEFT JOIN image_analyses
-                ON image_analyses.id = report_section_sources.image_analysis_id
+                ON image_analyses.id = report_section_evidence.image_analysis_id
             WHERE report_sections.report_id = $1::uuid
-            ORDER BY report_sections.section_order ASC, report_section_sources.created_at ASC
+            ORDER BY report_sections.section_order ASC, report_section_evidence.created_at ASC
             """,
             report_id,
         )
@@ -130,8 +130,8 @@ async def update_report_section(
     report_id: str,
     section_id: str,
     company_id: str,
-    field_expert_content: str | None,
-    is_approved: bool | None,
+    reviewed_content: str | None,
+    approved: bool | None,
 ) -> ReportSection:
     connection = await asyncpg.connect(get_connection_url())
 
@@ -139,13 +139,13 @@ async def update_report_section(
         values: list[object] = [report_id, section_id, company_id]
         assignments: list[str] = []
 
-        if field_expert_content is not None:
-            values.append(field_expert_content)
-            assignments.append(f"expert_content = to_jsonb(ARRAY[${len(values)}::text])")
+        if reviewed_content is not None:
+            values.append(reviewed_content)
+            assignments.append(f"reviewed_content = to_jsonb(ARRAY[${len(values)}::text])")
 
-        if is_approved is not None:
-            values.append(is_approved)
-            assignments.append(f"is_approved = ${len(values)}::boolean")
+        if approved is not None:
+            values.append(approved)
+            assignments.append(f"approved = ${len(values)}::boolean")
 
         if assignments:
             assignments.append("updated_at = NOW()")
@@ -182,26 +182,26 @@ async def update_report_section(
                 report_sections.section_id,
                 report_sections.section_order,
                 report_sections.render_type,
-                report_sections.ai_content ->> 0 AS ai_draft,
-                report_sections.expert_content ->> 0 AS field_expert_content,
-                report_sections.is_approved,
+                report_sections.generated_content ->> 0 AS generated_content,
+                report_sections.reviewed_content ->> 0 AS reviewed_content,
+                report_sections.approved AS approved,
                 report_sections.confidence_level,
                 report_sections.confidence_score,
-                report_section_sources.source_type,
+                report_section_evidence.evidence_type AS evidence_type,
                 transcription_segments.start_seconds AS start_seconds,
                 transcription_segments.end_seconds AS end_seconds,
                 transcription_segments.text AS transcription_text,
                 image_analyses.captured_at AS captured_at,
                 image_analyses.analysis_text AS image_analysis_text
             FROM report_sections
-            JOIN report_section_sources
-                ON report_section_sources.report_section_id = report_sections.id
+            JOIN report_section_evidence
+                ON report_section_evidence.report_section_id = report_sections.id
             LEFT JOIN transcription_segments
-                ON transcription_segments.id = report_section_sources.transcription_segment_id
+                ON transcription_segments.id = report_section_evidence.transcription_segment_id
             LEFT JOIN image_analyses
-                ON image_analyses.id = report_section_sources.image_analysis_id
+                ON image_analyses.id = report_section_evidence.image_analysis_id
             WHERE report_sections.id = $1::uuid
-            ORDER BY report_section_sources.created_at ASC
+            ORDER BY report_section_evidence.created_at ASC
             """,
             section_row["id"],
         )
@@ -474,7 +474,7 @@ async def insert_report_section(
     section_id: str,
     section_order: int,
     render_type: str,
-    ai_draft_text: str,
+    generated_content: str,
     confidence_level: str,
     confidence_score: float,
 ) -> str:
@@ -491,10 +491,10 @@ async def insert_report_section(
                 section_id,
                 section_order,
                 render_type,
-                ai_content,
-                expert_content,
+                generated_content,
+                reviewed_content,
                 edit_distance,
-                is_approved,
+                approved,
                 confidence_level,
                 confidence_score,
                 updated_at
@@ -521,7 +521,7 @@ async def insert_report_section(
             section_id,
             section_order,
             render_type,
-            ai_draft_text,
+            generated_content,
             confidence_level,
             confidence_score,
         )
@@ -540,10 +540,10 @@ async def insert_report_section_source_transcription(
     try:
         await connection.execute(
             """
-            INSERT INTO report_section_sources (
+            INSERT INTO report_section_evidence (
                 id,
                 report_section_id,
-                source_type,
+                evidence_type,
                 transcription_segment_id,
                 image_analysis_id,
                 created_at
@@ -551,7 +551,7 @@ async def insert_report_section_source_transcription(
             VALUES (
                 $1::uuid,
                 $2::uuid,
-                'transcription_segment'::report_section_source_type,
+                'transcription_segment'::report_evidence_type,
                 $3::uuid,
                 NULL,
                 NOW()
@@ -574,10 +574,10 @@ async def insert_report_section_source_image(
     try:
         await connection.execute(
             """
-            INSERT INTO report_section_sources (
+            INSERT INTO report_section_evidence (
                 id,
                 report_section_id,
-                source_type,
+                evidence_type,
                 transcription_segment_id,
                 image_analysis_id,
                 created_at
@@ -585,7 +585,7 @@ async def insert_report_section_source_image(
             VALUES (
                 $1::uuid,
                 $2::uuid,
-                'image_analysis'::report_section_source_type,
+                'image_analysis'::report_evidence_type,
                 NULL,
                 $3::uuid,
                 NOW()

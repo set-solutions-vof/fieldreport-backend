@@ -1,4 +1,4 @@
-from openai import AsyncOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from src.config import settings
 
@@ -21,8 +21,9 @@ def get_deepseek_client() -> AsyncOpenAI:
     )
 
 
-def get_gpt4o_transcribe_client() -> AsyncOpenAI:
-    return create_openai_compatible_client(
-        settings.azure_openai_endpoint,
-        settings.azure_openai_api_key,
+def get_gpt4o_transcribe_client() -> AsyncAzureOpenAI:
+    return AsyncAzureOpenAI(
+        azure_endpoint=settings.azure_openai_resource_endpoint,
+        api_key=settings.azure_openai_api_key,
+        api_version=settings.gpt4o_transcribe_api_version,
     )

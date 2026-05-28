@@ -32,7 +32,7 @@ async def test_build_template_analysis_document_combines_text_and_visual_outputs
         )
 
     assert result == TemplateAnalysisDocument(
-        file_name="report.pdf",
+            original_file_name="report.pdf",
         extracted_text="Extracted text",
         visual_summary='{"visual_summary":"Visual summary"}',
     )
@@ -53,12 +53,17 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
     job = TemplateAnalysisJobRecord(
         id=uuid4(),
         company_id=uuid4(),
-        template_id=None,
         status="processing",
-        reports_count=1,
+        source_reports_count=1,
+        structure=TemplateStructure(sections=[]),
         created_at=datetime.now(UTC),
     )
-    files = [TemplateAnalysisFile(file_name="report.pdf", storage_path="/tmp/report.pdf")]
+    files = [
+        TemplateAnalysisFile(
+            original_file_name="report.pdf",
+            stored_file_path="/tmp/report.pdf",
+        )
+    ]
     sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
 
     with (
@@ -77,7 +82,7 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
             "build_template_analysis_document",
             AsyncMock(
                 return_value=TemplateAnalysisDocument(
-                    file_name="report.pdf",
+            original_file_name="report.pdf",
                     extracted_text="Extracted text",
                     visual_summary="Visual summary",
                 )
@@ -108,12 +113,17 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
     job = TemplateAnalysisJobRecord(
         id=uuid4(),
         company_id=uuid4(),
-        template_id=None,
         status="processing",
-        reports_count=1,
+        source_reports_count=1,
+        structure=TemplateStructure(sections=[]),
         created_at=datetime.now(UTC),
     )
-    files = [TemplateAnalysisFile(file_name="report.pdf", storage_path="/tmp/report.pdf")]
+    files = [
+        TemplateAnalysisFile(
+            original_file_name="report.pdf",
+            stored_file_path="/tmp/report.pdf",
+        )
+    ]
 
     with (
         patch.object(
@@ -131,7 +141,7 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
             "build_template_analysis_document",
             AsyncMock(
                 return_value=TemplateAnalysisDocument(
-                    file_name="report.pdf",
+            original_file_name="report.pdf",
                     extracted_text="Extracted text",
                     visual_summary="Visual summary",
                 )
@@ -159,5 +169,5 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
         str(job.id),
         "failed",
         None,
-        error_message="bad json",
+        failure_message="bad json",
     )

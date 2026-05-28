@@ -48,8 +48,8 @@ async def update_report_section(
         report_id,
         section_id,
         current_user,
-        request_body.field_expert_content,
-        request_body.is_approved,
+        request_body.reviewed_content,
+        request_body.approved,
     )
 
     return report_section_response(section)

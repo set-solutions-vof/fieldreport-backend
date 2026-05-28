@@ -4,13 +4,19 @@ from unittest.mock import AsyncMock, patch
 from src.llm import gpt4o_client
 
 
+class FakeOpenAIMessage:
+    def __init__(self, content: str):
+        self.content = content
+
+    def model_dump(self) -> dict[str, str]:
+        return {"content": self.content}
+
+
 async def test_analyze_pdf_visuals_returns_normalized_json() -> None:
-    message = SimpleNamespace(
-        content=(
-            '{"document_type":"inspection","visual_summary":"summary",'
-            '"likely_sections":["summary"],"table_patterns":["key value"],'
-            '"photo_expectations":["damage photo"]}'
-        )
+    message = FakeOpenAIMessage(
+        '{"document_type":"inspection","visual_summary":"summary",'
+        '"likely_sections":["summary"],"table_patterns":["key value"],'
+        '"photo_expectations":["damage photo"]}'
     )
     client = SimpleNamespace(
         chat=SimpleNamespace(
@@ -36,7 +42,7 @@ async def test_analyze_pdf_visuals_returns_normalized_json() -> None:
 
 
 async def test_analyze_pdf_visuals_raises_for_invalid_json() -> None:
-    message = SimpleNamespace(content="oops")
+    message = FakeOpenAIMessage("oops")
     client = SimpleNamespace(
         chat=SimpleNamespace(
             completions=SimpleNamespace(
@@ -59,7 +65,7 @@ async def test_analyze_pdf_visuals_raises_for_invalid_json() -> None:
 
 
 async def test_analyze_inspection_photo_returns_description() -> None:
-    message = SimpleNamespace(content="Vochtplek zichtbaar op de wand.")
+    message = FakeOpenAIMessage("Vochtplek zichtbaar op de wand.")
     client = SimpleNamespace(
         chat=SimpleNamespace(
             completions=SimpleNamespace(

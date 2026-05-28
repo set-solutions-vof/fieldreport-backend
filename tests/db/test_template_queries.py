@@ -7,7 +7,6 @@ from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import (
     ActiveCompanyTemplateRecord,
-    CompanyTemplateRecord,
     TemplateAnalysisJobRecord,
 )
 
@@ -23,19 +22,18 @@ class FakeConnection:
         self.close = AsyncMock()
 
 
-async def test_fetch_company_template_context_returns_company_and_latest_job() -> None:
-    company_row = {"template_id": uuid4(), "structure": '{"sections": []}'}
+async def test_fetch_template_configuration_context_returns_state_context() -> None:
+    company_row = {"current_template_id": uuid4(), "structure": '{"sections": []}'}
     created_at = datetime.now(UTC)
     job_row = {
         "id": uuid4(),
         "company_id": uuid4(),
-        "template_id": None,
         "status": "pending_review",
-        "reports_count": 3,
+        "source_reports_count": 3,
         "structure": (
             '{"sections": [{"id": "summary", "label": "Summary", "render_type": "text_block"}]}'
         ),
-        "error_message": None,
+        "failure_message": None,
         "created_at": created_at,
     }
     connection = FakeConnection(company_row, job_row)
@@ -45,20 +43,19 @@ async def test_fetch_company_template_context_returns_company_and_latest_job() -
         AsyncMock(return_value=connection),
     ):
         (
-            result_company_row,
+            result_active_template,
             result_job_row,
-        ) = await template_queries.fetch_company_template_context(str(uuid4()))
+        ) = await template_queries.fetch_template_configuration_context(str(uuid4()))
 
-    assert result_company_row == CompanyTemplateRecord(
-        template_id=company_row["template_id"],
+    assert result_active_template == ActiveCompanyTemplateRecord(
+        current_template_id=company_row["current_template_id"],
         structure=TemplateStructure(sections=[]),
     )
     assert result_job_row == TemplateAnalysisJobRecord(
         id=job_row["id"],
         company_id=job_row["company_id"],
-        template_id=None,
         status="pending_review",
-        reports_count=3,
+        source_reports_count=3,
         structure=TemplateStructure(
             sections=[
                 TemplateSection(id="summary", label="Summary", render_type="text_block"),
@@ -71,7 +68,7 @@ async def test_fetch_company_template_context_returns_company_and_latest_job() -
 
 
 async def test_fetch_active_company_template_returns_company_template() -> None:
-    company_row = {"template_id": uuid4(), "structure": '{"sections": []}'}
+    company_row = {"current_template_id": uuid4(), "structure": '{"sections": []}'}
     connection = FakeConnection()
     connection.fetchrow = AsyncMock(return_value=company_row)
 
@@ -82,7 +79,7 @@ async def test_fetch_active_company_template_returns_company_template() -> None:
         result = await template_queries.fetch_active_company_template(str(uuid4()))
 
     assert result == ActiveCompanyTemplateRecord(
-        template_id=company_row["template_id"],
+        current_template_id=company_row["current_template_id"],
         structure=TemplateStructure(sections=[]),
     )
     connection.close.assert_awaited_once()
@@ -93,8 +90,8 @@ async def test_replace_template_analysis_job_replaces_existing_company_jobs_and_
 ):
     connection = FakeConnection()
     stored_files = [
-        TemplateAnalysisFile(file_name="one.pdf", storage_path="/tmp/one.pdf"),
-        TemplateAnalysisFile(file_name="two.pdf", storage_path="/tmp/two.pdf"),
+        TemplateAnalysisFile(original_file_name="one.pdf", stored_file_path="/tmp/one.pdf"),
+        TemplateAnalysisFile(original_file_name="two.pdf", stored_file_path="/tmp/two.pdf"),
     ]
 
     with patch(
@@ -118,8 +115,8 @@ async def test_replace_template_analysis_job_replaces_existing_company_jobs_and_
 
 async def test_get_template_analysis_job_files_returns_stored_files() -> None:
     rows = [
-        {"file_name": "one.pdf", "storage_path": "/tmp/one.pdf"},
-        {"file_name": "two.pdf", "storage_path": "/tmp/two.pdf"},
+        {"original_file_name": "one.pdf", "stored_file_path": "/tmp/one.pdf"},
+        {"original_file_name": "two.pdf", "stored_file_path": "/tmp/two.pdf"},
     ]
     connection = FakeConnection(rows=rows)
 
@@ -130,8 +127,8 @@ async def test_get_template_analysis_job_files_returns_stored_files() -> None:
         result = await template_queries.get_template_analysis_job_files(str(uuid4()))
 
     assert result == [
-        TemplateAnalysisFile(file_name="one.pdf", storage_path="/tmp/one.pdf"),
-        TemplateAnalysisFile(file_name="two.pdf", storage_path="/tmp/two.pdf"),
+        TemplateAnalysisFile(original_file_name="one.pdf", stored_file_path="/tmp/one.pdf"),
+        TemplateAnalysisFile(original_file_name="two.pdf", stored_file_path="/tmp/two.pdf"),
     ]
     connection.close.assert_awaited_once()
 
@@ -139,8 +136,7 @@ async def test_get_template_analysis_job_files_returns_stored_files() -> None:
 async def test_fetch_template_structure_returns_stored_structure() -> None:
     row = {
         "structure": (
-            '{"sections": [{"id": "conclusie", "label": "Conclusie", '
-            '"render_type": "text_block"}]}'
+            '{"sections": [{"id": "conclusie", "label": "Conclusie", "render_type": "text_block"}]}'
         )
     }
     connection = FakeConnection()
@@ -162,11 +158,10 @@ async def test_get_template_analysis_job_returns_company_scoped_job() -> None:
     job_row = {
         "id": uuid4(),
         "company_id": uuid4(),
-        "template_id": None,
         "status": "queued",
-        "reports_count": 2,
+        "source_reports_count": 2,
         "structure": '{"sections": []}',
-        "error_message": None,
+        "failure_message": None,
         "created_at": created_at,
     }
     connection = FakeConnection(job_row=job_row)
@@ -181,9 +176,8 @@ async def test_get_template_analysis_job_returns_company_scoped_job() -> None:
     assert result == TemplateAnalysisJobRecord(
         id=job_row["id"],
         company_id=job_row["company_id"],
-        template_id=None,
         status="queued",
-        reports_count=2,
+        source_reports_count=2,
         structure=TemplateStructure(sections=[]),
         created_at=created_at,
     )
@@ -209,11 +203,10 @@ async def test_fetch_latest_template_analysis_job_returns_latest_company_job() -
     job_row = {
         "id": uuid4(),
         "company_id": uuid4(),
-        "template_id": None,
         "status": "pending_review",
-        "reports_count": 4,
+        "source_reports_count": 4,
         "structure": '{"sections": []}',
-        "error_message": None,
+        "failure_message": None,
         "created_at": created_at,
     }
     connection = FakeConnection()
@@ -228,26 +221,24 @@ async def test_fetch_latest_template_analysis_job_returns_latest_company_job() -
     assert result == TemplateAnalysisJobRecord(
         id=job_row["id"],
         company_id=job_row["company_id"],
-        template_id=None,
         status="pending_review",
-        reports_count=4,
+        source_reports_count=4,
         structure=TemplateStructure(sections=[]),
         created_at=created_at,
     )
     connection.close.assert_awaited_once()
 
 
-async def test_fetch_company_template_context_handles_null_job_structure() -> None:
-    company_row = {"template_id": uuid4(), "structure": '{"sections": []}'}
+async def test_fetch_template_configuration_context_handles_null_job_structure() -> None:
+    company_row = {"current_template_id": uuid4(), "structure": '{"sections": []}'}
     created_at = datetime.now(UTC)
     job_row = {
         "id": uuid4(),
         "company_id": uuid4(),
-        "template_id": None,
         "status": "pending_review",
-        "reports_count": 2,
+        "source_reports_count": 2,
         "structure": None,
-        "error_message": None,
+        "failure_message": None,
         "created_at": created_at,
     }
     connection = FakeConnection(company_row, job_row)
@@ -257,25 +248,25 @@ async def test_fetch_company_template_context_handles_null_job_structure() -> No
         AsyncMock(return_value=connection),
     ):
         (
-            result_company_row,
+            result_active_template,
             result_job_row,
-        ) = await template_queries.fetch_company_template_context(str(uuid4()))
+        ) = await template_queries.fetch_template_configuration_context(str(uuid4()))
 
-    assert result_company_row == CompanyTemplateRecord(
-        template_id=company_row["template_id"],
+    assert result_active_template == ActiveCompanyTemplateRecord(
+        current_template_id=company_row["current_template_id"],
         structure=TemplateStructure(sections=[]),
     )
     assert result_job_row == TemplateAnalysisJobRecord(
         id=job_row["id"],
         company_id=job_row["company_id"],
-        template_id=None,
         status="pending_review",
-        reports_count=2,
+        source_reports_count=2,
+        structure=TemplateStructure(sections=[]),
         created_at=created_at,
     )
 
 
-async def test_update_template_analysis_job_updates_status_structure_and_error_message() -> None:
+async def test_update_template_analysis_job_updates_status_structure_and_failure_message() -> None:
     connection = FakeConnection()
 
     with patch(
@@ -286,7 +277,7 @@ async def test_update_template_analysis_job_updates_status_structure_and_error_m
             str(uuid4()),
             "failed",
             TemplateStructure(sections=[]),
-            error_message="model error",
+            failure_message="model error",
         )
 
     assert "UPDATE template_analysis_jobs" in connection.execute.await_args.args[0]
@@ -329,11 +320,10 @@ async def test_claim_next_template_analysis_job_returns_processing_job() -> None
     row = {
         "id": uuid4(),
         "company_id": uuid4(),
-        "template_id": uuid4(),
         "status": "processing",
-        "reports_count": 2,
+        "source_reports_count": 2,
         "structure": None,
-        "error_message": None,
+        "failure_message": None,
         "created_at": datetime.now(UTC),
     }
     connection = FakeConnection()
@@ -347,7 +337,6 @@ async def test_claim_next_template_analysis_job_returns_processing_job() -> None
 
     assert result is not None
     assert result.id == row["id"]
-    assert result.template_id == row["template_id"]
     connection.close.assert_awaited_once()
 
 
@@ -366,7 +355,7 @@ async def test_create_template_inserts_template_structure() -> None:
     connection.close.assert_awaited_once()
 
 
-async def test_set_active_template_updates_company_active_template_id() -> None:
+async def test_set_active_template_updates_company_current_template_id() -> None:
     connection = FakeConnection()
 
     with patch(

@@ -11,8 +11,8 @@ from httpx import ASGITransport, AsyncClient
 from src.main import app
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
-    TemplateConfigurationActive,
-    TemplateConfigurationProcessing,
+    TemplateStatusActive,
+    TemplateStatusProcessing,
 )
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.records import TemplateAnalysisJobRecord
@@ -56,12 +56,12 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
         patch(
             "src.routes.template.templates.load_template_configuration",
             AsyncMock(
-                return_value=TemplateConfigurationActive(
+                return_value=TemplateStatusActive(
                     status="active",
                     sections=[
                         TemplateSection(id="summary", label="Summary", render_type="text_block")
                     ],
-                    reports_count=3,
+                    source_reports_count=3,
                 )
             ),
         ),
@@ -74,7 +74,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
     assert response.status_code == 200
     assert response.json() == {
         "status": "active",
-        "reports_count": 3,
+        "source_reports_count": 3,
         "sections": [
             {
                 "id": "summary",
@@ -100,10 +100,10 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
         patch(
             "src.routes.template.templates.start_template_analysis",
             AsyncMock(
-                return_value=TemplateConfigurationProcessing(
+                return_value=TemplateStatusProcessing(
                     status="processing",
                     job_id="job-123",
-                    reports_count=3,
+                    source_reports_count=3,
                 )
             ),
         ) as start_analysis,
@@ -119,7 +119,11 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
         )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "processing", "jobId": "job-123", "reports_count": 3}
+    assert response.json() == {
+        "status": "processing",
+        "job_id": "job-123",
+        "source_reports_count": 3,
+    }
     start_analysis.assert_awaited_once()
     assert len(start_analysis.await_args.args[1]) == 3
 
@@ -174,9 +178,8 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
                 return_value=TemplateAnalysisJobRecord(
                     id=job_id,
                     company_id=current_user.company_id,
-                    template_id=None,
                     status="pending_review",
-                    reports_count=3,
+                    source_reports_count=3,
                     created_at=datetime.now(UTC),
                     structure=TemplateStructure(
                         sections=[
@@ -201,7 +204,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
     assert response.json() == {
         "status": "pending_review",
         "job_id": str(job_id),
-        "reports_count": 3,
+        "source_reports_count": 3,
         "sections": [
             {
                 "id": "findings",
@@ -262,9 +265,9 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
         patch(
             "src.routes.template.templates.confirm_template",
             AsyncMock(
-                return_value=TemplateConfigurationActive(
+                return_value=TemplateStatusActive(
                     status="active",
-                    reports_count=3,
+                    source_reports_count=3,
                     sections=[
                         TemplateSection(
                             id="summary",
@@ -291,7 +294,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
     assert response.status_code == 200
     assert response.json() == {
         "status": "active",
-        "reports_count": 3,
+        "source_reports_count": 3,
         "sections": [
             {
                 "id": "summary",

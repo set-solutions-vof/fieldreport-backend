@@ -26,7 +26,7 @@ async def run_audio_pipeline(report_id: str) -> None:
             file_content = inspection_file_storage.load_inspection_file(audio_key)
             result = await gpt4o_transcribe_client.transcribe_audio(
                 file_content,
-                audio_file["original_filename"],
+                audio_file["original_file_name"],
             )
             transcription_id = await report_queries.insert_transcription(
                 inspection_id,
@@ -113,7 +113,7 @@ async def run_audio_pipeline(report_id: str) -> None:
                 section_data["id"],
                 template_section.order,
                 template_section.render_type,
-                section_data["ai_draft"],
+                section_data["generated_content"],
                 section_data["confidence_level"],
                 section_data["confidence_score"],
             )

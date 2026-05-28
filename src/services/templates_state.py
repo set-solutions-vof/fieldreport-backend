@@ -1,33 +1,35 @@
 from src.models.templates.configuration import (
-    TemplateConfiguration,
-    TemplateConfigurationActive,
-    TemplateConfigurationFailed,
-    TemplateConfigurationNotConfigured,
-    TemplateConfigurationPendingReview,
-    TemplateConfigurationProcessing,
+    TemplateStatus,
+    TemplateStatusActive,
+    TemplateStatusFailed,
+    TemplateStatusNotConfigured,
+    TemplateStatusPendingReview,
+    TemplateStatusProcessing,
 )
 from src.models.templates.domain import TemplateStructure
-from src.models.templates.records import CompanyTemplateRecord, TemplateAnalysisJobRecord
+from src.models.templates.records import ActiveCompanyTemplateRecord, TemplateAnalysisJobRecord
 
 
 def resolve_template_company_state(
-    company: CompanyTemplateRecord,
+    active_template: ActiveCompanyTemplateRecord | None,
     job: TemplateAnalysisJobRecord | None,
-) -> TemplateConfiguration:
+) -> TemplateStatus:
     if job is not None and job.status in {"queued", "processing", "pending_review"}:
         return resolve_template_job_state(job)
 
-    if company.template_id is not None:
-        reports_count = job.reports_count if job is not None and job.status == "active" else 0
-        return _active_state(company.structure, reports_count)
+    if active_template is not None:
+        source_reports_count = (
+            job.source_reports_count if job is not None and job.status == "active" else 0
+        )
+        return _active_state(active_template.structure, source_reports_count)
 
     if job is not None and job.status == "failed":
         return _failed_state(job)
 
-    return TemplateConfigurationNotConfigured(status="not_configured")
+    return TemplateStatusNotConfigured(status="not_configured")
 
 
-def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateConfiguration:
+def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateStatus:
     if job.status in {"queued", "processing"}:
         return _processing_state(job)
 
@@ -37,40 +39,40 @@ def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateConfig
     if job.status == "failed":
         return _failed_state(job)
 
-    return _active_state(job.structure, job.reports_count)
+    return _active_state(job.structure, job.source_reports_count)
 
 
-def _processing_state(job: TemplateAnalysisJobRecord) -> TemplateConfigurationProcessing:
-    return TemplateConfigurationProcessing(
+def _processing_state(job: TemplateAnalysisJobRecord) -> TemplateStatusProcessing:
+    return TemplateStatusProcessing(
         status="processing",
         job_id=str(job.id),
-        reports_count=job.reports_count,
+        source_reports_count=job.source_reports_count,
     )
 
 
-def _pending_review_state(job: TemplateAnalysisJobRecord) -> TemplateConfigurationPendingReview:
-    return TemplateConfigurationPendingReview(
+def _pending_review_state(job: TemplateAnalysisJobRecord) -> TemplateStatusPendingReview:
+    return TemplateStatusPendingReview(
         status="pending_review",
         job_id=str(job.id),
-        reports_count=job.reports_count,
+        source_reports_count=job.source_reports_count,
         sections=job.structure.sections,
     )
 
 
-def _failed_state(job: TemplateAnalysisJobRecord) -> TemplateConfigurationFailed:
-    return TemplateConfigurationFailed(
+def _failed_state(job: TemplateAnalysisJobRecord) -> TemplateStatusFailed:
+    return TemplateStatusFailed(
         status="failed",
-        reports_count=job.reports_count,
-        error_message=job.error_message,
+        source_reports_count=job.source_reports_count,
+        failure_message=job.failure_message,
     )
 
 
 def _active_state(
     structure: TemplateStructure,
-    reports_count: int,
-) -> TemplateConfigurationActive:
-    return TemplateConfigurationActive(
+    source_reports_count: int,
+) -> TemplateStatusActive:
+    return TemplateStatusActive(
         status="active",
-        reports_count=reports_count,
+        source_reports_count=source_reports_count,
         sections=structure.sections,
     )

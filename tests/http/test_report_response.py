@@ -2,31 +2,31 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from src.http.v1.response.report import (
+    EvidenceItemResponse,
+    EvidenceSourceResponse,
     ReportDetailResponse,
-    SectionSourceResponse,
-    TimelineItemResponse,
     report_detail_response,
 )
 from src.models.reports.report import ReportDetail, ReportDetailSection
 
 
-def test_section_source_response_serializes_missing_capture_time() -> None:
-    response = SectionSourceResponse(
+def test_evidence_source_response_serializes_missing_captured_at() -> None:
+    response = EvidenceSourceResponse(
         type="audio",
-        timestamp_start=1.0,
-        timestamp_end=2.0,
-        capture_time=None,
+        start_seconds=1.0,
+        end_seconds=2.0,
+        captured_at=None,
         content_summary="Audio summary",
     )
 
-    assert response.model_dump(mode="json")["capture_time"] is None
+    assert response.model_dump(mode="json")["captured_at"] is None
 
 
 def test_timeline_item_response_serializes_missing_captured_at() -> None:
-    response = TimelineItemResponse(
+    response = EvidenceItemResponse(
         id=uuid4(),
-        source_type="transcription_segment",
-        timeline_offset_seconds=1.0,
+        evidence_type="transcription_segment",
+        timeline_seconds=1.0,
         start_seconds=1.0,
         end_seconds=2.0,
         captured_at=None,
@@ -46,7 +46,7 @@ def test_report_detail_response_serializes_missing_updated_at() -> None:
         inspector_name="Jeroen van Dijk",
         updated_at=None,
         sections=[],
-        timeline_items=[],
+        evidence_items=[],
     )
 
     assert response.model_dump(mode="json")["updated_at"] is None
@@ -67,9 +67,9 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
                 id=section_id,
                 section_id="meetresultaten",
                 label="Meetresultaten",
-                ai_draft="Visuele inspectie: Geen lekkage.",
-                field_expert_content=None,
-                is_approved=False,
+                generated_content="Visuele inspectie: Geen lekkage.",
+                reviewed_content=None,
+                approved=False,
                 confidence_level="high",
                 confidence_score=0.91,
                 render_type="measurement_table",
@@ -81,7 +81,7 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
                         "fields": ["Visuele inspectie"],
                     }
                 ],
-                source_item_ids=[],
+                evidence_item_ids=[],
             )
         ],
     )

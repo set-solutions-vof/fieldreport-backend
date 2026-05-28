@@ -39,7 +39,7 @@ async def create_inspection(
         audio_files,
         photo_files,
     )
-    template_id = str(company_template.template_id)
+    template_id = str(company_template.current_template_id)
 
     await inspection_queries.insert_inspection(
         inspection_id,

@@ -11,7 +11,9 @@ async def test_store_inspection_files_persists_audio_and_photos(tmp_path: Path) 
     audio_files = [UploadFile(filename="audio.m4a", file=BytesIO(b"audio"))]
     photo_files = [UploadFile(filename="photo.jpg", file=BytesIO(b"photo"))]
 
-    with patch.object(inspection_file_storage.settings, "inspection_storage_path", str(tmp_path)):
+    with patch.object(
+        inspection_file_storage.settings, "inspection_stored_file_path", str(tmp_path)
+    ):
         audio_keys, photo_keys = await inspection_file_storage.store_inspection_files(
             "company-1",
             "inspection-1",
@@ -27,7 +29,9 @@ async def test_store_inspection_files_persists_audio_and_photos(tmp_path: Path) 
 
 
 def test_get_inspection_storage_directory_returns_resolved_path(tmp_path: Path) -> None:
-    with patch.object(inspection_file_storage.settings, "inspection_storage_path", str(tmp_path)):
+    with patch.object(
+        inspection_file_storage.settings, "inspection_stored_file_path", str(tmp_path)
+    ):
         result = inspection_file_storage.get_inspection_storage_directory()
 
     assert result == tmp_path.resolve()

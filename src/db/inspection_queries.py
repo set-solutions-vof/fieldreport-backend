@@ -68,7 +68,7 @@ async def insert_inspection(
 async def insert_inspection_audio_file(
     inspection_id: str,
     storage_key: str,
-    original_filename: str,
+    original_file_name: str,
 ) -> None:
     connection = await asyncpg.connect(get_connection_url())
 
@@ -79,7 +79,7 @@ async def insert_inspection_audio_file(
                 id,
                 inspection_id,
                 storage_key,
-                original_filename,
+                original_file_name,
                 created_at
             )
             VALUES (
@@ -93,7 +93,7 @@ async def insert_inspection_audio_file(
             str(uuid4()),
             inspection_id,
             storage_key,
-            original_filename,
+            original_file_name,
         )
     finally:
         await connection.close()
@@ -102,7 +102,7 @@ async def insert_inspection_audio_file(
 async def insert_inspection_photo_file(
     inspection_id: str,
     storage_key: str,
-    original_filename: str,
+    original_file_name: str,
 ) -> None:
     connection = await asyncpg.connect(get_connection_url())
 
@@ -113,7 +113,7 @@ async def insert_inspection_photo_file(
                 id,
                 inspection_id,
                 storage_key,
-                original_filename,
+                original_file_name,
                 created_at
             )
             VALUES (
@@ -127,7 +127,7 @@ async def insert_inspection_photo_file(
             str(uuid4()),
             inspection_id,
             storage_key,
-            original_filename,
+            original_file_name,
         )
     finally:
         await connection.close()
@@ -139,7 +139,7 @@ async def fetch_inspection_audio_files(inspection_id: str) -> list[asyncpg.Recor
     try:
         return await connection.fetch(
             """
-            SELECT id, inspection_id, storage_key, original_filename, created_at
+            SELECT id, inspection_id, storage_key, original_file_name, created_at
             FROM inspection_audio_files
             WHERE inspection_id = $1::uuid
             ORDER BY created_at ASC
@@ -156,7 +156,7 @@ async def fetch_inspection_photo_files(inspection_id: str) -> list[asyncpg.Recor
     try:
         return await connection.fetch(
             """
-            SELECT id, inspection_id, storage_key, original_filename, created_at
+            SELECT id, inspection_id, storage_key, original_file_name, created_at
             FROM inspection_photo_files
             WHERE inspection_id = $1::uuid
             ORDER BY created_at ASC

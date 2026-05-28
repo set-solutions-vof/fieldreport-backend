@@ -3,10 +3,10 @@ import asyncpg
 from src.models.reports.report import (
     ReportDetail,
     ReportDetailSection,
+    ReportEvidenceItem,
+    ReportEvidenceSource,
     ReportSection,
-    ReportSectionSource,
     ReportSummary,
-    ReportTimelineItem,
 )
 
 
@@ -35,41 +35,41 @@ def map_report_detail(row: asyncpg.Record) -> ReportDetail:
     )
 
 
-def map_report_section_source(row: asyncpg.Record) -> ReportSectionSource:
-    if row["source_type"] == "transcription_segment":
-        return ReportSectionSource(
+def map_report_section_source(row: asyncpg.Record) -> ReportEvidenceSource:
+    if row["evidence_type"] == "transcription_segment":
+        return ReportEvidenceSource(
             type="audio",
-            timestamp_start=row["start_seconds"],
-            timestamp_end=row["end_seconds"],
-            capture_time=None,
-            content_summary=row["transcription_text"],
-        )
-
-    return ReportSectionSource(
-        type="image",
-        timestamp_start=None,
-        timestamp_end=None,
-        capture_time=row["captured_at"],
-        content_summary=row["image_analysis_text"],
-    )
-
-
-def map_report_timeline_item(row: asyncpg.Record) -> ReportTimelineItem:
-    if row["source_type"] == "transcription_segment":
-        return ReportTimelineItem(
-            id=row["transcription_segment_id"],
-            source_type="transcription_segment",
-            timeline_offset_seconds=float(row["timeline_offset_seconds"]),
             start_seconds=row["start_seconds"],
             end_seconds=row["end_seconds"],
             captured_at=None,
             content_summary=row["transcription_text"],
         )
 
-    return ReportTimelineItem(
+    return ReportEvidenceSource(
+        type="image",
+        start_seconds=None,
+        end_seconds=None,
+        captured_at=row["captured_at"],
+        content_summary=row["image_analysis_text"],
+    )
+
+
+def map_report_evidence_item(row: asyncpg.Record) -> ReportEvidenceItem:
+    if row["evidence_type"] == "transcription_segment":
+        return ReportEvidenceItem(
+            id=row["transcription_segment_id"],
+            evidence_type="transcription_segment",
+            timeline_seconds=float(row["timeline_seconds"]),
+            start_seconds=row["start_seconds"],
+            end_seconds=row["end_seconds"],
+            captured_at=None,
+            content_summary=row["transcription_text"],
+        )
+
+    return ReportEvidenceItem(
         id=row["image_analysis_id"],
-        source_type="image_analysis",
-        timeline_offset_seconds=float(row["timeline_offset_seconds"]),
+        evidence_type="image_analysis",
+        timeline_seconds=float(row["timeline_seconds"]),
         start_seconds=None,
         end_seconds=None,
         captured_at=row["captured_at"],
@@ -89,27 +89,27 @@ def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
                 id=section_id,
                 section_id=row["section_id"],
                 label=row["section_id"].replace("_", " ").title(),
-                ai_draft=row["ai_draft"],
-                field_expert_content=row["field_expert_content"],
-                is_approved=row["is_approved"],
+                generated_content=row["generated_content"],
+                reviewed_content=row["reviewed_content"],
+                approved=row["approved"],
                 confidence_level=row["confidence_level"],
                 confidence_score=float(row["confidence_score"]),
                 render_type=row["render_type"],
-                sources=[],
+                evidence_sources=[],
             )
             sections_by_id[section_id] = section
             sections.append(section)
 
-        sections_by_id[section_id].sources.append(map_report_section_source(row))
+        sections_by_id[section_id].evidence_sources.append(map_report_section_source(row))
 
     return sections
 
 
 def map_report_detail_sections(
     rows: list[asyncpg.Record],
-) -> tuple[list[ReportDetailSection], list[ReportTimelineItem]]:
+) -> tuple[list[ReportDetailSection], list[ReportEvidenceItem]]:
     sections_by_id: dict[object, ReportDetailSection] = {}
-    timeline_items_by_id: dict[object, ReportTimelineItem] = {}
+    evidence_items_by_id: dict[object, ReportEvidenceItem] = {}
     sections: list[ReportDetailSection] = []
 
     for row in rows:
@@ -120,28 +120,28 @@ def map_report_detail_sections(
                 id=section_id,
                 section_id=row["section_id"],
                 label=row["section_id"].replace("_", " ").title(),
-                ai_draft=row["ai_draft"],
-                field_expert_content=row["field_expert_content"],
-                is_approved=row["is_approved"],
+                generated_content=row["generated_content"],
+                reviewed_content=row["reviewed_content"],
+                approved=row["approved"],
                 confidence_level=row["confidence_level"],
                 confidence_score=float(row["confidence_score"]),
                 render_type=row["render_type"],
-                source_item_ids=[],
+                evidence_item_ids=[],
             )
             sections_by_id[section_id] = section
             sections.append(section)
 
-        timeline_item = map_report_timeline_item(row)
-        sections_by_id[section_id].source_item_ids.append(timeline_item.id)
-        timeline_items_by_id[timeline_item.id] = timeline_item
+        evidence_item = map_report_evidence_item(row)
+        sections_by_id[section_id].evidence_item_ids.append(evidence_item.id)
+        evidence_items_by_id[evidence_item.id] = evidence_item
 
-    timeline_items = sorted(
-        timeline_items_by_id.values(),
+    evidence_items = sorted(
+        evidence_items_by_id.values(),
         key=lambda item: (
-            item.timeline_offset_seconds,
-            item.source_type,
+            item.timeline_seconds,
+            item.evidence_type,
             str(item.id),
         ),
     )
 
-    return sections, timeline_items
+    return sections, evidence_items

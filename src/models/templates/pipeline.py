@@ -4,12 +4,12 @@ from src.models.templates.domain import TemplateSection
 
 
 class TemplateAnalysisFile(BaseModel):
-    file_name: str
-    storage_path: str
+    original_file_name: str
+    stored_file_path: str
 
 
 class TemplateAnalysisDocument(BaseModel):
-    file_name: str
+    original_file_name: str
     extracted_text: str
     visual_summary: str
 

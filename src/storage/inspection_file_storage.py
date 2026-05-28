@@ -7,7 +7,7 @@ from src.config import settings
 
 
 def get_inspection_storage_directory() -> Path:
-    return Path(settings.inspection_storage_path).resolve()
+    return Path(settings.inspection_stored_file_path).resolve()
 
 
 async def store_inspection_files(
@@ -32,15 +32,15 @@ async def store_files(directory: Path, files: list[UploadFile]) -> list[str]:
     storage_keys: list[str] = []
 
     for file in files:
-        file_name = file.filename or str(uuid4())
-        file_extension = Path(file_name).suffix
-        storage_path = directory / f"{uuid4()}{file_extension}"
+        original_file_name = file.filename or str(uuid4())
+        file_extension = Path(original_file_name).suffix
+        stored_file_path = directory / f"{uuid4()}{file_extension}"
         file_content = await file.read()
 
-        storage_path.write_bytes(file_content)
+        stored_file_path.write_bytes(file_content)
         await file.seek(0)
 
-        storage_keys.append(str(storage_path))
+        storage_keys.append(str(stored_file_path))
 
     return storage_keys
 

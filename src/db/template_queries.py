@@ -6,7 +6,7 @@ import asyncpg
 from src.db.connection import get_connection_url
 from src.db.template_mapper import (
     map_active_company_template,
-    map_company_template,
+    map_optional_active_company_template,
     map_template_analysis_file,
     map_template_analysis_job,
     parse_template_structure,
@@ -15,26 +15,27 @@ from src.models.templates.domain import TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import (
     ActiveCompanyTemplateRecord,
-    CompanyTemplateRecord,
     TemplateAnalysisJobRecord,
 )
 
 
-async def fetch_company_template_context(
+async def fetch_template_configuration_context(
     company_id: str,
-) -> tuple[CompanyTemplateRecord, TemplateAnalysisJobRecord | None]:
+) -> tuple[ActiveCompanyTemplateRecord | None, TemplateAnalysisJobRecord | None]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
-        company_row = await fetch_company_template_row(connection, company_id)
+        active_template_row = await fetch_optional_active_company_template_row(
+            connection, company_id
+        )
         job_row = await fetch_latest_template_analysis_job_row(connection, company_id)
     finally:
         await connection.close()
 
-    company = map_company_template(company_row)
+    active_template = map_optional_active_company_template(active_template_row)
     job = map_template_analysis_job(job_row) if job_row is not None else None
 
-    return company, job
+    return active_template, job
 
 
 async def fetch_active_company_template(company_id: str) -> ActiveCompanyTemplateRecord:
@@ -72,11 +73,10 @@ async def get_template_analysis_job(
             SELECT
                 id,
                 company_id,
-                template_id,
                 status,
-                reports_count,
+                source_reports_count,
                 structure,
-                error_message,
+                failure_message,
                 created_at
             FROM template_analysis_jobs
             WHERE id = $1::uuid
@@ -94,17 +94,17 @@ async def get_template_analysis_job(
     return map_template_analysis_job(job_row)
 
 
-async def fetch_company_template_row(
+async def fetch_optional_active_company_template_row(
     connection: asyncpg.Connection,
     company_id: str,
 ) -> asyncpg.Record:
     return await connection.fetchrow(
         """
         SELECT
-            company.active_template_id AS template_id,
+            company.current_template_id AS current_template_id,
             templates.structure AS structure
         FROM company
-        LEFT JOIN templates ON templates.id = company.active_template_id
+        LEFT JOIN templates ON templates.id = company.current_template_id
         WHERE company.id = $1::uuid
         """,
         company_id,
@@ -118,10 +118,10 @@ async def fetch_active_company_template_row(
     return await connection.fetchrow(
         """
         SELECT
-            company.active_template_id AS template_id,
+            company.current_template_id AS current_template_id,
             templates.structure AS structure
         FROM company
-        JOIN templates ON templates.id = company.active_template_id
+        JOIN templates ON templates.id = company.current_template_id
         WHERE company.id = $1::uuid
         """,
         company_id,
@@ -137,11 +137,10 @@ async def fetch_latest_template_analysis_job_row(
         SELECT
             id,
             company_id,
-            template_id,
             status,
-            reports_count,
+            source_reports_count,
             structure,
-            error_message,
+            failure_message,
             created_at
         FROM template_analysis_jobs
         WHERE company_id = $1::uuid
@@ -172,11 +171,10 @@ async def replace_template_analysis_job(
             INSERT INTO template_analysis_jobs (
                 id,
                 company_id,
-                template_id,
                 status,
-                reports_count,
+                source_reports_count,
                 structure,
-                error_message,
+                failure_message,
                 started_at,
                 finished_at,
                 created_at
@@ -184,7 +182,6 @@ async def replace_template_analysis_job(
             VALUES (
                 $1::uuid,
                 $2::uuid,
-                NULL,
                 'queued'::template_analysis_status_enum,
                 $3::integer,
                 NULL,
@@ -205,8 +202,8 @@ async def replace_template_analysis_job(
                 INSERT INTO template_analysis_job_files (
                     id,
                     job_id,
-                    file_name,
-                    storage_path,
+                    original_file_name,
+                    stored_file_path,
                     created_at
                 )
                 VALUES (
@@ -218,8 +215,8 @@ async def replace_template_analysis_job(
                 )
                 """,
                 job_id,
-                file.file_name,
-                file.storage_path,
+                file.original_file_name,
+                file.stored_file_path,
                 str(uuid4()),
             )
     finally:
@@ -230,8 +227,7 @@ async def update_template_analysis_job(
     job_id: str,
     status: str,
     structure: TemplateStructure | None,
-    template_id: str | None = None,
-    error_message: str | None = None,
+    failure_message: str | None = None,
 ) -> None:
     connection = await asyncpg.connect(get_connection_url())
 
@@ -241,8 +237,7 @@ async def update_template_analysis_job(
             UPDATE template_analysis_jobs
             SET status = $2::template_analysis_status_enum,
                 structure = $3::jsonb,
-                template_id = $4::uuid,
-                error_message = $5::text,
+                failure_message = $4::text,
                 finished_at = CASE
                     WHEN $2::template_analysis_status_enum IN (
                         'pending_review'::template_analysis_status_enum,
@@ -257,8 +252,7 @@ async def update_template_analysis_job(
             job_id,
             status,
             structure.model_dump_json() if structure is not None else None,
-            template_id,
-            error_message,
+            failure_message,
         )
     finally:
         await connection.close()
@@ -298,17 +292,16 @@ async def claim_next_template_analysis_job() -> TemplateAnalysisJobRecord | None
             UPDATE template_analysis_jobs
             SET status = 'processing'::template_analysis_status_enum,
                 started_at = NOW(),
-                error_message = NULL,
+                failure_message = NULL,
                 finished_at = NULL
             WHERE id IN (SELECT id FROM next_job)
             RETURNING
                 id,
                 company_id,
-                template_id,
                 status,
-                reports_count,
+                source_reports_count,
                 structure,
-                error_message,
+                failure_message,
                 created_at
             """
         )
@@ -327,7 +320,9 @@ async def get_template_analysis_job_files(job_id: str) -> list[TemplateAnalysisF
     try:
         rows = await connection.fetch(
             """
-            SELECT file_name, storage_path
+            SELECT
+                original_file_name AS original_file_name,
+                stored_file_path AS stored_file_path
             FROM template_analysis_job_files
             WHERE job_id = $1::uuid
             ORDER BY created_at ASC
@@ -400,7 +395,7 @@ async def set_active_template(company_id: str, template_id: str) -> None:
         await connection.execute(
             """
             UPDATE company
-            SET active_template_id = $2::uuid
+            SET current_template_id = $2::uuid
             WHERE id = $1::uuid
             """,
             company_id,

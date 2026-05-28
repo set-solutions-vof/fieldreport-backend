@@ -23,25 +23,25 @@ class ReportSummaryResponse(BaseModel):
     inspector_name: str
 
 
-class SectionSourceResponse(BaseModel):
+class EvidenceSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     type: Literal["audio", "image"]
-    timestamp_start: float | None
-    timestamp_end: float | None
-    capture_time: datetime | None
+    start_seconds: float | None
+    end_seconds: float | None
+    captured_at: datetime | None
     content_summary: str
 
 
-class ReportSectionResponseBase(BaseModel):
+class ReportSectionContentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     section_id: str
     label: str
-    ai_draft: str
-    field_expert_content: str | None
-    is_approved: bool
+    generated_content: str
+    reviewed_content: str | None
+    approved: bool
     confidence_level: str
     confidence_score: float
     render_type: str = "text_block"
@@ -49,24 +49,24 @@ class ReportSectionResponseBase(BaseModel):
     groups: list[dict] | None = None
 
 
-class ReportSectionResponse(ReportSectionResponseBase):
-    sources: list[SectionSourceResponse]
+class ReportSectionResponse(ReportSectionContentResponse):
+    evidence_sources: list[EvidenceSourceResponse]
 
 
-class TimelineItemResponse(BaseModel):
+class EvidenceItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    source_type: Literal["transcription_segment", "image_analysis"]
-    timeline_offset_seconds: float
+    evidence_type: Literal["transcription_segment", "image_analysis"]
+    timeline_seconds: float
     start_seconds: float | None
     end_seconds: float | None
     captured_at: datetime | None
     content_summary: str
 
 
-class ReportDetailSectionResponse(ReportSectionResponseBase):
-    source_item_ids: list[UUID]
+class ReportDetailSectionResponse(ReportSectionContentResponse):
+    evidence_item_ids: list[UUID]
 
 
 class ReportDetailResponse(BaseModel):
@@ -80,7 +80,7 @@ class ReportDetailResponse(BaseModel):
     inspector_name: str
     updated_at: datetime | None = None
     sections: list[ReportDetailSectionResponse]
-    timeline_items: list[TimelineItemResponse]
+    evidence_items: list[EvidenceItemResponse]
 
 
 def report_summary_response(report_summary: ReportSummary) -> ReportSummaryResponse:

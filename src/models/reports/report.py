@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from src.models.templates.domain import TemplateSectionGroup, TemplateSectionRenderType
 
 ReportStatus = Literal["generating", "draft", "approved", "failed"]
-ReportSourceType = Literal["transcription_segment", "image_analysis"]
+ReportEvidenceItemType = Literal["transcription_segment", "image_analysis"]
 
 
 class ReportSummary(BaseModel):
@@ -20,31 +20,31 @@ class ReportSummary(BaseModel):
     inspector_name: str
 
 
-class ReportSectionSource(BaseModel):
+class ReportEvidenceSource(BaseModel):
     type: Literal["audio", "image"]
-    timestamp_start: float | None
-    timestamp_end: float | None
-    capture_time: datetime | None
-    content_summary: str
-
-
-class ReportTimelineItem(BaseModel):
-    id: UUID
-    source_type: ReportSourceType
-    timeline_offset_seconds: float
     start_seconds: float | None
     end_seconds: float | None
     captured_at: datetime | None
     content_summary: str
 
 
-class ReportSectionBase(BaseModel):
+class ReportEvidenceItem(BaseModel):
+    id: UUID
+    evidence_type: ReportEvidenceItemType
+    timeline_seconds: float
+    start_seconds: float | None
+    end_seconds: float | None
+    captured_at: datetime | None
+    content_summary: str
+
+
+class ReportSectionContent(BaseModel):
     id: UUID
     section_id: str
     label: str
-    ai_draft: str
-    field_expert_content: str | None
-    is_approved: bool
+    generated_content: str
+    reviewed_content: str | None
+    approved: bool
     confidence_level: Literal["high", "medium", "low"]
     confidence_score: float
     render_type: TemplateSectionRenderType = "text_block"
@@ -52,12 +52,12 @@ class ReportSectionBase(BaseModel):
     groups: list[TemplateSectionGroup] | None = None
 
 
-class ReportSection(ReportSectionBase):
-    sources: list[ReportSectionSource]
+class ReportSection(ReportSectionContent):
+    evidence_sources: list[ReportEvidenceSource]
 
 
-class ReportDetailSection(ReportSectionBase):
-    source_item_ids: list[UUID] = Field(default_factory=list)
+class ReportDetailSection(ReportSectionContent):
+    evidence_item_ids: list[UUID] = Field(default_factory=list)
 
 
 class ReportDetail(BaseModel):
@@ -69,4 +69,4 @@ class ReportDetail(BaseModel):
     inspector_name: str
     updated_at: datetime | None = None
     sections: list[ReportDetailSection]
-    timeline_items: list[ReportTimelineItem] = Field(default_factory=list)
+    evidence_items: list[ReportEvidenceItem] = Field(default_factory=list)

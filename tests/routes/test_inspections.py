@@ -32,7 +32,7 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
             "src.routes.inspections.template_queries.fetch_active_company_template",
             AsyncMock(
                 return_value=ActiveCompanyTemplateRecord(
-                    template_id=template_id,
+                    current_template_id=template_id,
                     structure=TemplateStructure(sections=[]),
                 )
             ),

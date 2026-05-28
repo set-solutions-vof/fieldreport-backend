@@ -20,27 +20,23 @@ def build_analysis_job_record(
     *,
     job_id=None,
     company_id=None,
-    template_id=None,
     status: TemplateAnalysisJobStatus | None = None,
-    reports_count: int | None = None,
+    source_reports_count: int | None = None,
     structure: TemplateStructure | None = None,
-    error_message: str | None = None,
+    failure_message: str | None = None,
     created_at: datetime | None = None,
 ) -> TemplateAnalysisJobRecord:
     job_data = {
         "id": job_id if job_id is not None else uuid4(),
         "company_id": company_id if company_id is not None else uuid4(),
-        "template_id": template_id,
         "status": status if status is not None else "queued",
-        "reports_count": reports_count if reports_count is not None else 0,
+        "source_reports_count": source_reports_count if source_reports_count is not None else 0,
+        "structure": structure if structure is not None else TemplateStructure(sections=[]),
         "created_at": created_at if created_at is not None else datetime.now(UTC),
     }
 
-    if structure is not None:
-        job_data["structure"] = structure
-
-    if error_message is not None:
-        job_data["error_message"] = error_message
+    if failure_message is not None:
+        job_data["failure_message"] = failure_message
 
     return TemplateAnalysisJobRecord.model_validate(job_data)
 
@@ -71,14 +67,14 @@ async def test_get_template_analysis_job_returns_active_job() -> None:
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
-                status="active", reports_count=5, structure=structure
+                status="active", source_reports_count=5, structure=structure
             )
         ),
     ):
         result = await templates_service.get_template_analysis_job(current_user, str(uuid4()))
 
     assert result.status == "active"
-    assert result.reports_count == 5
+    assert result.source_reports_count == 5
     assert result.structure == structure
 
 
@@ -89,8 +85,8 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
         build_upload_file("two.pdf"),
     ]
     stored_files = [
-        TemplateAnalysisFile(file_name="one.pdf", storage_path="/tmp/one.pdf"),
-        TemplateAnalysisFile(file_name="two.pdf", storage_path="/tmp/two.pdf"),
+        TemplateAnalysisFile(original_file_name="one.pdf", stored_file_path="/tmp/one.pdf"),
+        TemplateAnalysisFile(original_file_name="two.pdf", stored_file_path="/tmp/two.pdf"),
     ]
 
     with (
@@ -108,7 +104,7 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
         result = await templates_service.start_template_analysis(current_user, files)
 
     assert result.status == "processing"
-    assert result.reports_count == 2
+    assert result.source_reports_count == 2
     store_files.assert_awaited_once_with(str(current_user.company_id), result.job_id, files)
     replace_job.assert_awaited_once_with(result.job_id, str(current_user.company_id), stored_files)
 
@@ -124,14 +120,14 @@ async def test_get_template_analysis_job_returns_pending_review_job() -> None:
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
-                status="pending_review", reports_count=1, structure=structure
+                status="pending_review", source_reports_count=1, structure=structure
             )
         ),
     ):
         result = await templates_service.get_template_analysis_job(current_user, str(uuid4()))
 
     assert result.status == "pending_review"
-    assert result.reports_count == 1
+    assert result.source_reports_count == 1
     assert result.structure == structure
 
 
@@ -164,7 +160,7 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             fields=["Issue", "Action"],
         ),
     ]
-    job = build_analysis_job_record(job_id=job_id, status="pending_review", reports_count=3)
+    job = build_analysis_job_record(job_id=job_id, status="pending_review", source_reports_count=3)
 
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
@@ -193,7 +189,7 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
 
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
-        "reports_count": 3,
+        "source_reports_count": 3,
         "sections": [
             {
                 "id": "summary",
