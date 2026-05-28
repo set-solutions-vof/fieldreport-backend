@@ -1,4 +1,3 @@
-from src.models.templates.domain import TemplateSection
 from src.prompts.report_generation import REPORT_GENERATION_PROMPT
 
 

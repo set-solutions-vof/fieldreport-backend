@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, Form, HTTPException
 
 from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.models.auth.authentication import CurrentUser
+from src.models.templates import status_resolver
 from src.models.templates.configuration import (
     TemplateStatus,
     TemplateStatusActive,
 )
 from src.models.templates.domain import TemplateStructure
 from src.security.authentication import require_admin
-from src.services import templates, templates_state
+from src.services import templates
 
 router = APIRouter(tags=["Template"])
 
@@ -53,7 +54,7 @@ async def get_template_analysis(
     try:
         job = await templates.get_template_analysis_job(current_user, job_id)
 
-        return templates_state.resolve_template_job_state(job)
+        return status_resolver.resolve_template_job_state(job)
     except LookupError:
         raise HTTPException(status_code=404, detail="Template analysis not found")
 

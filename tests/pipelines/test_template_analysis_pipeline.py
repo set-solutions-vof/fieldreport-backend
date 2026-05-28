@@ -5,28 +5,28 @@ from uuid import uuid4
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisDocument, TemplateAnalysisFile
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.services import template_analysis as template_analysis_service
+from src.pipelines import template_analysis_pipeline
 
 
 async def test_build_template_analysis_document_combines_text_and_visual_outputs() -> None:
     with (
         patch.object(
-            template_analysis_service.template_file_storage,
+            template_analysis_pipeline.template_file_storage,
             "load_template_analysis_file",
             return_value=b"pdf-bytes",
         ),
         patch.object(
-            template_analysis_service.pdf_text_extractor,
+            template_analysis_pipeline.pdf_text_extractor,
             "extract_text_from_pdf",
             return_value="Extracted text",
         ),
         patch.object(
-            template_analysis_service.gpt4o_client,
+            template_analysis_pipeline.gpt4o_client,
             "analyze_pdf_visuals",
             AsyncMock(return_value='{"visual_summary":"Visual summary"}'),
         ),
     ):
-        result = await template_analysis_service.build_template_analysis_document(
+        result = await template_analysis_pipeline.build_template_analysis_document(
             "report.pdf",
             "/tmp/report.pdf",
         )
@@ -40,11 +40,11 @@ async def test_build_template_analysis_document_combines_text_and_visual_outputs
 
 async def test_process_next_template_analysis_job_returns_none_when_queue_is_empty() -> None:
     with patch.object(
-        template_analysis_service.template_queries,
+        template_analysis_pipeline.template_queries,
         "claim_next_template_analysis_job",
         AsyncMock(return_value=None),
     ):
-        result = await template_analysis_service.process_next_template_analysis_job()
+        result = await template_analysis_pipeline.process_next_template_analysis_job()
 
     assert result is None
 
@@ -68,17 +68,17 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
 
     with (
         patch.object(
-            template_analysis_service.template_queries,
+            template_analysis_pipeline.template_queries,
             "claim_next_template_analysis_job",
             AsyncMock(return_value=job),
         ),
         patch.object(
-            template_analysis_service.template_queries,
+            template_analysis_pipeline.template_queries,
             "get_template_analysis_job_files",
             AsyncMock(return_value=files),
         ),
         patch.object(
-            template_analysis_service,
+            template_analysis_pipeline,
             "build_template_analysis_document",
             AsyncMock(
                 return_value=TemplateAnalysisDocument(
@@ -89,17 +89,17 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
             ),
         ),
         patch.object(
-            template_analysis_service.deepseek_client,
+            template_analysis_pipeline.deepseek_client,
             "synthesize_template_sections",
             AsyncMock(return_value=sections),
         ),
         patch.object(
-            template_analysis_service.template_queries,
+            template_analysis_pipeline.template_queries,
             "update_template_analysis_job",
             AsyncMock(),
         ) as update_job,
     ):
-        result = await template_analysis_service.process_next_template_analysis_job()
+        result = await template_analysis_pipeline.process_next_template_analysis_job()
 
     assert result == job
     update_job.assert_awaited_once_with(
@@ -127,17 +127,17 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
 
     with (
         patch.object(
-            template_analysis_service.template_queries,
+            template_analysis_pipeline.template_queries,
             "claim_next_template_analysis_job",
             AsyncMock(return_value=job),
         ),
         patch.object(
-            template_analysis_service.template_queries,
+            template_analysis_pipeline.template_queries,
             "get_template_analysis_job_files",
             AsyncMock(return_value=files),
         ),
         patch.object(
-            template_analysis_service,
+            template_analysis_pipeline,
             "build_template_analysis_document",
             AsyncMock(
                 return_value=TemplateAnalysisDocument(
@@ -148,18 +148,18 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
             ),
         ),
         patch.object(
-            template_analysis_service.deepseek_client,
+            template_analysis_pipeline.deepseek_client,
             "synthesize_template_sections",
             AsyncMock(side_effect=ValueError("bad json")),
         ),
         patch.object(
-            template_analysis_service.template_queries,
+            template_analysis_pipeline.template_queries,
             "update_template_analysis_job",
             AsyncMock(),
         ) as update_job,
     ):
         try:
-            await template_analysis_service.process_next_template_analysis_job()
+            await template_analysis_pipeline.process_next_template_analysis_job()
         except ValueError:
             pass
         else:

@@ -1,9 +1,9 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from src.models.templates import status_resolver
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.records import ActiveCompanyTemplateRecord, TemplateAnalysisJobRecord
-from src.services import templates_state
 
 
 def build_active_template(
@@ -31,7 +31,7 @@ def build_job(
 
 
 def test_resolve_template_company_state_returns_not_configured() -> None:
-    result = templates_state.resolve_template_company_state(None, None)
+    result = status_resolver.resolve_template_company_state(None, None)
 
     assert result.status == "not_configured"
 
@@ -42,7 +42,7 @@ def test_resolve_template_company_state_returns_pending_review_job() -> None:
     )
     job = build_job(status="pending_review", structure=structure, source_reports_count=3)
 
-    result = templates_state.resolve_template_company_state(None, job)
+    result = status_resolver.resolve_template_company_state(None, job)
 
     assert result.status == "pending_review"
     assert result.sections == structure.sections
@@ -59,7 +59,7 @@ def test_resolve_template_company_state_returns_unfinished_job_before_active_tem
     )
     job = build_job(status="pending_review", structure=pending_structure)
 
-    result = templates_state.resolve_template_company_state(
+    result = status_resolver.resolve_template_company_state(
         build_active_template(active_structure),
         job,
     )
@@ -71,7 +71,7 @@ def test_resolve_template_company_state_returns_unfinished_job_before_active_tem
 def test_resolve_template_company_state_maps_queued_job_to_processing() -> None:
     job = build_job(status="queued", source_reports_count=3)
 
-    result = templates_state.resolve_template_company_state(None, job)
+    result = status_resolver.resolve_template_company_state(None, job)
 
     assert result.status == "processing"
     assert result.job_id == str(job.id)
@@ -82,51 +82,31 @@ def test_resolve_template_company_state_returns_active_template_when_no_job() ->
     structure = TemplateStructure(
         sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
-    result = templates_state.resolve_template_company_state(build_active_template(structure), None)
+    result = status_resolver.resolve_template_company_state(build_active_template(structure), None)
 
     assert result.status == "active"
     assert result.sections == structure.sections
 
 
-def test_resolve_template_company_state_prefers_active_template_over_failed_job() -> None:
+def test_resolve_template_company_state_returns_failed_job_before_active_template() -> None:
     active_structure = TemplateStructure(
         sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
-    job = build_job(status="failed", failure_message="model error")
+    job = build_job(status="failed", failure_message="model error", source_reports_count=2)
 
-    result = templates_state.resolve_template_company_state(
+    result = status_resolver.resolve_template_company_state(
         build_active_template(active_structure), job
     )
 
-    assert result.status == "active"
-    assert result.sections == active_structure.sections
-
-
-def test_resolve_template_company_state_returns_active_from_active_job() -> None:
-    active_structure = TemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
-    )
-    job = build_job(
-        status="active",
-        structure=TemplateStructure(
-            sections=[TemplateSection(id="draft", label="Draft", render_type="text_block")]
-        ),
-        source_reports_count=4,
-    )
-
-    result = templates_state.resolve_template_company_state(
-        build_active_template(active_structure), job
-    )
-
-    assert result.status == "active"
-    assert result.sections == active_structure.sections
-    assert result.source_reports_count == 4
+    assert result.status == "failed"
+    assert result.failure_message == "model error"
+    assert result.source_reports_count == 2
 
 
 def test_resolve_template_company_state_returns_failed_without_active_template() -> None:
     job = build_job(status="failed", failure_message="model error", source_reports_count=2)
 
-    result = templates_state.resolve_template_company_state(None, job)
+    result = status_resolver.resolve_template_company_state(None, job)
 
     assert result.status == "failed"
     assert result.failure_message == "model error"
@@ -135,7 +115,7 @@ def test_resolve_template_company_state_returns_failed_without_active_template()
 def test_resolve_template_job_state_returns_processing() -> None:
     job = build_job(status="processing", source_reports_count=2)
 
-    result = templates_state.resolve_template_job_state(job)
+    result = status_resolver.resolve_template_job_state(job)
 
     assert result.status == "processing"
 
@@ -146,7 +126,7 @@ def test_resolve_template_job_state_returns_pending_review() -> None:
     )
     job = build_job(status="pending_review", structure=structure)
 
-    result = templates_state.resolve_template_job_state(job)
+    result = status_resolver.resolve_template_job_state(job)
 
     assert result.status == "pending_review"
     assert result.sections == structure.sections
@@ -155,7 +135,7 @@ def test_resolve_template_job_state_returns_pending_review() -> None:
 def test_resolve_template_job_state_returns_failed() -> None:
     job = build_job(status="failed", failure_message="model error", source_reports_count=2)
 
-    result = templates_state.resolve_template_job_state(job)
+    result = status_resolver.resolve_template_job_state(job)
 
     assert result.status == "failed"
     assert result.failure_message == "model error"
@@ -168,7 +148,7 @@ def test_resolve_template_job_state_returns_active_from_job_structure() -> None:
     )
     job = build_job(status="active", structure=structure, source_reports_count=5)
 
-    result = templates_state.resolve_template_job_state(job)
+    result = status_resolver.resolve_template_job_state(job)
 
     assert result.status == "active"
     assert result.sections == structure.sections

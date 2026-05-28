@@ -4,6 +4,7 @@ from fastapi import UploadFile
 
 from src.db import template_queries
 from src.models.auth.authentication import CurrentUser
+from src.models.templates import status_resolver
 from src.models.templates.configuration import (
     TemplateStatus,
     TemplateStatusActive,
@@ -11,14 +12,13 @@ from src.models.templates.configuration import (
 )
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.services import templates_state
 from src.storage import template_file_storage
 
 
 async def load_template_configuration(company_id: str) -> TemplateStatus:
     active_template, job = await template_queries.fetch_template_configuration_context(company_id)
 
-    return templates_state.resolve_template_company_state(active_template, job)
+    return status_resolver.resolve_template_company_state(active_template, job)
 
 
 async def get_template_analysis_job(

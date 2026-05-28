@@ -1,9 +1,9 @@
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+from src.models.templates import status_resolver
 from src.models.templates.configuration import TemplateStatusNotConfigured
 from src.services import templates as templates_service
-from src.services import templates_state
 
 
 async def test_load_template_configuration_fetches_and_resolves() -> None:
@@ -17,7 +17,7 @@ async def test_load_template_configuration_fetches_and_resolves() -> None:
             AsyncMock(return_value=(None, None)),
         ) as fetch_context,
         patch.object(
-            templates_state,
+            status_resolver,
             "resolve_template_company_state",
             return_value=expected,
         ) as resolve_state,

@@ -7,7 +7,7 @@ from src.workers import template_analysis_worker
 async def test_run_template_analysis_worker_does_not_sleep_when_job_is_available() -> None:
     with (
         patch.object(
-            template_analysis_worker.template_analysis,
+            template_analysis_worker.template_analysis_pipeline,
             "process_next_template_analysis_job",
             AsyncMock(side_effect=[SimpleNamespace(id="job-1"), KeyboardInterrupt()]),
         ) as process_job,
@@ -25,7 +25,7 @@ async def test_run_template_analysis_worker_does_not_sleep_when_job_is_available
 async def test_run_template_analysis_worker_sleeps_when_no_job_is_available() -> None:
     with (
         patch.object(
-            template_analysis_worker.template_analysis,
+            template_analysis_worker.template_analysis_pipeline,
             "process_next_template_analysis_job",
             AsyncMock(side_effect=[None, KeyboardInterrupt()]),
         ),

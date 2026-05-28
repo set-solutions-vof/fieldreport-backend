@@ -4,7 +4,7 @@ from uuid import uuid4
 
 from src.models.reports.transcription import TranscriptionResult, TranscriptionSegment
 from src.models.templates.domain import TemplateSection, TemplateStructure
-from src.services import audio_pipeline
+from src.pipelines import audio_pipeline
 
 
 def build_report(status: str = "generating") -> dict:

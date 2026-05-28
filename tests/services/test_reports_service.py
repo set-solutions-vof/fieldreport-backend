@@ -133,13 +133,15 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
             content_summary="Thermal image",
         ),
     ]
-
-    template_sections_by_id = {
-        "bevindingen": TemplateSection(
-            id="bevindingen", label="Bevindingen", render_type="text_block"
+    company_template = ActiveCompanyTemplateRecord(
+        current_template_id=uuid4(),
+        structure=TemplateStructure(
+            sections=[
+                TemplateSection(id="bevindingen", label="Bevindingen", render_type="text_block"),
+                TemplateSection(id="advies", label="Advies", render_type="text_block"),
+            ]
         ),
-        "advies": TemplateSection(id="advies", label="Advies", render_type="text_block"),
-    }
+    )
 
     with (
         patch.object(
@@ -148,14 +150,19 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
             AsyncMock(return_value=report),
         ) as get_report,
         patch.object(
-            reports_service,
-            "load_report_detail_sections",
-            AsyncMock(return_value=(sections, evidence_items)),
-        ) as get_report_sections,
+            reports_service.report_queries,
+            "fetch_report_section_rows",
+            AsyncMock(return_value=[{"id": uuid4()}]),
+        ) as fetch_rows,
         patch.object(
             reports_service,
-            "load_template_sections_by_id",
-            AsyncMock(return_value=template_sections_by_id),
+            "map_report_detail_sections",
+            return_value=(sections, evidence_items),
+        ) as map_sections,
+        patch.object(
+            reports_service.template_queries,
+            "fetch_active_company_template",
+            AsyncMock(return_value=company_template),
         ),
     ):
         result = await reports_service.get_report_detail(str(report_id), current_user)
@@ -163,26 +170,8 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
     assert result.sections == sections
     assert result.evidence_items == evidence_items
     get_report.assert_awaited_once_with(str(report_id), str(current_user.company_id))
-    get_report_sections.assert_awaited_once_with(str(report_id))
-
-
-async def test_load_template_sections_by_id_returns_sections_by_id() -> None:
-    company_id = uuid4()
-    section = TemplateSection(id="advies", label="Advies", render_type="text_block")
-    company_template = ActiveCompanyTemplateRecord(
-        current_template_id=uuid4(),
-        structure=TemplateStructure(sections=[section]),
-    )
-
-    with patch.object(
-        reports_service.template_queries,
-        "fetch_active_company_template",
-        AsyncMock(return_value=company_template),
-    ) as fetch_template:
-        result = await reports_service.load_template_sections_by_id(str(company_id))
-
-    assert result == {"advies": section}
-    fetch_template.assert_awaited_once_with(str(company_id))
+    fetch_rows.assert_awaited_once_with(str(report_id))
+    map_sections.assert_called_once()
 
 
 async def test_update_report_section_returns_repository_section() -> None:
@@ -215,6 +204,12 @@ async def test_update_report_section_returns_repository_section() -> None:
             )
         ],
     )
+    company_template = ActiveCompanyTemplateRecord(
+        current_template_id=uuid4(),
+        structure=TemplateStructure(
+            sections=[TemplateSection(id="advies", label="Advies", render_type="text_block")]
+        ),
+    )
 
     with (
         patch.object(
@@ -223,13 +218,9 @@ async def test_update_report_section_returns_repository_section() -> None:
             AsyncMock(return_value=section),
         ) as update_section,
         patch.object(
-            reports_service,
-            "load_template_sections_by_id",
-            AsyncMock(
-                return_value={
-                    "advies": TemplateSection(id="advies", label="Advies", render_type="text_block")
-                }
-            ),
+            reports_service.template_queries,
+            "fetch_active_company_template",
+            AsyncMock(return_value=company_template),
         ),
     ):
         result = await reports_service.update_report_section(

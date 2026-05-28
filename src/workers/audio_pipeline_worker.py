@@ -4,7 +4,7 @@ from loguru import logger
 
 from src.config import settings
 from src.db import report_queries
-from src.services import audio_pipeline
+from src.pipelines import audio_pipeline
 
 
 async def run_audio_pipeline_worker() -> None:
