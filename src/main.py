@@ -3,7 +3,11 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.routes import auth, health, inspections, reports, template
 
-app = FastAPI(title="Fieldreport API")
+app = FastAPI(
+    title="Fieldreport API",
+    description="API documentation for Fieldreport",
+    version="1.0.0",
+)
 
 app.add_middleware(
     CORSMiddleware,

@@ -8,10 +8,6 @@ from src.models.templates.records import (
 )
 
 
-def parse_template_structure(value: str) -> TemplateStructure:
-    return TemplateStructure.model_validate_json(value)
-
-
 def map_optional_active_company_template(
     row: asyncpg.Record,
 ) -> ActiveCompanyTemplateRecord | None:
@@ -23,7 +19,7 @@ def map_optional_active_company_template(
 
 def map_active_company_template(row: asyncpg.Record) -> ActiveCompanyTemplateRecord:
     row_data = dict(row)
-    row_data["structure"] = parse_template_structure(row_data["structure"])
+    row_data["structure"] = TemplateStructure.model_validate_json(row_data["structure"])
 
     return ActiveCompanyTemplateRecord.model_validate(row_data)
 
@@ -31,7 +27,7 @@ def map_active_company_template(row: asyncpg.Record) -> ActiveCompanyTemplateRec
 def map_template_analysis_job(row: asyncpg.Record) -> TemplateAnalysisJobRecord:
     row_data = dict(row)
     if row_data.get("structure") is not None:
-        row_data["structure"] = parse_template_structure(row_data["structure"])
+        row_data["structure"] = TemplateStructure.model_validate_json(row_data["structure"])
     else:
         row_data["structure"] = TemplateStructure(sections=[])
 

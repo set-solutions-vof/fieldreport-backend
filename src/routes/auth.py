@@ -11,10 +11,15 @@ from src.models.auth.authentication import CurrentUser, LoginCredentials
 from src.security.authentication import get_current_user
 from src.services import authentication
 
-router = APIRouter(prefix="/api/v1/auth")
+router = APIRouter(tags=["Auth"])
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post(
+    "/api/v1/auth/login",
+    response_model=TokenResponse,
+    summary="Login (form)",
+    description="Authenticate with email and password using OAuth2 form fields.",
+)
 async def login_form(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> TokenResponse:
@@ -28,7 +33,12 @@ async def login_form(
     return TokenResponse.model_validate(token_pair)
 
 
-@router.post("/login/json", response_model=TokenResponse)
+@router.post(
+    "/api/v1/auth/login/json",
+    response_model=TokenResponse,
+    summary="Login (JSON)",
+    description="Authenticate with email and password in a JSON request body.",
+)
 async def login_json(request_body: LoginJsonRequest) -> TokenResponse:
     try:
         token_pair = await authentication.login(
@@ -40,7 +50,12 @@ async def login_json(request_body: LoginJsonRequest) -> TokenResponse:
     return TokenResponse.model_validate(token_pair)
 
 
-@router.post("/refresh", response_model=RefreshTokenResponse)
+@router.post(
+    "/api/v1/auth/refresh",
+    response_model=RefreshTokenResponse,
+    summary="Refresh token",
+    description="Exchange a valid refresh token for a new access token.",
+)
 async def refresh_token(request_body: RefreshTokenRequest) -> RefreshTokenResponse:
     try:
         refreshed_token = await authentication.refresh(request_body.refresh_token)
@@ -50,7 +65,12 @@ async def refresh_token(request_body: RefreshTokenRequest) -> RefreshTokenRespon
     return RefreshTokenResponse.model_validate(refreshed_token)
 
 
-@router.get("/me", response_model=CurrentUserResponse)
+@router.get(
+    "/api/v1/auth/me",
+    response_model=CurrentUserResponse,
+    summary="Current user",
+    description="Returns the authenticated user's profile.",
+)
 async def get_me(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> CurrentUserResponse:

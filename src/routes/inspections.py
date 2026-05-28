@@ -10,10 +10,15 @@ from src.models.auth.authentication import CurrentUser
 from src.security.authentication import get_current_user
 from src.storage import inspection_file_storage
 
-router = APIRouter(prefix="/api/v1/inspections")
+router = APIRouter(tags=["Inspections"])
 
 
-@router.post("")
+@router.post(
+    "/api/v1/inspections",
+    response_model=CreateInspectionResponse,
+    summary="Create inspection",
+    description="Creates an inspection with audio and photo uploads and starts report generation.",
+)
 async def create_inspection(
     address: Annotated[str, Form()],
     inspection_date: Annotated[str, Form()],

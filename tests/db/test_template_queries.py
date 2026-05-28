@@ -209,8 +209,7 @@ async def test_fetch_latest_template_analysis_job_returns_latest_company_job() -
         "failure_message": None,
         "created_at": created_at,
     }
-    connection = FakeConnection()
-    connection.fetchrow = AsyncMock(return_value=job_row)
+    connection = FakeConnection(rows=[job_row])
 
     with patch(
         "src.db.template_queries.asyncpg.connect",

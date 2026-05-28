@@ -1,4 +1,3 @@
-from typing import cast
 from uuid import uuid4
 
 import asyncpg
@@ -9,7 +8,6 @@ from src.db.template_mapper import (
     map_optional_active_company_template,
     map_template_analysis_file,
     map_template_analysis_job,
-    parse_template_structure,
 )
 from src.models.templates.domain import TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile
@@ -55,11 +53,27 @@ async def fetch_latest_template_analysis_job(
     connection = await asyncpg.connect(get_connection_url())
 
     try:
-        job_row = await fetch_latest_template_analysis_job_row(connection, company_id)
+        rows = await connection.fetch(
+            """
+            SELECT
+                id,
+                company_id,
+                status,
+                source_reports_count,
+                structure,
+                failure_message,
+                created_at
+            FROM template_analysis_jobs
+            WHERE company_id = $1::uuid
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            company_id,
+        )
     finally:
         await connection.close()
 
-    return map_template_analysis_job(cast(asyncpg.Record, job_row))
+    return map_template_analysis_job(rows[0])
 
 
 async def get_template_analysis_job(
@@ -350,7 +364,7 @@ async def fetch_template_structure(template_id: str) -> TemplateStructure:
     finally:
         await connection.close()
 
-    return parse_template_structure(row["structure"])
+    return TemplateStructure.model_validate_json(row["structure"])
 
 
 async def create_template(

@@ -32,7 +32,7 @@ async def test_build_template_analysis_document_combines_text_and_visual_outputs
         )
 
     assert result == TemplateAnalysisDocument(
-            original_file_name="report.pdf",
+        original_file_name="report.pdf",
         extracted_text="Extracted text",
         visual_summary='{"visual_summary":"Visual summary"}',
     )
@@ -82,7 +82,7 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
             "build_template_analysis_document",
             AsyncMock(
                 return_value=TemplateAnalysisDocument(
-            original_file_name="report.pdf",
+                    original_file_name="report.pdf",
                     extracted_text="Extracted text",
                     visual_summary="Visual summary",
                 )
@@ -141,7 +141,7 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
             "build_template_analysis_document",
             AsyncMock(
                 return_value=TemplateAnalysisDocument(
-            original_file_name="report.pdf",
+                    original_file_name="report.pdf",
                     extracted_text="Extracted text",
                     visual_summary="Visual summary",
                 )

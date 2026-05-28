@@ -18,6 +18,8 @@ make run
 
 `make run` starts PostgreSQL when needed, applies the latest database migrations, and then starts the API.
 
+API docs: http://127.0.0.1:8000/docs
+
 `make stop` stops the local API process and tears down the Docker services.
 
 `make check` runs the CI-safe local checks: format validation, linting, static analysis, and tests.

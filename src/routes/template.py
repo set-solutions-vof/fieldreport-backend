@@ -11,17 +11,27 @@ from src.models.templates.configuration import (
 from src.security.authentication import require_admin
 from src.services import templates, templates_state
 
-router = APIRouter(prefix="/api/v1/template")
+router = APIRouter(tags=["Template"])
 
 
-@router.get("")
+@router.get(
+    "/api/v1/template",
+    response_model=TemplateStatus,
+    summary="Get template configuration",
+    description="Returns the company's template configuration status.",
+)
 async def get_template_configuration(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateStatus:
     return await templates.load_template_configuration(str(current_user.company_id))
 
 
-@router.post("/analysis")
+@router.post(
+    "/api/v1/template/analysis",
+    response_model=TemplateStatus,
+    summary="Start template analysis",
+    description="Uploads example PDFs and queues template structure analysis.",
+)
 async def start_template_analysis(
     files: Annotated[list[UploadFile], File()],
     current_user: Annotated[CurrentUser, Depends(require_admin)],
@@ -32,7 +42,12 @@ async def start_template_analysis(
     return await templates.start_template_analysis(current_user, files)
 
 
-@router.get("/analysis/{job_id}")
+@router.get(
+    "/api/v1/template/analysis/{job_id}",
+    response_model=TemplateStatus,
+    summary="Get template analysis",
+    description="Returns the status and result of a template analysis job.",
+)
 async def get_template_analysis(
     job_id: str,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
@@ -45,7 +60,12 @@ async def get_template_analysis(
         raise HTTPException(status_code=404, detail="Template analysis not found")
 
 
-@router.post("")
+@router.post(
+    "/api/v1/template",
+    response_model=TemplateStatusActive,
+    summary="Confirm template",
+    description="Activates the reviewed template structure for the company.",
+)
 async def confirm_template(
     request_body: TemplateStructureRequest,
     current_user: Annotated[CurrentUser, Depends(require_admin)],

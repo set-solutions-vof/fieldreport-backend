@@ -82,9 +82,7 @@ def test_resolve_template_company_state_returns_active_template_when_no_job() ->
     structure = TemplateStructure(
         sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
     )
-    result = templates_state.resolve_template_company_state(
-        build_active_template(structure), None
-    )
+    result = templates_state.resolve_template_company_state(build_active_template(structure), None)
 
     assert result.status == "active"
     assert result.sections == structure.sections
