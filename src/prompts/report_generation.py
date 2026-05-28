@@ -1,22 +1,4 @@
-from src.models.templates.domain import TemplateSection
-
-
-def build_report_generation_prompt(
-    template_sections: list[TemplateSection],
-    combined_transcription: str,
-    image_analysis_texts: list[str],
-    extra_context: str = "",
-) -> str:
-    sections_text = "\n".join(
-        f"- id: {section.id}, label: {section.label}" for section in template_sections
-    )
-    image_text = "\n".join(
-        f"{image_index}. {analysis_text}"
-        for image_index, analysis_text in enumerate(image_analysis_texts, start=1)
-    )
-    context_text = f"\nExtra context:\n{extra_context}\n" if extra_context else ""
-
-    return f"""
+REPORT_GENERATION_PROMPT = """
 Je genereert Nederlandstalige conceptrapportsecties voor een inspectierapport.
 
 Template secties:

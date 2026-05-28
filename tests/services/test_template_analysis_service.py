@@ -16,7 +16,7 @@ async def test_build_template_analysis_document_combines_text_and_visual_outputs
             return_value=b"pdf-bytes",
         ),
         patch.object(
-            template_analysis_service.pdf_extractor,
+            template_analysis_service.pdf_text_extractor,
             "extract_text_from_pdf",
             return_value="Extracted text",
         ),

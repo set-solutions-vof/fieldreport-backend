@@ -3,8 +3,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from openai import AsyncOpenAI
-
 from src.config import settings
 from src.llm.client_factory import get_gpt4o_transcribe_client
 from src.models.reports.transcription import (
@@ -27,15 +25,15 @@ async def transcribe_audio(
     chunk_transcriptions: list[ChunkTranscription] = []
 
     for audio_chunk in audio_chunks:
-        chunk_text = await transcribe_chunk(
-            client,
-            audio_chunk.content,
-            audio_chunk.filename,
-            language,
+        response = await client.audio.transcriptions.create(
+            model=settings.gpt4o_transcribe_deployment,
+            file=(audio_chunk.filename, audio_chunk.content),
+            language=language,
+            response_format="json",
         )
         chunk_transcriptions.append(
             ChunkTranscription(
-                text=chunk_text,
+                text=response.text,
                 duration_seconds=audio_chunk.duration_seconds,
             )
         )
@@ -155,19 +153,3 @@ def split_audio_sync(file_content: bytes, filename: str) -> list[AudioChunk]:
             )
 
         return audio_chunks
-
-
-async def transcribe_chunk(
-    client: AsyncOpenAI,
-    file_content: bytes,
-    filename: str,
-    language: str,
-) -> str:
-    response = await client.audio.transcriptions.create(
-        model=settings.gpt4o_transcribe_deployment,
-        file=(filename, file_content),
-        language=language,
-        response_format="json",
-    )
-
-    return response.text

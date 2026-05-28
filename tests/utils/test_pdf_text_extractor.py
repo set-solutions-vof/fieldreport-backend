@@ -2,7 +2,7 @@ from pathlib import Path
 
 import fitz
 
-from src.pdf import extractor
+from src.utils import pdf_text_extractor
 
 
 def test_extract_text_from_pdf_returns_joined_page_text(tmp_path: Path) -> None:
@@ -17,6 +17,6 @@ def test_extract_text_from_pdf_returns_joined_page_text(tmp_path: Path) -> None:
     document.save(pdf_path)
     document.close()
 
-    result = extractor.extract_text_from_pdf(str(pdf_path))
+    result = pdf_text_extractor.extract_text_from_pdf(str(pdf_path))
 
     assert result == "Summary page\n\nFindings page"

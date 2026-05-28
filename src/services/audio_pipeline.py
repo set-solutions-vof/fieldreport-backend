@@ -6,7 +6,7 @@ from loguru import logger
 from src.config import settings
 from src.db import inspection_queries, report_queries, template_queries
 from src.llm import client_factory, gpt4o_client, gpt4o_transcribe_client
-from src.prompts.report_generation import build_report_generation_prompt
+from src.prompts.report_generation import REPORT_GENERATION_PROMPT
 from src.storage import inspection_file_storage
 
 
@@ -82,11 +82,19 @@ async def run_audio_pipeline(report_id: str) -> None:
     )
 
     try:
-        prompt = build_report_generation_prompt(
-            template_sections,
-            combined_transcription,
-            image_analysis_texts,
-            extra_context,
+        sections_text = "\n".join(
+            f"- id: {section.id}, label: {section.label}" for section in template_sections
+        )
+        image_text = "\n".join(
+            f"{image_index}. {analysis_text}"
+            for image_index, analysis_text in enumerate(image_analysis_texts, start=1)
+        )
+        context_text = f"\nExtra context:\n{extra_context}\n" if extra_context else ""
+        prompt = REPORT_GENERATION_PROMPT.format(
+            sections_text=sections_text,
+            combined_transcription=combined_transcription,
+            image_text=image_text,
+            context_text=context_text,
         )
         client = client_factory.get_gpt4o_client()
         response = await client.chat.completions.create(
