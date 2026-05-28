@@ -9,6 +9,7 @@ from src.models.reports.report import (
     ReportSection,
     ReportSummary,
 )
+from src.models.templates.domain import TemplateSectionGroup, TemplateSectionRenderType
 
 
 class ReportSummaryResponse(BaseModel):
@@ -42,11 +43,11 @@ class ReportSectionContentResponse(BaseModel):
     generated_content: str
     reviewed_content: str | None
     approved: bool
-    confidence_level: str
+    confidence_level: Literal["high", "medium", "low"]
     confidence_score: float
-    render_type: str = "text_block"
+    render_type: TemplateSectionRenderType = "text_block"
     fields: list[str] | None = None
-    groups: list[dict] | None = None
+    groups: list[TemplateSectionGroup] | None = None
 
 
 class ReportSectionResponse(ReportSectionContentResponse):

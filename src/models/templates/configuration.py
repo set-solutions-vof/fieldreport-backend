@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from src.models.templates.domain import TemplateSection
 
@@ -34,10 +34,11 @@ class TemplateStatusFailed(BaseModel):
     failure_message: str
 
 
-TemplateStatus = (
+TemplateStatus = Annotated[
     TemplateStatusNotConfigured
     | TemplateStatusProcessing
     | TemplateStatusPendingReview
     | TemplateStatusActive
-    | TemplateStatusFailed
-)
+    | TemplateStatusFailed,
+    Field(discriminator="status"),
+]

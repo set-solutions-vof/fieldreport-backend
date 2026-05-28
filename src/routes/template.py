@@ -2,12 +2,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException
 
-from src.http.v1.request.template import StartTemplateAnalysisRequest, TemplateStructureRequest
+from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
     TemplateStatus,
     TemplateStatusActive,
 )
+from src.models.templates.domain import TemplateStructure
 from src.security.authentication import require_admin
 from src.services import templates, templates_state
 
@@ -64,7 +65,7 @@ async def get_template_analysis(
     description="Activates the reviewed template structure for the company.",
 )
 async def confirm_template(
-    request_body: TemplateStructureRequest,
+    request_body: TemplateStructure,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateStatusActive:
     return await templates.confirm_template(current_user, request_body.sections)

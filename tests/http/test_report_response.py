@@ -8,6 +8,7 @@ from src.http.v1.response.report import (
     report_detail_response,
 )
 from src.models.reports.report import ReportDetail, ReportDetailSection
+from src.models.templates.domain import TemplateSectionGroup
 
 
 def test_evidence_source_response_serializes_missing_captured_at() -> None:
@@ -75,11 +76,11 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
                 render_type="measurement_table",
                 fields=["Visuele inspectie"],
                 groups=[
-                    {
-                        "id": "algemene_inspectie",
-                        "label": "Algemene inspectie",
-                        "fields": ["Visuele inspectie"],
-                    }
+                    TemplateSectionGroup(
+                        id="algemene_inspectie",
+                        label="Algemene inspectie",
+                        fields=["Visuele inspectie"],
+                    )
                 ],
                 evidence_item_ids=[],
             )
