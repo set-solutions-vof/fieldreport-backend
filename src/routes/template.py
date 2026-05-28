@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, Form, HTTPException
 
-from src.http.v1.request.template import TemplateStructureRequest
+from src.http.v1.request.template import StartTemplateAnalysisRequest, TemplateStructureRequest
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
     TemplateStatus,
@@ -33,13 +33,10 @@ async def get_template_configuration(
     description="Uploads example PDFs and queues template structure analysis.",
 )
 async def start_template_analysis(
-    files: Annotated[list[UploadFile], File()],
+    request_body: Annotated[StartTemplateAnalysisRequest, Form()],
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateStatus:
-    if not files:
-        raise HTTPException(status_code=400, detail="At least one file is required")
-
-    return await templates.start_template_analysis(current_user, files)
+    return await templates.start_template_analysis(current_user, request_body.files)
 
 
 @router.get(

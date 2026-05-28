@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from starlette.datastructures import UploadFile
 
+from src.http.v1.request.inspection import CreateInspectionRequest
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.domain import TemplateStructure
 from src.models.templates.records import ActiveCompanyTemplateRecord
@@ -59,14 +60,16 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
         ) as insert_report,
     ):
         response = await inspections.create_inspection(
-            "Main Street 1",
-            "2026-05-25",
-            "Lekdetectie",
-            "Zakelijk",
-            [audio_file],
+            CreateInspectionRequest(
+                address="Main Street 1",
+                inspection_date="2026-05-25",
+                investigation_type="Lekdetectie",
+                client_type="Zakelijk",
+                extra_context="Extra",
+                audio_files=[audio_file],
+                photo_files=[photo_file],
+            ),
             current_user,
-            extra_context="Extra",
-            photo_files=[photo_file],
         )
 
     assert response.status == "processing"

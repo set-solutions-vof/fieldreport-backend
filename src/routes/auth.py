@@ -1,10 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, Form, HTTPException
 from jwt import InvalidTokenError
 
-from src.http.v1.request.auth import LoginJsonRequest, RefreshTokenRequest
+from src.http.v1.request.auth import LoginFormRequest, LoginJsonRequest, RefreshTokenRequest
 from src.http.v1.response.auth import RefreshTokenResponse, TokenResponse
 from src.http.v1.response.user import CurrentUserResponse
 from src.models.auth.authentication import CurrentUser, LoginCredentials
@@ -21,7 +20,7 @@ router = APIRouter(tags=["Auth"])
     description="Authenticate with email and password using OAuth2 form fields.",
 )
 async def login_form(
-    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
+    form_data: Annotated[LoginFormRequest, Form()],
 ) -> TokenResponse:
     try:
         token_pair = await authentication.login(

@@ -5,9 +5,10 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
-from fastapi import HTTPException
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 
+from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.main import app
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
@@ -131,16 +132,11 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
 async def test_post_template_analysis_rejects_empty_upload_list(client: AsyncClient) -> None:
     current_user = build_current_user()
 
-    try:
-        await template_route.start_template_analysis([], current_user)
-    except HTTPException as error:
-        response_status = error.status_code
-        response_detail = error.detail
-    else:
-        raise AssertionError("Expected HTTPException")
-
-    assert response_status == 400
-    assert response_detail == "At least one file is required"
+    with pytest.raises(ValidationError):
+        await template_route.start_template_analysis(
+            StartTemplateAnalysisRequest(files=[]),
+            current_user,
+        )
 
 
 async def test_post_template_analysis_missing_files_returns_validation_error(
