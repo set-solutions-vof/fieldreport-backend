@@ -65,25 +65,33 @@ async def test_insert_inspection_photo_file_executes_insert() -> None:
 
 
 async def test_fetch_inspection_audio_files_returns_rows() -> None:
-    rows = [{"storage_key": "/tmp/audio.m4a"}]
+    from src.models.reports.pipeline import InspectionMediaFile
+
+    rows = [{"storage_key": "/tmp/audio.m4a", "original_file_name": "audio.m4a"}]
     connection = FakeConnection(rows)
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await inspection_queries.fetch_inspection_audio_files("inspection-id")
 
-    assert result == rows
+    assert result == [
+        InspectionMediaFile(storage_key="/tmp/audio.m4a", original_file_name="audio.m4a")
+    ]
     connection.fetch.assert_awaited_once()
     connection.close.assert_awaited_once()
 
 
 async def test_fetch_inspection_photo_files_returns_rows() -> None:
-    rows = [{"storage_key": "/tmp/photo.jpg"}]
+    from src.models.reports.pipeline import InspectionMediaFile
+
+    rows = [{"storage_key": "/tmp/photo.jpg", "original_file_name": "photo.jpg"}]
     connection = FakeConnection(rows)
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await inspection_queries.fetch_inspection_photo_files("inspection-id")
 
-    assert result == rows
+    assert result == [
+        InspectionMediaFile(storage_key="/tmp/photo.jpg", original_file_name="photo.jpg")
+    ]
     connection.fetch.assert_awaited_once()
     connection.close.assert_awaited_once()
 

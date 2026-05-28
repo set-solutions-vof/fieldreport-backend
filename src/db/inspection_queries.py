@@ -4,6 +4,8 @@ from uuid import uuid4
 import asyncpg
 
 from src.db.connection import get_connection_url
+from src.db.inspection_mapper import map_inspection_media_file
+from src.models.reports.pipeline import InspectionMediaFile
 
 
 async def insert_inspection(
@@ -133,11 +135,11 @@ async def insert_inspection_photo_file(
         await connection.close()
 
 
-async def fetch_inspection_audio_files(inspection_id: str) -> list[asyncpg.Record]:
+async def fetch_inspection_audio_files(inspection_id: str) -> list[InspectionMediaFile]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
-        return await connection.fetch(
+        rows = await connection.fetch(
             """
             SELECT id, inspection_id, storage_key, original_file_name, created_at
             FROM inspection_audio_files
@@ -149,12 +151,14 @@ async def fetch_inspection_audio_files(inspection_id: str) -> list[asyncpg.Recor
     finally:
         await connection.close()
 
+    return [map_inspection_media_file(row) for row in rows]
 
-async def fetch_inspection_photo_files(inspection_id: str) -> list[asyncpg.Record]:
+
+async def fetch_inspection_photo_files(inspection_id: str) -> list[InspectionMediaFile]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
-        return await connection.fetch(
+        rows = await connection.fetch(
             """
             SELECT id, inspection_id, storage_key, original_file_name, created_at
             FROM inspection_photo_files
@@ -165,6 +169,8 @@ async def fetch_inspection_photo_files(inspection_id: str) -> list[asyncpg.Recor
         )
     finally:
         await connection.close()
+
+    return [map_inspection_media_file(row) for row in rows]
 
 
 async def insert_report(

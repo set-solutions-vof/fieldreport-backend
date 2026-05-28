@@ -3,7 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from src.models.templates.domain import TemplateAnalysisJobStatus, TemplateStructure
+from src.models.enums.template_analysis_job_status import TemplateAnalysisJobStatus
+from src.models.templates.domain import TemplateStructure
 
 
 class ActiveCompanyTemplateRecord(BaseModel):

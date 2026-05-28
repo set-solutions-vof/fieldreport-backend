@@ -2,7 +2,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from src.models.auth.authentication import UserRole
+from src.models.enums.user_role import UserRole
 
 
 class CurrentUserResponse(BaseModel):

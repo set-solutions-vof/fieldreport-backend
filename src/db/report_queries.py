@@ -5,8 +5,16 @@ import asyncpg
 from src.db.connection import get_connection_url
 from src.db.report_mapper import (
     map_report_detail,
+    map_report_pipeline_context,
     map_report_sections,
     map_report_summary,
+    map_stored_image_analysis,
+    map_stored_transcription_segment,
+)
+from src.models.reports.pipeline import (
+    ReportPipelineContext,
+    StoredImageAnalysis,
+    StoredTranscriptionSegment,
 )
 from src.models.reports.report import (
     ReportDetail,
@@ -236,7 +244,7 @@ async def claim_next_audio_pipeline_report() -> dict | None:
     return dict(row) if row is not None else None
 
 
-async def get_report_for_pipeline(report_id: str) -> dict:
+async def get_report_for_pipeline(report_id: str) -> ReportPipelineContext:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
@@ -260,7 +268,7 @@ async def get_report_for_pipeline(report_id: str) -> dict:
     finally:
         await connection.close()
 
-    return dict(row)
+    return map_report_pipeline_context(row)
 
 
 async def set_report_status(report_id: str, status: str) -> None:
@@ -372,11 +380,11 @@ async def insert_transcription_segments(
 
 async def fetch_transcription_segments_for_inspection(
     inspection_id: str,
-) -> list[asyncpg.Record]:
+) -> list[StoredTranscriptionSegment]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
-        return await connection.fetch(
+        rows = await connection.fetch(
             """
             SELECT
                 id,
@@ -395,6 +403,8 @@ async def fetch_transcription_segments_for_inspection(
         )
     finally:
         await connection.close()
+
+    return [map_stored_transcription_segment(row) for row in rows]
 
 
 async def insert_image_analysis(
@@ -444,11 +454,11 @@ async def insert_image_analysis(
     return image_analysis_id
 
 
-async def fetch_image_analyses_for_inspection(inspection_id: str) -> list[asyncpg.Record]:
+async def fetch_image_analyses_for_inspection(inspection_id: str) -> list[StoredImageAnalysis]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
-        return await connection.fetch(
+        rows = await connection.fetch(
             """
             SELECT
                 id,
@@ -466,6 +476,8 @@ async def fetch_image_analyses_for_inspection(inspection_id: str) -> list[asyncp
         )
     finally:
         await connection.close()
+
+    return [map_stored_image_analysis(row) for row in rows]
 
 
 async def insert_report_section(

@@ -74,4 +74,4 @@ async def create_inspection(
         template_id,
     )
 
-    return CreateInspectionResponse(report_id=report_id, status="processing")
+    return CreateInspectionResponse(report_id=report_id, status="generating")

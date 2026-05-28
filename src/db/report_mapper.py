@@ -1,5 +1,10 @@
 import asyncpg
 
+from src.models.reports.pipeline import (
+    ReportPipelineContext,
+    StoredImageAnalysis,
+    StoredTranscriptionSegment,
+)
 from src.models.reports.report import (
     ReportDetail,
     ReportDetailSection,
@@ -145,3 +150,30 @@ def map_report_detail_sections(
     )
 
     return sections, evidence_items
+
+
+def map_report_pipeline_context(row: asyncpg.Record) -> ReportPipelineContext:
+    return ReportPipelineContext(
+        id=row["id"],
+        inspection_id=row["inspection_id"],
+        company_id=row["company_id"],
+        template_id=row["template_id"],
+        status=row["status"],
+        extra_context=row["extra_context"],
+        investigation_type=row["investigation_type"],
+        client_type=row["client_type"],
+    )
+
+
+def map_stored_transcription_segment(row: asyncpg.Record) -> StoredTranscriptionSegment:
+    return StoredTranscriptionSegment(
+        id=row["id"],
+        text=row["text"],
+    )
+
+
+def map_stored_image_analysis(row: asyncpg.Record) -> StoredImageAnalysis:
+    return StoredImageAnalysis(
+        id=row["id"],
+        analysis_text=row["analysis_text"],
+    )

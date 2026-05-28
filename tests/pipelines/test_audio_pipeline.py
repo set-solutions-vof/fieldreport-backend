@@ -2,26 +2,34 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+from src.models.reports.pipeline import (
+    InspectionMediaFile,
+    ReportPipelineContext,
+    StoredImageAnalysis,
+    StoredTranscriptionSegment,
+)
 from src.models.reports.transcription import TranscriptionResult, TranscriptionSegment
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.pipelines import audio_pipeline
 
 
-def build_report(status: str = "generating") -> dict:
-    return {
-        "id": uuid4(),
-        "inspection_id": uuid4(),
-        "company_id": uuid4(),
-        "template_id": uuid4(),
-        "status": status,
-        "extra_context": "Extra",
-        "investigation_type": "Lekdetectie",
-        "client_type": "Zakelijk",
-    }
+def build_report(status: str = "generating") -> ReportPipelineContext:
+    return ReportPipelineContext(
+        id=uuid4(),
+        inspection_id=uuid4(),
+        company_id=uuid4(),
+        template_id=uuid4(),
+        status=status,
+        extra_context="Extra",
+        investigation_type="Lekdetectie",
+        client_type="Zakelijk",
+    )
 
 
 async def test_run_audio_pipeline_processes_media_and_persists_sections() -> None:
     report = build_report()
+    segment_id = uuid4()
+    image_id = uuid4()
     template_structure = TemplateStructure(
         sections=[
             TemplateSection(
@@ -76,14 +84,24 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
             audio_pipeline.inspection_queries,
             "fetch_inspection_audio_files",
             AsyncMock(
-                return_value=[{"storage_key": "/tmp/audio.m4a", "original_file_name": "audio.m4a"}]
+                return_value=[
+                    InspectionMediaFile(
+                        storage_key="/tmp/audio.m4a",
+                        original_file_name="audio.m4a",
+                    )
+                ]
             ),
         ),
         patch.object(
             audio_pipeline.inspection_queries,
             "fetch_inspection_photo_files",
             AsyncMock(
-                return_value=[{"storage_key": "/tmp/photo.jpg", "original_file_name": "photo.jpg"}]
+                return_value=[
+                    InspectionMediaFile(
+                        storage_key="/tmp/photo.jpg",
+                        original_file_name="photo.jpg",
+                    )
+                ]
             ),
         ),
         patch.object(
@@ -119,12 +137,21 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
         patch.object(
             audio_pipeline.report_queries,
             "fetch_transcription_segments_for_inspection",
-            AsyncMock(return_value=[{"id": "segment-id", "text": "Inspecteur noemt vocht."}]),
+            AsyncMock(
+                return_value=[
+                    StoredTranscriptionSegment(
+                        id=segment_id,
+                        text="Inspecteur noemt vocht.",
+                    )
+                ]
+            ),
         ),
         patch.object(
             audio_pipeline.report_queries,
             "fetch_image_analyses_for_inspection",
-            AsyncMock(return_value=[{"id": "image-id", "analysis_text": "Fotoanalyse"}]),
+            AsyncMock(
+                return_value=[StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]
+            ),
         ),
         patch.object(audio_pipeline.client_factory, "get_gpt4o_client", return_value=client),
         patch.object(
@@ -148,7 +175,7 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
 
     insert_section.assert_awaited_once_with(
         "report-id",
-        str(report["company_id"]),
+        str(report.company_id),
         "conclusie",
         1,
         "text_block",
@@ -156,8 +183,8 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
         "high",
         0.9,
     )
-    insert_segment_source.assert_awaited_once_with("section-id", "segment-id")
-    insert_image_source.assert_awaited_once_with("section-id", "image-id")
+    insert_segment_source.assert_awaited_once_with("section-id", str(segment_id))
+    insert_image_source.assert_awaited_once_with("section-id", str(image_id))
     set_status.assert_awaited_once_with("report-id", "draft")
 
 
@@ -189,14 +216,24 @@ async def test_run_audio_pipeline_continues_after_media_file_failures() -> None:
             audio_pipeline.inspection_queries,
             "fetch_inspection_audio_files",
             AsyncMock(
-                return_value=[{"storage_key": "/tmp/audio.m4a", "original_file_name": "audio.m4a"}]
+                return_value=[
+                    InspectionMediaFile(
+                        storage_key="/tmp/audio.m4a",
+                        original_file_name="audio.m4a",
+                    )
+                ]
             ),
         ),
         patch.object(
             audio_pipeline.inspection_queries,
             "fetch_inspection_photo_files",
             AsyncMock(
-                return_value=[{"storage_key": "/tmp/photo.jpg", "original_file_name": "photo.jpg"}]
+                return_value=[
+                    InspectionMediaFile(
+                        storage_key="/tmp/photo.jpg",
+                        original_file_name="photo.jpg",
+                    )
+                ]
             ),
         ),
         patch.object(

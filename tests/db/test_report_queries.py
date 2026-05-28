@@ -285,6 +285,8 @@ async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None
 
 
 async def test_get_report_for_pipeline_returns_report_context() -> None:
+    from src.models.reports.pipeline import ReportPipelineContext
+
     row = {
         "id": uuid4(),
         "inspection_id": uuid4(),
@@ -300,7 +302,7 @@ async def test_get_report_for_pipeline_returns_report_context() -> None:
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await report_queries.get_report_for_pipeline(str(row["id"]))
 
-    assert result == row
+    assert result == ReportPipelineContext(**row)
     connection.fetchrow.assert_awaited_once()
     connection.close.assert_awaited_once()
 
@@ -369,13 +371,16 @@ async def test_insert_transcription_segments_executes_inserts_and_returns_ids() 
 
 
 async def test_fetch_transcription_segments_for_inspection_returns_rows() -> None:
-    rows = [{"text": "Segment"}]
+    from src.models.reports.pipeline import StoredTranscriptionSegment
+
+    segment_id = uuid4()
+    rows = [{"id": segment_id, "text": "Segment"}]
     connection = FakeConnection(rows=rows)
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await report_queries.fetch_transcription_segments_for_inspection("inspection-id")
 
-    assert result == rows
+    assert result == [StoredTranscriptionSegment(id=segment_id, text="Segment")]
     connection.fetch.assert_awaited_once()
     connection.close.assert_awaited_once()
 
@@ -403,13 +408,16 @@ async def test_insert_image_analysis_executes_insert_and_returns_id() -> None:
 
 
 async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
-    rows = [{"analysis_text": "Fotoanalyse"}]
+    from src.models.reports.pipeline import StoredImageAnalysis
+
+    image_id = uuid4()
+    rows = [{"id": image_id, "analysis_text": "Fotoanalyse"}]
     connection = FakeConnection(rows=rows)
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await report_queries.fetch_image_analyses_for_inspection("inspection-id")
 
-    assert result == rows
+    assert result == [StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]
     connection.fetch.assert_awaited_once()
     connection.close.assert_awaited_once()
 

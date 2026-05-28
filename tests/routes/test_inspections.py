@@ -72,7 +72,7 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
             current_user,
         )
 
-    assert response.status == "processing"
+    assert response.status == "generating"
     assert response.report_id
     store_files.assert_awaited_once()
     inspection_id = insert_inspection.await_args.args[0]

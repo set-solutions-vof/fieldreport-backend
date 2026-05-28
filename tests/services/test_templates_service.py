@@ -6,11 +6,8 @@ from uuid import uuid4
 from starlette.datastructures import UploadFile
 
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.domain import (
-    TemplateAnalysisJobStatus,
-    TemplateSection,
-    TemplateStructure,
-)
+from src.models.enums.template_analysis_job_status import TemplateAnalysisJobStatus
+from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import TemplateAnalysisJobRecord
 from src.services import templates as templates_service

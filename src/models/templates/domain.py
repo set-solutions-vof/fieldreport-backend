@@ -1,21 +1,6 @@
-from typing import Literal
-
 from pydantic import BaseModel
 
-TemplateSectionRenderType = Literal[
-    "text_block",
-    "key_value_table",
-    "measurement_table",
-    "photo_grid",
-]
-
-TemplateAnalysisJobStatus = Literal[
-    "queued",
-    "processing",
-    "pending_review",
-    "active",
-    "failed",
-]
+from src.models.enums.template_section_render_type import TemplateSectionRenderType
 
 
 class TemplateSectionGroup(BaseModel):

@@ -1,13 +1,14 @@
 from datetime import datetime
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from src.models.templates.domain import TemplateSectionGroup, TemplateSectionRenderType
-
-ReportStatus = Literal["generating", "draft", "approved", "failed"]
-ReportEvidenceItemType = Literal["transcription_segment", "image_analysis"]
+from src.models.enums.confidence_level import ConfidenceLevel
+from src.models.enums.evidence_source_type import EvidenceSourceType
+from src.models.enums.report_evidence_item_type import ReportEvidenceItemType
+from src.models.enums.report_status import ReportStatus
+from src.models.enums.template_section_render_type import TemplateSectionRenderType
+from src.models.templates.domain import TemplateSectionGroup
 
 
 class ReportSummary(BaseModel):
@@ -21,7 +22,7 @@ class ReportSummary(BaseModel):
 
 
 class ReportEvidenceSource(BaseModel):
-    type: Literal["audio", "image"]
+    type: EvidenceSourceType
     start_seconds: float | None
     end_seconds: float | None
     captured_at: datetime | None
@@ -45,7 +46,7 @@ class ReportSectionContent(BaseModel):
     generated_content: str
     reviewed_content: str | None
     approved: bool
-    confidence_level: Literal["high", "medium", "low"]
+    confidence_level: ConfidenceLevel
     confidence_score: float
     render_type: TemplateSectionRenderType = "text_block"
     fields: list[str] | None = None

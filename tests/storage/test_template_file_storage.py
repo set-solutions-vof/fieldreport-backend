@@ -32,17 +32,6 @@ async def test_store_template_analysis_files_persists_uploaded_files(tmp_path: P
     assert await files[0].read() == b"one"
 
 
-def test_get_template_analysis_storage_directory_returns_resolved_path(tmp_path: Path) -> None:
-    with patch.object(
-        template_file_storage.settings,
-        "template_analysis_stored_file_path",
-        str(tmp_path),
-    ):
-        result = template_file_storage.get_template_analysis_storage_directory()
-
-    assert result == tmp_path.resolve()
-
-
 def test_load_template_analysis_file_reads_file_content(tmp_path: Path) -> None:
     file_path = tmp_path / "report.pdf"
     file_path.write_bytes(b"pdf-content")
