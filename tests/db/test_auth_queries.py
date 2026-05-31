@@ -1,14 +1,16 @@
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from src.db import auth_queries
 
 
-class FakeConnection:
-    def __init__(self, row):
-        self.row = row
-        self.fetchrow = AsyncMock(return_value=row)
-        self.close = AsyncMock()
+def build_connection(row: dict[str, object] | None) -> SimpleNamespace:
+    return SimpleNamespace(
+        row=row,
+        fetchrow=AsyncMock(return_value=row),
+        close=AsyncMock(),
+    )
 
 
 async def test_get_user_by_email_returns_authenticated_user() -> None:
@@ -21,7 +23,7 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
         "name": "Sanne de Vries",
         "role": "admin",
     }
-    connection = FakeConnection(row)
+    connection = build_connection(row)
 
     with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_queries.get_user_by_email("sanne.devries@lekk.nl")
@@ -34,7 +36,7 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
 
 
 async def test_get_user_by_email_returns_none_when_missing() -> None:
-    connection = FakeConnection(None)
+    connection = build_connection(None)
 
     with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_queries.get_user_by_email("missing@lekk.nl")
@@ -53,7 +55,7 @@ async def test_get_user_by_id_returns_current_user() -> None:
         "name": "Jeroen van Dijk",
         "role": "inspector",
     }
-    connection = FakeConnection(row)
+    connection = build_connection(row)
 
     with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_queries.get_user_by_id(str(uuid4()))
@@ -66,7 +68,7 @@ async def test_get_user_by_id_returns_current_user() -> None:
 
 
 async def test_get_user_by_id_returns_none_when_missing() -> None:
-    connection = FakeConnection(None)
+    connection = build_connection(None)
 
     with patch("src.db.auth_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         user = await auth_queries.get_user_by_id(str(uuid4()))

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
@@ -7,14 +8,18 @@ from src.db.report_mapper import map_report_detail_sections
 from src.models.reports.transcription import TranscriptionSegment
 
 
-class FakeConnection:
-    def __init__(self, rows=None, row=None):
-        self.rows = rows
-        self.row = row
-        self.fetch = AsyncMock(return_value=rows)
-        self.fetchrow = AsyncMock(return_value=row)
-        self.execute = AsyncMock()
-        self.close = AsyncMock()
+def build_connection(
+    rows: list[dict[str, object]] | None = None,
+    row: dict[str, object] | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        rows=rows,
+        row=row,
+        fetch=AsyncMock(return_value=rows),
+        fetchrow=AsyncMock(return_value=row),
+        execute=AsyncMock(),
+        close=AsyncMock(),
+    )
 
 
 async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> None:
@@ -40,7 +45,7 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
             "inspector_name": "Sanne de Vries",
         },
     ]
-    connection = FakeConnection(rows)
+    connection = build_connection(rows)
 
     with patch(
         "src.db.report_queries.asyncpg.connect",
@@ -73,7 +78,7 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
         "inspector_name": "Jeroen van Dijk",
         "updated_at": updated_at,
     }
-    connection = FakeConnection(row=row)
+    connection = build_connection(row=row)
 
     with patch(
         "src.db.report_queries.asyncpg.connect",
@@ -222,7 +227,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     for row in rows:
         row["render_type"] = "text_block"
     rows[0]["render_type"] = "measurement_table"
-    connection = FakeConnection(rows)
+    connection = build_connection(rows)
 
     with patch(
         "src.db.report_queries.asyncpg.connect",
@@ -274,7 +279,7 @@ async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None
         "company_id": uuid4(),
         "template_id": uuid4(),
     }
-    connection = FakeConnection(row=row)
+    connection = build_connection(row=row)
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await report_queries.claim_next_audio_pipeline_report()
@@ -297,7 +302,7 @@ async def test_get_report_for_pipeline_returns_report_context() -> None:
         "investigation_type": "Lekdetectie",
         "client_type": "Zakelijk",
     }
-    connection = FakeConnection(row=row)
+    connection = build_connection(row=row)
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await report_queries.get_report_for_pipeline(str(row["id"]))
@@ -308,7 +313,7 @@ async def test_get_report_for_pipeline_returns_report_context() -> None:
 
 
 async def test_set_report_status_executes_update() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         await report_queries.set_report_status("report-id", "draft")
@@ -319,7 +324,7 @@ async def test_set_report_status_executes_update() -> None:
 
 
 async def test_insert_transcription_executes_insert_and_returns_id() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         transcription_id = await report_queries.insert_transcription(
@@ -342,7 +347,7 @@ async def test_insert_transcription_executes_insert_and_returns_id() -> None:
 
 
 async def test_insert_transcription_segments_executes_inserts_and_returns_ids() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
     segments = [
         TranscriptionSegment(
             segment_index=0,
@@ -375,7 +380,7 @@ async def test_fetch_transcription_segments_for_inspection_returns_rows() -> Non
 
     segment_id = uuid4()
     rows = [{"id": segment_id, "text": "Segment"}]
-    connection = FakeConnection(rows=rows)
+    connection = build_connection(rows=rows)
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await report_queries.fetch_transcription_segments_for_inspection("inspection-id")
@@ -386,7 +391,7 @@ async def test_fetch_transcription_segments_for_inspection_returns_rows() -> Non
 
 
 async def test_insert_image_analysis_executes_insert_and_returns_id() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         image_analysis_id = await report_queries.insert_image_analysis(
@@ -412,7 +417,7 @@ async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
 
     image_id = uuid4()
     rows = [{"id": image_id, "analysis_text": "Fotoanalyse"}]
-    connection = FakeConnection(rows=rows)
+    connection = build_connection(rows=rows)
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await report_queries.fetch_image_analyses_for_inspection("inspection-id")
@@ -423,7 +428,7 @@ async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
 
 
 async def test_insert_report_section_executes_insert_and_returns_id() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         report_section_id = await report_queries.insert_report_section(
@@ -452,7 +457,7 @@ async def test_insert_report_section_executes_insert_and_returns_id() -> None:
 
 
 async def test_insert_report_section_source_transcription_executes_insert() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         await report_queries.insert_report_section_source_transcription(
@@ -466,7 +471,7 @@ async def test_insert_report_section_source_transcription_executes_insert() -> N
 
 
 async def test_insert_report_section_source_image_executes_insert() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         await report_queries.insert_report_section_source_image("section-id", "image-id")
@@ -500,7 +505,7 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
             "image_analysis_text": "Image summary",
         }
     ]
-    connection = FakeConnection(rows, {"id": section_id})
+    connection = build_connection(rows, {"id": section_id})
 
     with patch(
         "src.db.report_queries.asyncpg.connect",
@@ -564,7 +569,7 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
             "image_analysis_text": None,
         }
     ]
-    connection = FakeConnection(rows, {"id": section_id})
+    connection = build_connection(rows, {"id": section_id})
 
     with patch(
         "src.db.report_queries.asyncpg.connect",

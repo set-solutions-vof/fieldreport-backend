@@ -12,7 +12,9 @@ async def store_template_analysis_files(
     job_id: str,
     files: list[UploadFile],
 ) -> list[TemplateAnalysisFile]:
-    job_directory = Path(settings.template_analysis_stored_file_path).resolve() / company_id / job_id
+    job_directory = (
+        Path(settings.template_analysis_stored_file_path).resolve() / company_id / job_id
+    )
     job_directory.mkdir(parents=True, exist_ok=True)
 
     stored_files: list[TemplateAnalysisFile] = []

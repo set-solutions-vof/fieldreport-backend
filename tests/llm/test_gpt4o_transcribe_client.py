@@ -1,19 +1,9 @@
+from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from src.llm import gpt4o_transcribe_client
 from src.models.reports.transcription import AudioChunk
-
-
-class TemporaryDirectoryContext:
-    def __init__(self, directory_name: str):
-        self.directory_name = directory_name
-
-    def __enter__(self) -> str:
-        return self.directory_name
-
-    def __exit__(self, *args: object) -> None:
-        return None
 
 
 async def test_transcribe_audio_returns_single_segment_from_text() -> None:
@@ -137,7 +127,7 @@ def test_split_audio_sync_returns_chunk_files(tmp_path) -> None:
         patch.object(
             gpt4o_transcribe_client.tempfile,
             "TemporaryDirectory",
-            return_value=TemporaryDirectoryContext(str(tmp_path)),
+            return_value=nullcontext(str(tmp_path)),
         ),
         patch.object(
             gpt4o_transcribe_client.subprocess,
@@ -177,7 +167,7 @@ def test_split_audio_sync_reencodes_when_stream_copy_fails(tmp_path) -> None:
         patch.object(
             gpt4o_transcribe_client.tempfile,
             "TemporaryDirectory",
-            return_value=TemporaryDirectoryContext(str(tmp_path)),
+            return_value=nullcontext(str(tmp_path)),
         ),
         patch.object(
             gpt4o_transcribe_client.subprocess,

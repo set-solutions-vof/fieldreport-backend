@@ -5,12 +5,8 @@ from src.llm import deepseek_client
 from src.models.templates.pipeline import TemplateAnalysisDocument
 
 
-class FakeOpenAIMessage:
-    def __init__(self, content: str):
-        self.content = content
-
-    def model_dump(self) -> dict[str, str]:
-        return {"content": self.content}
+def build_openai_message(content: str) -> SimpleNamespace:
+    return SimpleNamespace(content=content, model_dump=lambda: {"content": content})
 
 
 def build_documents() -> list[TemplateAnalysisDocument]:
@@ -28,7 +24,7 @@ async def test_synthesize_template_sections_returns_validated_sections() -> None
         return_value=SimpleNamespace(
             choices=[
                 SimpleNamespace(
-                    message=FakeOpenAIMessage(
+                    message=build_openai_message(
                         '{"sections":[{"id":"summary","label":"Summary","render_type":"text_block"}]}'
                     )
                 )
@@ -66,7 +62,7 @@ async def test_synthesize_template_sections_raises_for_invalid_json() -> None:
             completions=SimpleNamespace(
                 create=AsyncMock(
                     return_value=SimpleNamespace(
-                        choices=[SimpleNamespace(message=FakeOpenAIMessage("not-json"))]
+                        choices=[SimpleNamespace(message=build_openai_message("not-json"))]
                     )
                 )
             )

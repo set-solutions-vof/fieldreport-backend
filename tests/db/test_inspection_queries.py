@@ -1,19 +1,21 @@
 from datetime import date
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from src.db import inspection_queries
 
 
-class FakeConnection:
-    def __init__(self, rows=None):
-        self.rows = rows
-        self.execute = AsyncMock()
-        self.fetch = AsyncMock(return_value=rows)
-        self.close = AsyncMock()
+def build_connection(rows: list[dict[str, object]] | None = None) -> SimpleNamespace:
+    return SimpleNamespace(
+        rows=rows,
+        execute=AsyncMock(),
+        fetch=AsyncMock(return_value=rows),
+        close=AsyncMock(),
+    )
 
 
 async def test_insert_inspection_executes_insert() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         await inspection_queries.insert_inspection(
@@ -35,7 +37,7 @@ async def test_insert_inspection_executes_insert() -> None:
 
 
 async def test_insert_inspection_audio_file_executes_insert() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         await inspection_queries.insert_inspection_audio_file(
@@ -50,7 +52,7 @@ async def test_insert_inspection_audio_file_executes_insert() -> None:
 
 
 async def test_insert_inspection_photo_file_executes_insert() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         await inspection_queries.insert_inspection_photo_file(
@@ -68,7 +70,7 @@ async def test_fetch_inspection_audio_files_returns_rows() -> None:
     from src.models.reports.pipeline import InspectionMediaFile
 
     rows = [{"storage_key": "/tmp/audio.m4a", "original_file_name": "audio.m4a"}]
-    connection = FakeConnection(rows)
+    connection = build_connection(rows)
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await inspection_queries.fetch_inspection_audio_files("inspection-id")
@@ -84,7 +86,7 @@ async def test_fetch_inspection_photo_files_returns_rows() -> None:
     from src.models.reports.pipeline import InspectionMediaFile
 
     rows = [{"storage_key": "/tmp/photo.jpg", "original_file_name": "photo.jpg"}]
-    connection = FakeConnection(rows)
+    connection = build_connection(rows)
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         result = await inspection_queries.fetch_inspection_photo_files("inspection-id")
@@ -97,7 +99,7 @@ async def test_fetch_inspection_photo_files_returns_rows() -> None:
 
 
 async def test_insert_report_executes_insert() -> None:
-    connection = FakeConnection()
+    connection = build_connection()
 
     with patch("src.db.inspection_queries.asyncpg.connect", AsyncMock(return_value=connection)):
         await inspection_queries.insert_report(

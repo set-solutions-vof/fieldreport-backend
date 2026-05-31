@@ -149,9 +149,7 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
         patch.object(
             audio_pipeline.report_queries,
             "fetch_image_analyses_for_inspection",
-            AsyncMock(
-                return_value=[StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]
-            ),
+            AsyncMock(return_value=[StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]),
         ),
         patch.object(audio_pipeline.client_factory, "get_gpt4o_client", return_value=client),
         patch.object(
