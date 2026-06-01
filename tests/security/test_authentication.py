@@ -19,6 +19,17 @@ def build_current_user() -> CurrentUser:
     )
 
 
+def build_inspector_user() -> CurrentUser:
+    return CurrentUser(
+        id=uuid4(),
+        company_id=uuid4(),
+        company_name="LEKK BV",
+        email="jeroen.vandijk@lekk.nl",
+        name="Jeroen van Dijk",
+        role="inspector",
+    )
+
+
 def test_decode_token_returns_access_claims() -> None:
     current_user = build_current_user()
     token = security.create_access_token(current_user)
@@ -44,7 +55,9 @@ def test_decode_token_returns_refresh_claims() -> None:
 
 
 def test_decode_token_raises_for_invalid_token() -> None:
-    with pytest.raises(security.AuthenticationError):
+    from jwt import InvalidTokenError
+
+    with pytest.raises(InvalidTokenError):
         security.decode_token("invalid")
 
 
@@ -70,7 +83,7 @@ async def test_get_current_user_returns_repository_user() -> None:
     access_token = security.create_access_token(current_user)
 
     with patch.object(
-        security.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
+        security.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
     ):
         user = await security.get_current_user(access_token)
 
@@ -81,8 +94,18 @@ async def test_get_current_user_raises_when_repository_returns_none() -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    with patch.object(security.auth_repository, "get_user_by_id", AsyncMock(return_value=None)):
+    with patch.object(security.auth_queries, "get_user_by_id", AsyncMock(return_value=None)):
         with pytest.raises(HTTPException) as error:
             await security.get_current_user(access_token)
 
     assert error.value.status_code == 401
+
+
+async def test_require_admin_raises_for_non_admin_user() -> None:
+    current_user = build_inspector_user()
+
+    with pytest.raises(HTTPException) as error:
+        await security.require_admin(current_user)
+
+    assert error.value.status_code == 403
+    assert error.value.detail == "Admin access required"

@@ -1,178 +1,99 @@
-from typing import Literal
+from datetime import datetime
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from src.models.reports.report import (
-    ReportDetail,
-    ReportDetailSection,
-    ReportSection,
-    ReportSectionSource,
-    ReportSummary,
-    ReportTimelineItem,
-)
+from src.models.enums.confidence_level import ConfidenceLevel
+from src.models.enums.evidence_source_type import EvidenceSourceType
+from src.models.enums.report_evidence_item_type import ReportEvidenceItemType
+from src.models.enums.template_section_render_type import TemplateSectionRenderType
+from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
+from src.models.templates.domain import TemplateSectionGroup
 
 
 class ReportSummaryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    company_id: str
+    id: UUID
+    company_id: UUID
     status: str
     client_name: str
     address: str
-    inspection_date: str
+    inspection_date: datetime
     inspector_name: str
 
 
-class SectionSourceResponse(BaseModel):
+class EvidenceSourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    type: Literal["audio", "image"]
-    timestamp_start: float | None
-    timestamp_end: float | None
-    capture_time: str | None
-    content_summary: str
-
-
-class ReportSectionResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    section_key: str
-    label: str
-    ai_draft: str
-    field_expert_content: str | None
-    is_approved: bool
-    confidence_level: str
-    confidence_score: float
-    sources: list[SectionSourceResponse]
-
-
-class TimelineItemResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    source_type: Literal["transcription_segment", "image_analysis"]
-    timeline_offset_seconds: float
+    type: EvidenceSourceType
     start_seconds: float | None
     end_seconds: float | None
-    captured_at: str | None
+    captured_at: datetime | None
     content_summary: str
 
 
-class ReportDetailSectionResponse(BaseModel):
+class ReportSectionContentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    section_key: str
+    id: UUID
+    section_id: str
     label: str
-    ai_draft: str
-    field_expert_content: str | None
-    is_approved: bool
-    confidence_level: str
+    generated_content: str
+    reviewed_content: str | None
+    approved: bool
+    confidence_level: ConfidenceLevel
     confidence_score: float
-    source_item_ids: list[str]
+    render_type: TemplateSectionRenderType = "text_block"
+    fields: list[str] | None = None
+    groups: list[TemplateSectionGroup] | None = None
+
+
+class ReportSectionResponse(ReportSectionContentResponse):
+    evidence_sources: list[EvidenceSourceResponse]
+
+
+class EvidenceItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    evidence_type: ReportEvidenceItemType
+    timeline_seconds: float
+    start_seconds: float | None
+    end_seconds: float | None
+    captured_at: datetime | None
+    content_summary: str
+
+
+class ReportDetailSectionResponse(ReportSectionContentResponse):
+    evidence_item_ids: list[UUID]
 
 
 class ReportDetailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: UUID
     status: str
     client_name: str
     address: str
-    inspection_date: str
+    inspection_date: datetime
     inspector_name: str
-    updated_at: str | None = None
+    updated_at: datetime | None = None
     sections: list[ReportDetailSectionResponse]
-    timeline_items: list[TimelineItemResponse]
+    evidence_items: list[EvidenceItemResponse]
 
 
 def report_summary_response(report_summary: ReportSummary) -> ReportSummaryResponse:
-    return ReportSummaryResponse(
-        id=str(report_summary.id),
-        company_id=str(report_summary.company_id),
-        status=report_summary.status,
-        client_name=report_summary.client_name,
-        address=report_summary.address,
-        inspection_date=report_summary.inspection_date.isoformat(),
-        inspector_name=report_summary.inspector_name,
-    )
+    return ReportSummaryResponse.model_validate(report_summary)
 
 
 def report_summary_responses(report_summaries: list[ReportSummary]) -> list[ReportSummaryResponse]:
     return [report_summary_response(report_summary) for report_summary in report_summaries]
 
 
-def section_source_response(source: ReportSectionSource) -> SectionSourceResponse:
-    capture_time = source.capture_time.isoformat() if source.capture_time is not None else None
-
-    return SectionSourceResponse(
-        type=source.type,
-        timestamp_start=source.timestamp_start,
-        timestamp_end=source.timestamp_end,
-        capture_time=capture_time,
-        content_summary=source.content_summary,
-    )
-
-
 def report_section_response(section: ReportSection) -> ReportSectionResponse:
-    return ReportSectionResponse(
-        id=str(section.id),
-        section_key=section.section_key,
-        label=section.section_key.replace("_", " ").title(),
-        ai_draft=section.ai_draft,
-        field_expert_content=section.field_expert_content,
-        is_approved=section.is_approved,
-        confidence_level=section.confidence_level,
-        confidence_score=section.confidence_score,
-        sources=[section_source_response(source) for source in section.sources],
-    )
-
-
-def timeline_item_response(timeline_item: ReportTimelineItem) -> TimelineItemResponse:
-    captured_at = (
-        timeline_item.captured_at.isoformat() if timeline_item.captured_at is not None else None
-    )
-
-    return TimelineItemResponse(
-        id=str(timeline_item.id),
-        source_type=timeline_item.source_type,
-        timeline_offset_seconds=timeline_item.timeline_offset_seconds,
-        start_seconds=timeline_item.start_seconds,
-        end_seconds=timeline_item.end_seconds,
-        captured_at=captured_at,
-        content_summary=timeline_item.content_summary,
-    )
-
-
-def report_detail_section_response(section: ReportDetailSection) -> ReportDetailSectionResponse:
-    return ReportDetailSectionResponse(
-        id=str(section.id),
-        section_key=section.section_key,
-        label=section.section_key.replace("_", " ").title(),
-        ai_draft=section.ai_draft,
-        field_expert_content=section.field_expert_content,
-        is_approved=section.is_approved,
-        confidence_level=section.confidence_level,
-        confidence_score=section.confidence_score,
-        source_item_ids=[str(source_item_id) for source_item_id in section.source_item_ids],
-    )
+    return ReportSectionResponse.model_validate(section.model_dump(mode="json"))
 
 
 def report_detail_response(report_detail: ReportDetail) -> ReportDetailResponse:
-    return ReportDetailResponse(
-        id=str(report_detail.id),
-        status=report_detail.status,
-        client_name=report_detail.client_name,
-        address=report_detail.address,
-        inspection_date=report_detail.inspection_date.isoformat(),
-        inspector_name=report_detail.inspector_name,
-        updated_at=report_detail.updated_at.isoformat()
-        if report_detail.updated_at is not None
-        else None,
-        sections=[report_detail_section_response(section) for section in report_detail.sections],
-        timeline_items=[
-            timeline_item_response(timeline_item) for timeline_item in report_detail.timeline_items
-        ],
-    )
+    return ReportDetailResponse.model_validate(report_detail.model_dump(mode="json"))

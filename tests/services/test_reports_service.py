@@ -6,11 +6,13 @@ from src.models.auth.authentication import CurrentUser
 from src.models.reports.report import (
     ReportDetail,
     ReportDetailSection,
+    ReportEvidenceItem,
+    ReportEvidenceSource,
     ReportSection,
-    ReportSectionSource,
     ReportSummary,
-    ReportTimelineItem,
 )
+from src.models.templates.domain import TemplateSection, TemplateStructure
+from src.models.templates.records import ActiveCompanyTemplateRecord
 from src.services import reports as reports_service
 
 
@@ -41,7 +43,7 @@ async def test_list_reports_for_user_returns_repository_reports() -> None:
     ]
 
     with patch.object(
-        reports_service.report_repository,
+        reports_service.report_queries,
         "list_report_summaries_by_company_id",
         AsyncMock(return_value=report_summaries),
     ) as list_reports:
@@ -51,7 +53,7 @@ async def test_list_reports_for_user_returns_repository_reports() -> None:
     list_reports.assert_awaited_once_with(str(current_user.company_id))
 
 
-async def test_get_report_detail_returns_source_centric_timeline_items() -> None:
+async def test_get_report_detail_returns_evidence_centric_items() -> None:
     current_user = CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
@@ -77,77 +79,99 @@ async def test_get_report_detail_returns_source_centric_timeline_items() -> None
     sections = [
         ReportDetailSection(
             id=uuid4(),
-            section_key="bevindingen",
-            ai_draft="Draft",
-            field_expert_content=None,
-            is_approved=False,
+            section_id="bevindingen",
+            label="Bevindingen",
+            generated_content="Draft",
+            reviewed_content=None,
+            approved=False,
             confidence_level="high",
             confidence_score=0.95,
-            source_item_ids=[shared_image_analysis_id, shared_transcription_segment_id],
+            evidence_item_ids=[shared_image_analysis_id, shared_transcription_segment_id],
         ),
         ReportDetailSection(
             id=uuid4(),
-            section_key="advies",
-            ai_draft="Advice",
-            field_expert_content=None,
-            is_approved=False,
+            section_id="advies",
+            label="Advies",
+            generated_content="Advice",
+            reviewed_content=None,
+            approved=False,
             confidence_level="medium",
             confidence_score=0.71,
-            source_item_ids=[
+            evidence_item_ids=[
                 shared_transcription_segment_id,
                 first_unique_segment_id,
                 shared_image_analysis_id,
             ],
         ),
     ]
-    timeline_items = [
-        ReportTimelineItem(
+    evidence_items = [
+        ReportEvidenceItem(
             id=first_unique_segment_id,
-            source_type="transcription_segment",
-            timeline_offset_seconds=5.0,
+            evidence_type="transcription_segment",
+            timeline_seconds=5.0,
             start_seconds=5.0,
             end_seconds=8.0,
             captured_at=None,
             content_summary="Opening note",
         ),
-        ReportTimelineItem(
+        ReportEvidenceItem(
             id=shared_transcription_segment_id,
-            source_type="transcription_segment",
-            timeline_offset_seconds=12.0,
+            evidence_type="transcription_segment",
+            timeline_seconds=12.0,
             start_seconds=12.0,
             end_seconds=15.0,
             captured_at=None,
             content_summary="Moisture mentioned",
         ),
-        ReportTimelineItem(
+        ReportEvidenceItem(
             id=shared_image_analysis_id,
-            source_type="image_analysis",
-            timeline_offset_seconds=20.0,
+            evidence_type="image_analysis",
+            timeline_seconds=20.0,
             start_seconds=None,
             end_seconds=None,
             captured_at=first_capture_time,
             content_summary="Thermal image",
         ),
     ]
+    company_template = ActiveCompanyTemplateRecord(
+        current_template_id=uuid4(),
+        structure=TemplateStructure(
+            sections=[
+                TemplateSection(id="bevindingen", label="Bevindingen", render_type="text_block"),
+                TemplateSection(id="advies", label="Advies", render_type="text_block"),
+            ]
+        ),
+    )
 
     with (
         patch.object(
-            reports_service.report_repository,
+            reports_service.report_queries,
             "get_report_by_id",
             AsyncMock(return_value=report),
         ) as get_report,
         patch.object(
-            reports_service.report_repository,
-            "get_report_detail_sections",
-            AsyncMock(return_value=(sections, timeline_items)),
-        ) as get_report_sections,
+            reports_service.report_queries,
+            "fetch_report_section_rows",
+            AsyncMock(return_value=[{"id": uuid4()}]),
+        ) as fetch_rows,
+        patch.object(
+            reports_service,
+            "map_report_detail_sections",
+            return_value=(sections, evidence_items),
+        ) as map_sections,
+        patch.object(
+            reports_service.template_queries,
+            "fetch_active_company_template",
+            AsyncMock(return_value=company_template),
+        ),
     ):
         result = await reports_service.get_report_detail(str(report_id), current_user)
 
     assert result.sections == sections
-    assert result.timeline_items == timeline_items
+    assert result.evidence_items == evidence_items
     get_report.assert_awaited_once_with(str(report_id), str(current_user.company_id))
-    get_report_sections.assert_awaited_once_with(str(report_id))
+    fetch_rows.assert_awaited_once_with(str(report_id))
+    map_sections.assert_called_once()
 
 
 async def test_update_report_section_returns_repository_section() -> None:
@@ -163,28 +187,42 @@ async def test_update_report_section_returns_repository_section() -> None:
     section_id = uuid4()
     section = ReportSection(
         id=section_id,
-        section_key="advies",
-        ai_draft="Advice",
-        field_expert_content="Updated advice",
-        is_approved=True,
+        section_id="advies",
+        label="Advies",
+        generated_content="Advice",
+        reviewed_content="Updated advice",
+        approved=True,
         confidence_level="medium",
         confidence_score=0.72,
-        sources=[
-            ReportSectionSource(
+        evidence_sources=[
+            ReportEvidenceSource(
                 type="image",
-                timestamp_start=None,
-                timestamp_end=None,
-                capture_time=None,
+                start_seconds=None,
+                end_seconds=None,
+                captured_at=None,
                 content_summary="Image summary",
             )
         ],
     )
+    company_template = ActiveCompanyTemplateRecord(
+        current_template_id=uuid4(),
+        structure=TemplateStructure(
+            sections=[TemplateSection(id="advies", label="Advies", render_type="text_block")]
+        ),
+    )
 
-    with patch.object(
-        reports_service.report_repository,
-        "update_report_section",
-        AsyncMock(return_value=section),
-    ) as update_section:
+    with (
+        patch.object(
+            reports_service.report_queries,
+            "update_report_section",
+            AsyncMock(return_value=section),
+        ) as update_section,
+        patch.object(
+            reports_service.template_queries,
+            "fetch_active_company_template",
+            AsyncMock(return_value=company_template),
+        ),
+    ):
         result = await reports_service.update_report_section(
             str(report_id),
             str(section_id),

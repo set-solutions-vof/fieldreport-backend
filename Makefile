@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := install
 
-.PHONY: install format format-check lint stan test check run stop db-upgrade db-downgrade
+.PHONY: install format format-check lint stan test check run worker stop db-upgrade db-downgrade
 
 install:
 	uv python install
@@ -43,8 +43,22 @@ run:
 	fi
 	@cp -n .env.example .env 2>/dev/null || true
 	uv run alembic upgrade head
+	@template_worker_pid=""; \
+	audio_worker_pid=""; \
+	trap 'if [ -n "$$template_worker_pid" ]; then kill "$$template_worker_pid" 2>/dev/null || true; fi; if [ -n "$$audio_worker_pid" ]; then kill "$$audio_worker_pid" 2>/dev/null || true; fi' EXIT INT TERM; \
+	uv run python -m src.workers.template_analysis_worker & \
+	template_worker_pid=$$!; \
+	uv run python -m src.workers.audio_pipeline_worker & \
+	audio_worker_pid=$$!; \
 	uv run uvicorn src.main:app --reload
+
+
+worker:
+	@cp -n .env.example .env 2>/dev/null || true
+	uv run python -m src.workers.template_analysis_worker
 
 stop:
 	-pkill -f "$(CURDIR)/.venv/bin/uvicorn src.main:app --reload"
+	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.template_analysis_worker"
+	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.audio_pipeline_worker"
 	docker compose down

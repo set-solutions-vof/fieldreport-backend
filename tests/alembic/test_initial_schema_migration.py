@@ -9,7 +9,7 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 
 MIGRATION_PATH = (
-    Path(__file__).resolve().parents[2] / "alembic" / "versions" / "20260508_0001_initial_schema.py"
+    Path(__file__).resolve().parents[2] / "alembic" / "versions" / "001_initial_schema.py"
 )
 
 
@@ -58,7 +58,7 @@ def test_upgrade_creates_all_tables() -> None:
         "transcription_segments",
         "reports",
         "report_sections",
-        "report_section_sources",
+        "report_section_evidence",
     ]:
         assert f"CREATE TABLE {table_name}" in sql
 
@@ -66,5 +66,5 @@ def test_upgrade_creates_all_tables() -> None:
 def test_upgrade_enforces_exactly_one_report_section_source() -> None:
     sql = render_upgrade_sql()
 
-    assert "ck_report_section_sources_exactly_one_source" in sql
+    assert "ck_report_section_evidence_exactly_one_source" in sql
     assert "(transcription_segment_id IS NOT NULL) <> (image_analysis_id IS NOT NULL)" in sql

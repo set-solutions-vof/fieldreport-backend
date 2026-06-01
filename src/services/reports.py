@@ -1,30 +1,66 @@
-from src.integrations import report_repository
+from src.db import report_queries, template_queries
+from src.db.report_mapper import map_report_detail_sections
 from src.models.auth.authentication import CurrentUser
 from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
 
 
-async def list_reports_for_user(user: CurrentUser) -> list[ReportSummary]:
-    return await report_repository.list_report_summaries_by_company_id(str(user.company_id))
-
-
 async def get_report_detail(report_id: str, user: CurrentUser) -> ReportDetail:
-    report = await report_repository.get_report_by_id(report_id, str(user.company_id))
-    sections, timeline_items = await report_repository.get_report_detail_sections(report_id)
+    company_id = str(user.company_id)
+    report = await report_queries.get_report_by_id(report_id, company_id)
+    sections, evidence_items = map_report_detail_sections(
+        await report_queries.fetch_report_section_rows(report_id)
+    )
+    template_sections_by_id = {
+        template_section.id: template_section
+        for template_section in (
+            await template_queries.fetch_active_company_template(company_id)
+        ).structure.sections
+    }
+    sections = [
+        section.model_copy(
+            update={
+                "label": template_sections_by_id[section.section_id].label,
+                "fields": template_sections_by_id[section.section_id].fields,
+                "groups": template_sections_by_id[section.section_id].groups,
+            }
+        )
+        for section in sections
+    ]
 
-    return report.model_copy(update={"sections": sections, "timeline_items": timeline_items})
+    return report.model_copy(update={"sections": sections, "evidence_items": evidence_items})
 
 
 async def update_report_section(
     report_id: str,
     section_id: str,
     user: CurrentUser,
-    field_expert_content: str | None,
-    is_approved: bool | None,
+    reviewed_content: str | None,
+    approved: bool | None,
 ) -> ReportSection:
-    return await report_repository.update_report_section(
+    company_id = str(user.company_id)
+    section = await report_queries.update_report_section(
         report_id,
         section_id,
-        str(user.company_id),
-        field_expert_content,
-        is_approved,
+        company_id,
+        reviewed_content,
+        approved,
     )
+    template_sections_by_id = {
+        template_section.id: template_section
+        for template_section in (
+            await template_queries.fetch_active_company_template(company_id)
+        ).structure.sections
+    }
+    template_section = template_sections_by_id[section.section_id]
+
+    return section.model_copy(
+        update={
+            "label": template_section.label,
+            "fields": template_section.fields,
+            "groups": template_section.groups,
+        }
+    )
+
+
+async def list_reports_for_user(user: CurrentUser) -> list[ReportSummary]:
+    return await report_queries.list_report_summaries_by_company_id(str(user.company_id))

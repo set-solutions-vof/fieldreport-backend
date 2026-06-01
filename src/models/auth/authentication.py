@@ -1,9 +1,9 @@
-from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel
 
-UserRole = Literal["admin", "inspector"]
+from src.models.enums.token_type import TokenType
+from src.models.enums.user_role import UserRole
 
 
 class LoginCredentials(BaseModel):
@@ -33,7 +33,7 @@ class CurrentUser(BaseModel):
 class TokenClaims(BaseModel):
     sub: UUID
     exp: int
-    type: Literal["access", "refresh"]
+    type: TokenType
     company_id: UUID | None = None
     role: UserRole | None = None
 

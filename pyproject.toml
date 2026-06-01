@@ -7,11 +7,14 @@ dependencies = [
     "bcrypt>=4.2.0",
     "fastapi>=0.115.0",
     "PyJWT>=2.10.0",
+    "PyMuPDF>=1.26.0",
     "python-multipart>=0.0.20",
     "uvicorn[standard]>=0.32.0",
     "pydantic-settings>=2.6.0",
     "asyncpg>=0.30.0",
     "sqlalchemy[asyncio]>=2.0.0",
+    "openai>=2.36.0",
+    "loguru>=0.7.0",
 ]
 
 [dependency-groups]

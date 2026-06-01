@@ -12,10 +12,10 @@ from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 from src.models.reports.report import (
     ReportDetail,
     ReportDetailSection,
+    ReportEvidenceItem,
+    ReportEvidenceSource,
     ReportSection,
-    ReportSectionSource,
     ReportSummary,
-    ReportTimelineItem,
 )
 from src.security import authentication as security
 from src.services import authentication as service
@@ -68,7 +68,7 @@ async def test_login_json_returns_tokens_for_valid_credentials(client: AsyncClie
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login/json",
@@ -85,7 +85,7 @@ async def test_login_form_returns_tokens_for_valid_credentials(client: AsyncClie
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login",
@@ -100,7 +100,7 @@ async def test_login_returns_unauthorized_for_wrong_password(client: AsyncClient
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login/json",
@@ -115,7 +115,7 @@ async def test_login_form_returns_unauthorized_for_wrong_password(client: AsyncC
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_repository, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login",
@@ -130,9 +130,7 @@ async def test_refresh_returns_new_access_token(client: AsyncClient) -> None:
     current_user = build_current_user()
     refresh_token = security.create_refresh_token(current_user)
 
-    with patch.object(
-        service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
-    ):
+    with patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)):
         response = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
 
     assert response.status_code == 200
@@ -158,9 +156,7 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    with patch.object(
-        service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
-    ):
+    with patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)):
         response = await client.get(
             "/api/v1/auth/me",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -191,9 +187,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
     fake_report = build_report_summary(current_user.company_id)
 
     with (
-        patch.object(
-            service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.list_reports_for_user",
             AsyncMock(return_value=[fake_report]),
@@ -212,7 +206,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
             "status": "draft",
             "client_name": "ACME",
             "address": "Main Street 1",
-            "inspection_date": "2026-05-08T12:30:00+00:00",
+            "inspection_date": "2026-05-08T12:30:00Z",
             "inspector_name": "Jeroen van Dijk",
         }
     ]
@@ -236,20 +230,21 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         sections=[
             ReportDetailSection(
                 id=uuid4(),
-                section_key="technische_bevindingen",
-                ai_draft="Draft",
-                field_expert_content=None,
-                is_approved=False,
+                section_id="technische_bevindingen",
+                label="Technische Bevindingen",
+                generated_content="Draft",
+                reviewed_content=None,
+                approved=False,
                 confidence_level="high",
                 confidence_score=0.95,
-                source_item_ids=[image_analysis_id],
+                evidence_item_ids=[image_analysis_id],
             )
         ],
-        timeline_items=[
-            ReportTimelineItem(
+        evidence_items=[
+            ReportEvidenceItem(
                 id=image_analysis_id,
-                source_type="image_analysis",
-                timeline_offset_seconds=15.0,
+                evidence_type="image_analysis",
+                timeline_seconds=15.0,
                 start_seconds=None,
                 end_seconds=None,
                 captured_at=capture_time,
@@ -259,9 +254,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     )
 
     with (
-        patch.object(
-            service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.get_report_detail",
             AsyncMock(return_value=fake_report),
@@ -278,30 +271,33 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         "status": "draft",
         "client_name": "ACME",
         "address": "Main Street 1",
-        "inspection_date": "2026-05-08T12:30:00+00:00",
+        "inspection_date": "2026-05-08T12:30:00Z",
         "inspector_name": "Jeroen van Dijk",
-        "updated_at": "2026-05-09T08:15:00+00:00",
+        "updated_at": "2026-05-09T08:15:00Z",
         "sections": [
             {
                 "id": str(fake_report.sections[0].id),
-                "section_key": "technische_bevindingen",
+                "section_id": "technische_bevindingen",
                 "label": "Technische Bevindingen",
-                "ai_draft": "Draft",
-                "field_expert_content": None,
-                "is_approved": False,
+                "generated_content": "Draft",
+                "reviewed_content": None,
+                "approved": False,
                 "confidence_level": "high",
                 "confidence_score": 0.95,
-                "source_item_ids": [str(image_analysis_id)],
+                "render_type": "text_block",
+                "fields": None,
+                "groups": None,
+                "evidence_item_ids": [str(image_analysis_id)],
             }
         ],
-        "timeline_items": [
+        "evidence_items": [
             {
                 "id": str(image_analysis_id),
-                "source_type": "image_analysis",
-                "timeline_offset_seconds": 15.0,
+                "evidence_type": "image_analysis",
+                "timeline_seconds": 15.0,
                 "start_seconds": None,
                 "end_seconds": None,
-                "captured_at": "2026-05-08T12:45:00+00:00",
+                "captured_at": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
             }
         ],
@@ -316,27 +312,26 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
     capture_time = datetime(2026, 5, 8, 12, 45, tzinfo=UTC)
     fake_section = ReportSection(
         id=section_id,
-        section_key="advies",
-        ai_draft="Advice",
-        field_expert_content="Updated advice",
-        is_approved=True,
+        section_id="advies",
+        label="Advies",
+        generated_content="Advice",
+        reviewed_content="Updated advice",
+        approved=True,
         confidence_level="medium",
         confidence_score=0.76,
-        sources=[
-            ReportSectionSource(
+        evidence_sources=[
+            ReportEvidenceSource(
                 type="image",
-                timestamp_start=None,
-                timestamp_end=None,
-                capture_time=capture_time,
+                start_seconds=None,
+                end_seconds=None,
+                captured_at=capture_time,
                 content_summary="Image summary",
             )
         ],
     )
 
     with (
-        patch.object(
-            service.auth_repository, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.update_report_section",
             AsyncMock(return_value=fake_section),
@@ -344,26 +339,29 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
     ):
         response = await client.patch(
             f"/api/v1/reports/{report_id}/sections/{section_id}",
-            json={"field_expert_content": "Updated advice", "is_approved": True},
+            json={"reviewed_content": "Updated advice", "approved": True},
             headers={"Authorization": f"Bearer {access_token}"},
         )
 
     assert response.status_code == 200
     assert response.json() == {
         "id": str(section_id),
-        "section_key": "advies",
+        "section_id": "advies",
         "label": "Advies",
-        "ai_draft": "Advice",
-        "field_expert_content": "Updated advice",
-        "is_approved": True,
+        "generated_content": "Advice",
+        "reviewed_content": "Updated advice",
+        "approved": True,
         "confidence_level": "medium",
         "confidence_score": 0.76,
-        "sources": [
+        "render_type": "text_block",
+        "fields": None,
+        "groups": None,
+        "evidence_sources": [
             {
                 "type": "image",
-                "timestamp_start": None,
-                "timestamp_end": None,
-                "capture_time": "2026-05-08T12:45:00+00:00",
+                "start_seconds": None,
+                "end_seconds": None,
+                "captured_at": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
             }
         ],
