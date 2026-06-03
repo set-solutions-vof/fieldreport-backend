@@ -87,3 +87,15 @@ async def test_create_inspection_returns_missing_required_metadata_keys() -> Non
             raise AssertionError("Expected HTTPException")
 
     create_inspection.assert_awaited_once()
+
+
+async def test_get_inspection_photo_returns_image_bytes() -> None:
+    with patch(
+        "src.routes.inspections.blob.download_file",
+        AsyncMock(return_value=b"\xff\xd8\xff"),
+    ) as download:
+        response = await inspections.get_inspection_photo("company/inspection/photo.jpg")
+
+    assert response.body == b"\xff\xd8\xff"
+    assert response.media_type == "image/jpeg"
+    download.assert_awaited_once_with("inspections", "company/inspection/photo.jpg")

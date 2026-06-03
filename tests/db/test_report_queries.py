@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from src.db import report_queries
@@ -18,7 +18,6 @@ def build_connection(
         fetch=AsyncMock(return_value=rows),
         fetchrow=AsyncMock(return_value=row),
         execute=AsyncMock(),
-        close=AsyncMock(),
     )
 
 
@@ -45,10 +44,10 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
     ]
     connection = build_connection(rows)
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         reports = await report_queries.list_report_summaries_by_company_id(str(company_id))
 
     assert [report.id for report in reports] == [rows[0]["id"], rows[1]["id"]]
@@ -62,7 +61,6 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
     assert reports[0].inspection_date == inspection_date
     assert reports[0].inspector_name == "Inspector User"
     connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
 
 
 async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
@@ -80,10 +78,10 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     }
     connection = build_connection(row=row)
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         report = await report_queries.get_report_by_id(str(report_id), str(company_id))
 
     assert report is not None
@@ -100,7 +98,6 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     assert report.updated_at == updated_at
     assert report.sections == []
     connection.fetchrow.assert_awaited_once()
-    connection.close.assert_awaited_once()
 
 
 async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> None:
@@ -228,15 +225,17 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "timeline_seconds": 30.0,
         },
     ]
+    photo_key = "company-id/inspection-id/photos/photo.jpg"
     for row in rows:
         row["render_type"] = "text_block"
+        row["image_storage_key"] = photo_key if row["evidence_type"] == "image_analysis" else None
     rows[0]["render_type"] = "measurement_table"
     connection = build_connection(rows)
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         rows = await report_queries.fetch_report_section_rows(str(uuid4()), str(uuid4()))
         sections, evidence_items = map_report_detail_sections(rows)
 
@@ -285,12 +284,14 @@ async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None
     }
     connection = build_connection(row=row)
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         result = await report_queries.claim_next_audio_pipeline_report()
 
     assert result == row
     connection.fetchrow.assert_awaited_once()
-    connection.close.assert_awaited_once()
 
 
 async def test_get_report_for_pipeline_returns_report_context() -> None:
@@ -308,23 +309,27 @@ async def test_get_report_for_pipeline_returns_report_context() -> None:
     }
     connection = build_connection(row=row)
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         result = await report_queries.get_report_for_pipeline(str(row["id"]))
 
     assert result == ReportPipelineContext(**row)
     connection.fetchrow.assert_awaited_once()
-    connection.close.assert_awaited_once()
 
 
 async def test_set_report_status_executes_update() -> None:
     connection = build_connection()
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         await report_queries.set_report_status("report-id", "draft")
 
     connection.execute.assert_awaited_once()
     assert connection.execute.await_args.args[-2:] == ("report-id", "draft")
-    connection.close.assert_awaited_once()
 
 
 async def test_fetch_transcription_segments_for_inspection_returns_rows() -> None:
@@ -334,12 +339,14 @@ async def test_fetch_transcription_segments_for_inspection_returns_rows() -> Non
     rows = [{"id": segment_id, "text": "Segment"}]
     connection = build_connection(rows=rows)
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         result = await report_queries.fetch_transcription_segments_for_inspection("inspection-id")
 
     assert result == [StoredTranscriptionSegment(id=segment_id, text="Segment")]
     connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
 
 
 async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
@@ -349,12 +356,14 @@ async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
     rows = [{"id": image_id, "analysis_text": "Fotoanalyse"}]
     connection = build_connection(rows=rows)
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         result = await report_queries.fetch_image_analyses_for_inspection("inspection-id")
 
     assert result == [StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]
     connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
 
 
 async def test_update_report_section_returns_updated_section_for_company() -> None:
@@ -383,10 +392,10 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
     ]
     connection = build_connection(rows, {"id": section_id})
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         section = await report_queries.update_report_section(
             str(report_id),
             str(section_id),
@@ -416,7 +425,6 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
         True,
     )
     assert connection.fetch.await_args.args[1:] == (section_id,)
-    connection.close.assert_awaited_once()
 
 
 async def test_update_report_section_returns_section_when_no_fields_are_changed() -> None:
@@ -447,10 +455,10 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
     ]
     connection = build_connection(rows, {"id": section_id})
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report_queries.get_pool", return_value=pool):
         section = await report_queries.update_report_section(
             str(report_id),
             str(section_id),
@@ -472,4 +480,3 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
         str(company_id),
     )
     connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()

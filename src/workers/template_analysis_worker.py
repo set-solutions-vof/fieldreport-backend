@@ -13,11 +13,3 @@ async def run_template_analysis_worker() -> None:
 
         if job is None:
             await asyncio.sleep(settings.template_analysis_worker_poll_seconds)
-
-
-def main() -> None:
-    asyncio.run(run_template_analysis_worker())
-
-
-if __name__ == "__main__":
-    main()

@@ -44,7 +44,6 @@ def build_pipeline_connection() -> MagicMock:
     transaction.__aenter__ = AsyncMock(return_value=None)
     transaction.__aexit__ = AsyncMock(return_value=None)
     connection.transaction = MagicMock(return_value=transaction)
-    connection.close = AsyncMock()
     return connection
 
 
@@ -110,6 +109,9 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
         confidence_score=0.9,
     )
     connection = build_pipeline_connection()
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with (
         patch.object(
@@ -122,10 +124,7 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
             "fetch_template_structure",
             AsyncMock(return_value=template_structure),
         ),
-        patch(
-            "src.pipelines.audio_pipeline.asyncpg.connect",
-            AsyncMock(return_value=connection),
-        ),
+        patch("src.pipelines.audio_pipeline.get_pool", return_value=pool),
         patch.object(
             audio_pipeline.inspection_queries,
             "fetch_inspection_audio_files",
@@ -224,7 +223,6 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
     insert_segment_source.assert_awaited_once_with("section-id", str(segment_id))
     insert_image_source.assert_awaited_once_with("section-id", str(image_id))
     set_status.assert_awaited_once_with("report-id", "draft")
-    connection.close.assert_awaited_once()
 
 
 async def test_run_audio_pipeline_marks_failed_when_media_file_fails() -> None:
@@ -233,6 +231,9 @@ async def test_run_audio_pipeline_marks_failed_when_media_file_fails() -> None:
         sections=[TemplateSection(id="conclusie", label="Conclusie", render_type="text_block")]
     )
     connection = build_pipeline_connection()
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with (
         patch.object(
@@ -245,10 +246,7 @@ async def test_run_audio_pipeline_marks_failed_when_media_file_fails() -> None:
             "fetch_template_structure",
             AsyncMock(return_value=template_structure),
         ),
-        patch(
-            "src.pipelines.audio_pipeline.asyncpg.connect",
-            AsyncMock(return_value=connection),
-        ),
+        patch("src.pipelines.audio_pipeline.get_pool", return_value=pool),
         patch.object(
             audio_pipeline.inspection_queries,
             "fetch_inspection_audio_files",
@@ -290,6 +288,9 @@ async def test_run_audio_pipeline_marks_failed_when_report_generation_fails() ->
         )
     )
     connection = build_pipeline_connection()
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with (
         patch.object(
@@ -302,10 +303,7 @@ async def test_run_audio_pipeline_marks_failed_when_report_generation_fails() ->
             "fetch_template_structure",
             AsyncMock(return_value=template_structure),
         ),
-        patch(
-            "src.pipelines.audio_pipeline.asyncpg.connect",
-            AsyncMock(return_value=connection),
-        ),
+        patch("src.pipelines.audio_pipeline.get_pool", return_value=pool),
         patch.object(
             audio_pipeline.inspection_queries,
             "fetch_inspection_audio_files",

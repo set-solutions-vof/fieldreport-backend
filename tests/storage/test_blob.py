@@ -37,6 +37,32 @@ async def test_upload_file_uploads_blob_and_returns_url() -> None:
     blob_client.upload_blob.assert_awaited_once()
 
 
+async def test_ensure_containers_creates_missing_containers() -> None:
+    existing = MagicMock()
+    existing.exists = AsyncMock(return_value=True)
+    existing.create_container = AsyncMock()
+    missing = MagicMock()
+    missing.exists = AsyncMock(return_value=False)
+    missing.create_container = AsyncMock()
+    missing_logos = MagicMock()
+    missing_logos.exists = AsyncMock(return_value=False)
+    missing_logos.create_container = AsyncMock()
+    service = MagicMock()
+    service.get_container_client.side_effect = [existing, missing, missing_logos]
+    service.__aenter__ = AsyncMock(return_value=service)
+    service.__aexit__ = AsyncMock(return_value=None)
+
+    with patch(
+        "src.storage.blob.BlobServiceClient.from_connection_string",
+        return_value=service,
+    ):
+        await blob.ensure_containers()
+
+    existing.create_container.assert_not_awaited()
+    missing.create_container.assert_awaited_once_with()
+    missing_logos.create_container.assert_awaited_once_with(public_access="blob")
+
+
 async def test_download_file_returns_bytes() -> None:
     blob_client = MagicMock()
     stream = MagicMock()

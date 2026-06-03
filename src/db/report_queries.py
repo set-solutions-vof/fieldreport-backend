@@ -1,6 +1,4 @@
-import asyncpg
-
-from src.db.connection import get_connection_url
+from src.db.connection import get_pool
 from src.db.report_mapper import (
     map_report_detail,
     map_report_pipeline_context,
@@ -22,9 +20,7 @@ from src.models.reports.report import (
 
 
 async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSummary]:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         rows = await connection.fetch(
             """
             SELECT
@@ -42,16 +38,12 @@ async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSum
             """,
             company_id,
         )
-    finally:
-        await connection.close()
 
     return [map_report_summary(row) for row in rows]
 
 
 async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             SELECT
@@ -70,16 +62,12 @@ async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
             report_id,
             company_id,
         )
-    finally:
-        await connection.close()
 
     return map_report_detail(row)
 
 
-async def fetch_report_section_rows(report_id: str, company_id: str) -> list[asyncpg.Record]:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+async def fetch_report_section_rows(report_id: str, company_id: str) -> list:
+    async with get_pool().acquire() as connection:
         return await connection.fetch(
             """
             SELECT
@@ -98,6 +86,7 @@ async def fetch_report_section_rows(report_id: str, company_id: str) -> list[asy
                 transcription_segments.end_seconds AS end_seconds,
                 transcription_segments.text AS transcription_text,
                 image_analyses.id AS image_analysis_id,
+                image_analyses.storage_key AS image_storage_key,
                 image_analyses.captured_at AS captured_at,
                 image_analyses.analysis_text AS image_analysis_text,
                 CASE
@@ -127,8 +116,6 @@ async def fetch_report_section_rows(report_id: str, company_id: str) -> list[asy
             report_id,
             company_id,
         )
-    finally:
-        await connection.close()
 
 
 async def update_report_section(
@@ -138,9 +125,7 @@ async def update_report_section(
     reviewed_content: str | None,
     approved: bool | None,
 ) -> ReportSection:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         values: list[object] = [report_id, section_id, company_id]
         assignments: list[str] = []
 
@@ -210,16 +195,12 @@ async def update_report_section(
             """,
             section_row["id"],
         )
-    finally:
-        await connection.close()
 
     return map_report_sections(rows)[0]
 
 
 async def claim_next_audio_pipeline_report() -> dict | None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             WITH next_report AS (
@@ -235,16 +216,12 @@ async def claim_next_audio_pipeline_report() -> dict | None:
             WHERE id IN (SELECT id FROM next_report)
             """
         )
-    finally:
-        await connection.close()
 
     return dict(row) if row is not None else None
 
 
 async def get_report_for_pipeline(report_id: str) -> ReportPipelineContext:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             SELECT
@@ -261,16 +238,12 @@ async def get_report_for_pipeline(report_id: str) -> ReportPipelineContext:
             """,
             report_id,
         )
-    finally:
-        await connection.close()
 
     return map_report_pipeline_context(row)
 
 
 async def set_report_status(report_id: str, status: str) -> None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         await connection.execute(
             """
             UPDATE reports
@@ -281,16 +254,12 @@ async def set_report_status(report_id: str, status: str) -> None:
             report_id,
             status,
         )
-    finally:
-        await connection.close()
 
 
 async def fetch_transcription_segments_for_inspection(
     inspection_id: str,
 ) -> list[StoredTranscriptionSegment]:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         rows = await connection.fetch(
             """
             SELECT
@@ -308,16 +277,12 @@ async def fetch_transcription_segments_for_inspection(
             """,
             inspection_id,
         )
-    finally:
-        await connection.close()
 
     return [map_stored_transcription_segment(row) for row in rows]
 
 
 async def fetch_image_analyses_for_inspection(inspection_id: str) -> list[StoredImageAnalysis]:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         rows = await connection.fetch(
             """
             SELECT
@@ -334,7 +299,5 @@ async def fetch_image_analyses_for_inspection(inspection_id: str) -> list[Stored
             """,
             inspection_id,
         )
-    finally:
-        await connection.close()
 
     return [map_stored_image_analysis(row) for row in rows]

@@ -37,6 +37,7 @@ class ReportEvidenceItem(BaseModel):
     end_seconds: float | None
     captured_at: datetime | None
     content_summary: str
+    storage_key: str | None = None
 
 
 class ReportSectionContent(BaseModel):

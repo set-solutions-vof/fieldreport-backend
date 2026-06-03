@@ -295,6 +295,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 "end_seconds": None,
                 "captured_at": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
+                "storage_key": None,
             }
         ],
     }

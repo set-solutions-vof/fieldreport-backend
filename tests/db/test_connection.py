@@ -1,14 +1,22 @@
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from src.db import connection
 
 
-def test_get_connection_url_strips_asyncpg_driver() -> None:
-    with patch.object(
-        connection.settings,
-        "database_url",
-        "postgresql+asyncpg://fieldreport:fieldreport@localhost:5432/fieldreport_test",
-    ):
-        result = connection.get_connection_url()
+async def test_create_pool_sets_module_pool() -> None:
+    mock_pool = MagicMock()
 
-    assert result == "postgresql://fieldreport:fieldreport@localhost:5432/fieldreport_test"
+    with patch("src.db.connection.asyncpg.create_pool", AsyncMock(return_value=mock_pool)):
+        await connection.create_pool()
+
+    assert connection.get_pool() is mock_pool
+
+
+async def test_close_pool_closes_pool() -> None:
+    mock_pool = MagicMock()
+    mock_pool.close = AsyncMock()
+    connection._pool = mock_pool
+
+    await connection.close_pool()
+
+    mock_pool.close.assert_awaited_once()

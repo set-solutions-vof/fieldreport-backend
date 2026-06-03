@@ -1,9 +1,7 @@
 from datetime import date
 from uuid import uuid4
 
-import asyncpg
-
-from src.db.connection import get_connection_url
+from src.db.connection import get_pool
 from src.db.inspection_mapper import map_inspection_media_file
 from src.models.reports.metadata import ReportMetadata
 from src.models.reports.pipeline import InspectionMediaFile
@@ -18,9 +16,7 @@ async def insert_inspection(
     extra_context: str,
     inspection_date: date,
 ) -> None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         await connection.execute(
             """
             INSERT INTO inspections (
@@ -48,12 +44,10 @@ async def insert_inspection(
             company_id,
             inspector_id,
             template_id,
-            metadata.model_dump(),
+            metadata.model_dump_json(),
             extra_context,
             inspection_date,
         )
-    finally:
-        await connection.close()
 
 
 async def insert_inspection_audio_file(
@@ -61,9 +55,7 @@ async def insert_inspection_audio_file(
     storage_key: str,
     original_file_name: str,
 ) -> None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         await connection.execute(
             """
             INSERT INTO inspection_audio_files (
@@ -86,8 +78,6 @@ async def insert_inspection_audio_file(
             storage_key,
             original_file_name,
         )
-    finally:
-        await connection.close()
 
 
 async def insert_inspection_photo_file(
@@ -95,9 +85,7 @@ async def insert_inspection_photo_file(
     storage_key: str,
     original_file_name: str,
 ) -> None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         await connection.execute(
             """
             INSERT INTO inspection_photo_files (
@@ -120,14 +108,10 @@ async def insert_inspection_photo_file(
             storage_key,
             original_file_name,
         )
-    finally:
-        await connection.close()
 
 
 async def fetch_inspection_audio_files(inspection_id: str) -> list[InspectionMediaFile]:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         rows = await connection.fetch(
             """
             SELECT id, inspection_id, storage_key, original_file_name, created_at
@@ -137,16 +121,12 @@ async def fetch_inspection_audio_files(inspection_id: str) -> list[InspectionMed
             """,
             inspection_id,
         )
-    finally:
-        await connection.close()
 
     return [map_inspection_media_file(row) for row in rows]
 
 
 async def fetch_inspection_photo_files(inspection_id: str) -> list[InspectionMediaFile]:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         rows = await connection.fetch(
             """
             SELECT id, inspection_id, storage_key, original_file_name, created_at
@@ -156,8 +136,6 @@ async def fetch_inspection_photo_files(inspection_id: str) -> list[InspectionMed
             """,
             inspection_id,
         )
-    finally:
-        await connection.close()
 
     return [map_inspection_media_file(row) for row in rows]
 
@@ -168,9 +146,7 @@ async def insert_report(
     company_id: str,
     template_id: str,
 ) -> None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         await connection.execute(
             """
             INSERT INTO reports (
@@ -197,5 +173,3 @@ async def insert_report(
             company_id,
             template_id,
         )
-    finally:
-        await connection.close()

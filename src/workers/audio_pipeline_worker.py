@@ -20,11 +20,3 @@ async def run_audio_pipeline_worker() -> None:
             await audio_pipeline.run_audio_pipeline(str(report["id"]))
         except Exception as error:
             logger.exception("Audio pipeline report {} failed: {}", report["id"], error)
-
-
-def main() -> None:
-    asyncio.run(run_audio_pipeline_worker())
-
-
-if __name__ == "__main__":
-    main()

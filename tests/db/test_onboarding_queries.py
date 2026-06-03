@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from src.db import onboarding_queries
@@ -15,8 +15,14 @@ def build_connection(
     return SimpleNamespace(
         fetchrow=AsyncMock(return_value=row),
         fetch=AsyncMock(return_value=rows or []),
-        close=AsyncMock(),
     )
+
+
+def mock_pool(connection):
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    return patch("src.db.onboarding_queries.get_pool", return_value=pool)
 
 
 async def test_get_company_returns_company_response() -> None:
@@ -30,10 +36,7 @@ async def test_get_company_returns_company_response() -> None:
     }
     connection = build_connection(row)
 
-    with patch(
-        "src.db.onboarding_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    with mock_pool(connection):
         company = await onboarding_queries.get_company(str(company_id))
 
     assert company == CompanyOnboarding(
@@ -43,7 +46,6 @@ async def test_get_company_returns_company_response() -> None:
         primary_color="#3B5BDB",
         onboarding_completed=False,
     )
-    connection.close.assert_awaited_once()
 
 
 async def test_update_company_returns_updated_company_response() -> None:
@@ -57,10 +59,7 @@ async def test_update_company_returns_updated_company_response() -> None:
     }
     connection = build_connection(row)
 
-    with patch(
-        "src.db.onboarding_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    with mock_pool(connection):
         company = await onboarding_queries.update_company(
             str(company_id),
             "https://cdn.example/logo.png",
@@ -82,23 +81,18 @@ async def test_update_company_returns_updated_company_response() -> None:
         True,
         True,
     )
-    connection.close.assert_awaited_once()
 
 
 async def test_has_pending_invite_returns_true_for_existing_pending_invite() -> None:
     connection = build_connection({"id": uuid4()})
 
-    with patch(
-        "src.db.onboarding_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    with mock_pool(connection):
         has_pending_invite = await onboarding_queries.has_pending_invite(
             str(uuid4()),
             "new.user@example.com",
         )
 
     assert has_pending_invite is True
-    connection.close.assert_awaited_once()
 
 
 async def test_create_invite_returns_created_invite_response() -> None:
@@ -113,10 +107,7 @@ async def test_create_invite_returns_created_invite_response() -> None:
     }
     connection = build_connection(row)
 
-    with patch(
-        "src.db.onboarding_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    with mock_pool(connection):
         invite = await onboarding_queries.create_invite(
             str(uuid4()),
             "new.user@example.com",
@@ -131,7 +122,6 @@ async def test_create_invite_returns_created_invite_response() -> None:
         role="admin",
         created_at=created_at,
     )
-    connection.close.assert_awaited_once()
 
 
 async def test_list_invites_returns_company_invites() -> None:
@@ -148,10 +138,7 @@ async def test_list_invites_returns_company_invites() -> None:
     }
     connection = build_connection(rows=[row])
 
-    with patch(
-        "src.db.onboarding_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    with mock_pool(connection):
         invites = await onboarding_queries.list_invites(str(uuid4()))
 
     assert invites == [
@@ -164,17 +151,12 @@ async def test_list_invites_returns_company_invites() -> None:
             expires_at=expires_at,
         )
     ]
-    connection.close.assert_awaited_once()
 
 
 async def test_delete_pending_invite_returns_true_when_deleted() -> None:
     connection = build_connection({"id": uuid4()})
 
-    with patch(
-        "src.db.onboarding_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
+    with mock_pool(connection):
         was_deleted = await onboarding_queries.delete_pending_invite(str(uuid4()), str(uuid4()))
 
     assert was_deleted is True
-    connection.close.assert_awaited_once()

@@ -1,11 +1,10 @@
 from pathlib import Path
 
-import asyncpg
 from loguru import logger
 
 from src.config import settings
 from src.db import inspection_queries, report_queries, template_queries
-from src.db.connection import get_connection_url
+from src.db.connection import get_pool
 from src.db.report_pipeline_repository import ReportPipelineRepository
 from src.llm import client_factory, gpt4o_client, gpt4o_transcribe_client
 from src.models.reports.generation import GeneratedReportSection, GeneratedReportSectionList
@@ -28,8 +27,7 @@ async def run_audio_pipeline(report_id: str) -> None:
     template_sections = template_structure.sections
 
     try:
-        connection = await asyncpg.connect(get_connection_url())
-        try:
+        async with get_pool().acquire() as connection:
             async with connection.transaction():
                 repository = ReportPipelineRepository(connection)
                 await transcribe_inspection_audio_files(report, repository)
@@ -55,8 +53,6 @@ async def run_audio_pipeline(report_id: str) -> None:
                     segment_rows,
                     image_rows,
                 )
-        finally:
-            await connection.close()
 
         await report_queries.set_report_status(report_id, "draft")
     except Exception as error:

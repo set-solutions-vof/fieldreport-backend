@@ -73,25 +73,3 @@ async def test_run_audio_pipeline_worker_sleeps_when_no_report_is_available() ->
     sleep.assert_awaited_once_with(
         audio_pipeline_worker.settings.audio_pipeline_worker_poll_seconds
     )
-
-
-def test_audio_pipeline_worker_main_starts_worker() -> None:
-    def close_coroutine(coroutine):
-        coroutine.close()
-
-    with patch.object(audio_pipeline_worker.asyncio, "run", side_effect=close_coroutine) as run:
-        audio_pipeline_worker.main()
-
-    run.assert_called_once()
-
-
-def test_audio_pipeline_worker_module_main_branch_executes_entrypoint() -> None:
-    import runpy
-
-    def close_coroutine(coroutine):
-        coroutine.close()
-
-    with patch("asyncio.run", side_effect=close_coroutine) as run:
-        runpy.run_path(audio_pipeline_worker.__file__, run_name="__main__")
-
-    run.assert_called_once()

@@ -74,6 +74,7 @@ def map_report_evidence_item(row: asyncpg.Record) -> ReportEvidenceItem:
         end_seconds=None,
         captured_at=row["captured_at"],
         content_summary=row["image_analysis_text"],
+        storage_key=row["image_storage_key"],
     )
 
 

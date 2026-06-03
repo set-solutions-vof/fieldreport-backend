@@ -1,18 +1,14 @@
 from datetime import datetime
 from uuid import uuid4
 
-import asyncpg
-
-from src.db.connection import get_connection_url
+from src.db.connection import get_pool
 from src.db.onboarding_mapper import map_company, map_created_invite, map_invite
 from src.models.onboarding.company import CompanyOnboarding
 from src.models.onboarding.invite import InviteCreated, InviteRecord
 
 
 async def get_company(company_id: str) -> CompanyOnboarding:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             SELECT
@@ -26,8 +22,6 @@ async def get_company(company_id: str) -> CompanyOnboarding:
             """,
             company_id,
         )
-    finally:
-        await connection.close()
 
     return map_company(row)
 
@@ -41,9 +35,7 @@ async def update_company(
     should_update_primary_color: bool,
     should_update_onboarding_completed: bool,
 ) -> CompanyOnboarding:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             UPDATE company
@@ -70,16 +62,12 @@ async def update_company(
             should_update_onboarding_completed,
             onboarding_completed,
         )
-    finally:
-        await connection.close()
 
     return map_company(row)
 
 
 async def has_pending_invite(company_id: str, email: str) -> bool:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             SELECT id
@@ -91,8 +79,6 @@ async def has_pending_invite(company_id: str, email: str) -> bool:
             company_id,
             email,
         )
-    finally:
-        await connection.close()
 
     return row is not None
 
@@ -104,9 +90,7 @@ async def create_invite(
     token: str,
     expires_at: datetime,
 ) -> InviteCreated:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             INSERT INTO invites (
@@ -142,16 +126,12 @@ async def create_invite(
             token,
             expires_at,
         )
-    finally:
-        await connection.close()
 
     return map_created_invite(row)
 
 
 async def list_invites(company_id: str) -> list[InviteRecord]:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         rows = await connection.fetch(
             """
             SELECT
@@ -167,16 +147,12 @@ async def list_invites(company_id: str) -> list[InviteRecord]:
             """,
             company_id,
         )
-    finally:
-        await connection.close()
 
     return [map_invite(row) for row in rows]
 
 
 async def delete_pending_invite(company_id: str, invite_id: str) -> bool:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             DELETE FROM invites
@@ -188,7 +164,5 @@ async def delete_pending_invite(company_id: str, invite_id: str) -> bool:
             invite_id,
             company_id,
         )
-    finally:
-        await connection.close()
 
     return row is not None

@@ -1,14 +1,10 @@
-import asyncpg
-
 from src.db.auth_mapper import map_authenticated_user, map_current_user
-from src.db.connection import get_connection_url
+from src.db.connection import get_pool
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 
 
 async def get_user_by_email(email: str) -> AuthenticatedUser | None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             SELECT
@@ -25,8 +21,6 @@ async def get_user_by_email(email: str) -> AuthenticatedUser | None:
             """,
             email,
         )
-    finally:
-        await connection.close()
 
     if row is None:
         return None
@@ -35,9 +29,7 @@ async def get_user_by_email(email: str) -> AuthenticatedUser | None:
 
 
 async def get_user_by_id(user_id: str) -> CurrentUser | None:
-    connection = await asyncpg.connect(get_connection_url())
-
-    try:
+    async with get_pool().acquire() as connection:
         row = await connection.fetchrow(
             """
             SELECT
@@ -53,8 +45,6 @@ async def get_user_by_id(user_id: str) -> CurrentUser | None:
             """,
             user_id,
         )
-    finally:
-        await connection.close()
 
     if row is None:
         return None

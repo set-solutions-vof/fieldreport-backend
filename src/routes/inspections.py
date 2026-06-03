@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi.responses import Response
 
 from src.exceptions import MissingMetadataKeys
 from src.http.v1.request.inspection import CreateInspectionRequest
@@ -8,6 +9,7 @@ from src.http.v1.response.inspection import CreateInspectionResponse
 from src.models.auth.authentication import CurrentUser
 from src.security.authentication import get_current_user
 from src.services import inspections
+from src.storage import blob
 
 router = APIRouter(tags=["Inspections"])
 
@@ -38,3 +40,9 @@ async def create_inspection(
         )
     except MissingMetadataKeys as error:
         raise HTTPException(status_code=422, detail={"missing_keys": error.keys})
+
+
+@router.get("/api/v1/inspections/photos/{key:path}", tags=["Inspections"])
+async def get_inspection_photo(key: str) -> Response:
+    data = await blob.download_file("inspections", key)
+    return Response(content=data, media_type="image/jpeg")
