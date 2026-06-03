@@ -166,7 +166,7 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
             ],
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert response.json() == {
         "status": "processing",
         "job_id": "job-123",
@@ -338,7 +338,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
             json=request_body,
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json() == {
         "status": "active",
         "source_reports_count": 3,

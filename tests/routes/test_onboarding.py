@@ -147,7 +147,7 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
             json={"email": "NEW.User@example.com", "role": "admin"},
         )
 
-    assert response.status_code == 200
+    assert response.status_code == 201
     assert response.json() == {
         "id": str(invite.id),
         "email": "new.user@example.com",
