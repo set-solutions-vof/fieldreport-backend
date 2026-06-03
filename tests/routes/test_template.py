@@ -8,6 +8,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
+from src.exceptions import TemplateAnalysisJobNotFound
 from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.main import app
 from src.models.auth.authentication import CurrentUser
@@ -274,7 +275,9 @@ async def test_get_template_analysis_returns_not_found_for_unknown_job(client: A
         ),
         patch(
             "src.routes.template.templates.get_template_analysis_job",
-            AsyncMock(side_effect=LookupError),
+            AsyncMock(
+                side_effect=TemplateAnalysisJobNotFound("job-123", str(current_user.company_id))
+            ),
         ),
     ):
         response = await client.get(

@@ -1,9 +1,12 @@
 from pathlib import Path
 
+import asyncpg
 from loguru import logger
 
 from src.config import settings
 from src.db import inspection_queries, report_queries, template_queries
+from src.db.connection import get_connection_url
+from src.db.report_pipeline_repository import ReportPipelineRepository
 from src.llm import client_factory, gpt4o_client, gpt4o_transcribe_client
 from src.models.reports.generation import GeneratedReportSection, GeneratedReportSectionList
 from src.models.reports.pipeline import (
@@ -13,40 +16,48 @@ from src.models.reports.pipeline import (
 )
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.prompts.report_generation import REPORT_GENERATION_PROMPT
-from src.storage import inspection_file_storage
+from src.storage import blob
 
 
 async def run_audio_pipeline(report_id: str) -> None:
     report = await report_queries.get_report_for_pipeline(report_id)
-    inspection_id = str(report.inspection_id)
-    company_id = str(report.company_id)
     template_structure = await template_queries.fetch_template_structure(
-        str(report.template_id), company_id
+        str(report.template_id),
+        str(report.company_id),
     )
     template_sections = template_structure.sections
 
-    await transcribe_inspection_audio_files(inspection_id, company_id)
-    await analyze_inspection_photo_files(inspection_id, company_id)
-
-    segment_rows = await report_queries.fetch_transcription_segments_for_inspection(inspection_id)
-    image_rows = await report_queries.fetch_image_analyses_for_inspection(inspection_id)
-
     try:
-        parsed_sections = await generate_report_sections(
-            report,
-            template_structure,
-            template_sections,
-            segment_rows,
-            image_rows,
-        )
-        await persist_report_sections(
-            report_id,
-            company_id,
-            template_sections,
-            parsed_sections,
-            segment_rows,
-            image_rows,
-        )
+        connection = await asyncpg.connect(get_connection_url())
+        try:
+            async with connection.transaction():
+                repository = ReportPipelineRepository(connection)
+                await transcribe_inspection_audio_files(report, repository)
+                await analyze_inspection_photo_files(report, repository)
+                segment_rows = await repository.fetch_transcription_segments_for_inspection(
+                    str(report.inspection_id)
+                )
+                image_rows = await repository.fetch_image_analyses_for_inspection(
+                    str(report.inspection_id)
+                )
+                parsed_sections = await generate_report_sections(
+                    report,
+                    template_structure,
+                    template_sections,
+                    segment_rows,
+                    image_rows,
+                )
+                await persist_pipeline_results(
+                    repository,
+                    report,
+                    template_sections,
+                    parsed_sections,
+                    segment_rows,
+                    image_rows,
+                )
+        finally:
+            await connection.close()
+
         await report_queries.set_report_status(report_id, "draft")
     except Exception as error:
         await report_queries.set_report_status(report_id, "failed")
@@ -54,27 +65,30 @@ async def run_audio_pipeline(report_id: str) -> None:
         raise
 
 
-async def transcribe_inspection_audio_files(inspection_id: str, company_id: str) -> None:
-    audio_files = await inspection_queries.fetch_inspection_audio_files(inspection_id)
+async def transcribe_inspection_audio_files(
+    report: ReportPipelineContext,
+    repository: ReportPipelineRepository,
+) -> None:
+    audio_files = await inspection_queries.fetch_inspection_audio_files(str(report.inspection_id))
 
     for audio_file in audio_files:
         audio_key = audio_file.storage_key
         try:
-            file_content = inspection_file_storage.load_inspection_file(audio_key)
+            file_content = await blob.download_file("inspections", audio_key)
             result = await gpt4o_transcribe_client.transcribe_audio(
                 file_content,
                 audio_file.original_file_name,
             )
-            transcription_id = await report_queries.insert_transcription(
-                inspection_id,
-                company_id,
+            transcription_id = await repository.insert_transcription(
+                str(report.inspection_id),
+                str(report.company_id),
                 audio_key,
                 result.full_text,
                 result.duration_seconds,
             )
-            segment_ids = await report_queries.insert_transcription_segments(
+            segment_ids = await repository.insert_transcription_segments(
                 transcription_id,
-                inspection_id,
+                str(report.inspection_id),
                 result.segments,
             )
             logger.info(
@@ -84,30 +98,35 @@ async def transcribe_inspection_audio_files(inspection_id: str, company_id: str)
                 result.duration_seconds,
                 len(result.full_text),
             )
-        except Exception as error:
-            logger.error("Audio file {} failed: {}", audio_key, error)
+        except Exception:
+            logger.exception("Audio file {} failed", audio_key)
+            raise
 
 
-async def analyze_inspection_photo_files(inspection_id: str, company_id: str) -> None:
-    photo_files = await inspection_queries.fetch_inspection_photo_files(inspection_id)
+async def analyze_inspection_photo_files(
+    report: ReportPipelineContext,
+    repository: ReportPipelineRepository,
+) -> None:
+    photo_files = await inspection_queries.fetch_inspection_photo_files(str(report.inspection_id))
 
     for photo_file in photo_files:
         photo_key = photo_file.storage_key
         try:
-            file_content = inspection_file_storage.load_inspection_file(photo_key)
+            file_content = await blob.download_file("inspections", photo_key)
             description = await gpt4o_client.analyze_inspection_photo(
                 Path(photo_key).name,
                 file_content,
             )
-            image_analysis_id = await report_queries.insert_image_analysis(
-                inspection_id,
-                company_id,
+            image_analysis_id = await repository.insert_image_analysis(
+                str(report.inspection_id),
+                str(report.company_id),
                 photo_key,
                 description,
             )
             logger.info("Analyzed photo {} as image_analysis {}", photo_key, image_analysis_id)
-        except Exception as error:
-            logger.error("Photo file {} failed: {}", photo_key, error)
+        except Exception:
+            logger.exception("Photo file {} failed", photo_key)
+            raise
 
 
 def build_report_generation_prompt(
@@ -172,9 +191,9 @@ async def generate_report_sections(
     return payload.sections
 
 
-async def persist_report_sections(
-    report_id: str,
-    company_id: str,
+async def persist_pipeline_results(
+    repository: ReportPipelineRepository,
+    report: ReportPipelineContext,
     template_sections: list[TemplateSection],
     generated_sections: list[GeneratedReportSection],
     segment_rows: list[StoredTranscriptionSegment],
@@ -186,25 +205,21 @@ async def persist_report_sections(
 
     for section_data in generated_sections:
         template_section = template_sections_by_id[section_data.id]
-        report_section_id = await report_queries.insert_report_section(
-            report_id,
-            company_id,
-            section_data.id,
-            template_section.order,
-            template_section.render_type,
-            section_data.generated_content,
-            section_data.confidence_level,
-            section_data.confidence_score,
+        report_section_id = await repository.insert_report_section(
+            str(report.id),
+            str(report.company_id),
+            section_data,
+            template_section,
         )
 
         for transcription_segment_id in transcription_segment_ids:
-            await report_queries.insert_report_section_source_transcription(
+            await repository.insert_report_section_source_transcription(
                 report_section_id,
                 transcription_segment_id,
             )
 
         for image_analysis_id in image_analysis_ids:
-            await report_queries.insert_report_section_source_image(
+            await repository.insert_report_section_source_image(
                 report_section_id,
                 image_analysis_id,
             )

@@ -5,14 +5,10 @@ import asyncpg
 
 from src.db.connection import get_connection_url
 from src.db.onboarding_mapper import map_company, map_created_invite, map_invite
-from src.http.v1.response.onboarding import (
-    CompanyOnboardingResponse,
-    InviteCreatedResponse,
-    InviteResponse,
-)
+from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
 
 
-async def get_company(company_id: str) -> CompanyOnboardingResponse:
+async def get_company(company_id: str) -> CompanyOnboarding:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
@@ -43,7 +39,7 @@ async def update_company(
     should_update_logo_url: bool,
     should_update_primary_color: bool,
     should_update_onboarding_completed: bool,
-) -> CompanyOnboardingResponse:
+) -> CompanyOnboarding:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
@@ -106,7 +102,7 @@ async def create_invite(
     role: str,
     token: str,
     expires_at: datetime,
-) -> InviteCreatedResponse:
+) -> InviteCreated:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
@@ -151,7 +147,7 @@ async def create_invite(
     return map_created_invite(row)
 
 
-async def list_invites(company_id: str) -> list[InviteResponse]:
+async def list_invites(company_id: str) -> list[InviteRecord]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:

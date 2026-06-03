@@ -4,11 +4,7 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from src.db import onboarding_queries
-from src.http.v1.response.onboarding import (
-    CompanyOnboardingResponse,
-    InviteCreatedResponse,
-    InviteResponse,
-)
+from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
 
 
 def build_connection(
@@ -39,7 +35,7 @@ async def test_get_company_returns_company_response() -> None:
     ):
         company = await onboarding_queries.get_company(str(company_id))
 
-    assert company == CompanyOnboardingResponse(
+    assert company == CompanyOnboarding(
         id=company_id,
         name="LEKK BV",
         logo_url=None,
@@ -128,7 +124,7 @@ async def test_create_invite_returns_created_invite_response() -> None:
             expires_at,
         )
 
-    assert invite == InviteCreatedResponse(
+    assert invite == InviteCreated(
         id=invite_id,
         email="new.user@lekk.nl",
         role="admin",
@@ -158,7 +154,7 @@ async def test_list_invites_returns_company_invites() -> None:
         invites = await onboarding_queries.list_invites(str(uuid4()))
 
     assert invites == [
-        InviteResponse(
+        InviteRecord(
             id=invite_id,
             email="new.user@lekk.nl",
             role="inspector",

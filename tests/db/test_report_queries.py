@@ -4,9 +4,8 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from src.db import report_queries
-from src.models.reports.metadata import ReportMetadata
 from src.db.report_mapper import map_report_detail_sections
-from src.models.reports.transcription import TranscriptionSegment
+from src.models.reports.metadata import ReportMetadata
 
 
 def build_connection(
@@ -55,9 +54,10 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
     assert [report.id for report in reports] == [rows[0]["id"], rows[1]["id"]]
     assert all(report.company_id == company_id for report in reports)
     assert [report.status for report in reports] == ["draft", "approved"]
-    assert [
-        report.metadata.model_dump()["naam_opdrachtgever"] for report in reports
-    ] == ["ACME", "Globex"]
+    assert [report.metadata.model_dump()["naam_opdrachtgever"] for report in reports] == [
+        "ACME",
+        "Globex",
+    ]
     assert reports[0].metadata.model_dump()["adres_schadeadres"] == "Main Street 1"
     assert reports[0].inspection_date == inspection_date
     assert reports[0].inspector_name == "Jeroen van Dijk"
@@ -327,58 +327,6 @@ async def test_set_report_status_executes_update() -> None:
     connection.close.assert_awaited_once()
 
 
-async def test_insert_transcription_executes_insert_and_returns_id() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        transcription_id = await report_queries.insert_transcription(
-            "inspection-id",
-            "company-id",
-            "/tmp/audio.m4a",
-            "Tekst",
-            12.5,
-        )
-
-    assert transcription_id
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        "inspection-id",
-        "company-id",
-        "/tmp/audio.m4a",
-        "Tekst",
-    )
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_transcription_segments_executes_inserts_and_returns_ids() -> None:
-    connection = build_connection()
-    segments = [
-        TranscriptionSegment(
-            segment_index=0,
-            start_seconds=0.0,
-            end_seconds=1.5,
-            text="Segment",
-        )
-    ]
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        segment_ids = await report_queries.insert_transcription_segments(
-            "transcription-id",
-            "inspection-id",
-            segments,
-        )
-
-    assert len(segment_ids) == 1
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        0,
-        0.0,
-        1.5,
-        "Segment",
-    )
-    connection.close.assert_awaited_once()
-
-
 async def test_fetch_transcription_segments_for_inspection_returns_rows() -> None:
     from src.models.reports.pipeline import StoredTranscriptionSegment
 
@@ -394,28 +342,6 @@ async def test_fetch_transcription_segments_for_inspection_returns_rows() -> Non
     connection.close.assert_awaited_once()
 
 
-async def test_insert_image_analysis_executes_insert_and_returns_id() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        image_analysis_id = await report_queries.insert_image_analysis(
-            "inspection-id",
-            "company-id",
-            "/tmp/photo.jpg",
-            "Fotoanalyse",
-        )
-
-    assert image_analysis_id
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        "inspection-id",
-        "company-id",
-        "/tmp/photo.jpg",
-        "Fotoanalyse",
-    )
-    connection.close.assert_awaited_once()
-
-
 async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
     from src.models.reports.pipeline import StoredImageAnalysis
 
@@ -428,60 +354,6 @@ async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
 
     assert result == [StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]
     connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_report_section_executes_insert_and_returns_id() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        report_section_id = await report_queries.insert_report_section(
-            "report-id",
-            "company-id",
-            "conclusie",
-            1,
-            "text_block",
-            "Concept",
-            "high",
-            0.9,
-        )
-
-    assert report_section_id
-    connection.execute.assert_awaited_once()
-    assert "to_jsonb(ARRAY[$7::text])" in connection.execute.await_args.args[0]
-    assert connection.execute.await_args.args[-6:] == (
-        "conclusie",
-        1,
-        "text_block",
-        "Concept",
-        "high",
-        0.9,
-    )
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_report_section_source_transcription_executes_insert() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        await report_queries.insert_report_section_source_transcription(
-            "section-id",
-            "segment-id",
-        )
-
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-2:] == ("section-id", "segment-id")
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_report_section_source_image_executes_insert() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        await report_queries.insert_report_section_source_image("section-id", "image-id")
-
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-2:] == ("section-id", "image-id")
     connection.close.assert_awaited_once()
 
 

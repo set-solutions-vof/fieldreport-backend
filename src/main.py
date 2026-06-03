@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 
-from src.routes import auth, health, inspections, onboarding, reports, template
+from src.routes import auth, health, inspections, onboarding, reports, template, uploads
 
 app = FastAPI(
     title="Fieldreport API",
@@ -22,3 +22,4 @@ app.include_router(inspections.router)
 app.include_router(onboarding.router)
 app.include_router(reports.router)
 app.include_router(template.router)
+app.include_router(uploads.router)

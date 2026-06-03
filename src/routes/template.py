@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException
 
+from src.exceptions import TemplateAnalysisJobNotFound
 from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.models.auth.authentication import CurrentUser
 from src.models.templates import status_resolver
@@ -55,7 +56,7 @@ async def get_template_analysis(
         job = await templates.get_template_analysis_job(current_user, job_id)
 
         return status_resolver.resolve_template_job_state(job)
-    except LookupError:
+    except TemplateAnalysisJobNotFound:
         raise HTTPException(status_code=404, detail="Template analysis not found")
 
 

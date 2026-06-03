@@ -3,8 +3,10 @@ from io import BytesIO
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
 from starlette.datastructures import UploadFile
 
+from src.exceptions import TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.enums.template_analysis_job_status import TemplateAnalysisJobStatus
 from src.models.templates.domain import TemplateSection, TemplateStructure
@@ -136,12 +138,8 @@ async def test_get_template_analysis_job_raises_for_missing_job() -> None:
         "get_template_analysis_job",
         AsyncMock(return_value=None),
     ):
-        try:
+        with pytest.raises(TemplateAnalysisJobNotFound):
             await templates_service.get_template_analysis_job(current_user, str(uuid4()))
-        except LookupError:
-            pass
-        else:
-            raise AssertionError("Expected LookupError")
 
 
 async def test_confirm_template_creates_and_activates_template_from_reviewed_sections() -> None:

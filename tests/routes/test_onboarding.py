@@ -6,13 +6,10 @@ from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.http.v1.response.onboarding import (
-    CompanyOnboardingResponse,
-    InviteCreatedResponse,
-    InviteResponse,
-)
+from src.exceptions import InviteAlreadyExists
 from src.main import app
 from src.models.auth.authentication import CurrentUser
+from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
 from src.security import authentication as security
 from src.services import authentication as auth_service
 
@@ -48,7 +45,7 @@ def build_inspector_user() -> CurrentUser:
 async def test_get_onboarding_company_returns_company_state(client: AsyncClient) -> None:
     current_user = build_admin_user()
     access_token = security.create_access_token(current_user)
-    company = CompanyOnboardingResponse(
+    company = CompanyOnboarding(
         id=current_user.company_id,
         name="LEKK BV",
         logo_url="https://cdn.example/logo.png",
@@ -63,7 +60,7 @@ async def test_get_onboarding_company_returns_company_state(client: AsyncClient)
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding_queries.get_company",
+            "src.routes.onboarding.onboarding.get_company",
             AsyncMock(return_value=company),
         ),
     ):
@@ -85,7 +82,7 @@ async def test_get_onboarding_company_returns_company_state(client: AsyncClient)
 async def test_patch_onboarding_company_updates_company_state(client: AsyncClient) -> None:
     current_user = build_admin_user()
     access_token = security.create_access_token(current_user)
-    updated_company = CompanyOnboardingResponse(
+    updated_company = CompanyOnboarding(
         id=current_user.company_id,
         name="LEKK BV",
         logo_url=None,
@@ -100,7 +97,7 @@ async def test_patch_onboarding_company_updates_company_state(client: AsyncClien
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding_queries.update_company",
+            "src.routes.onboarding.onboarding.update_company",
             AsyncMock(return_value=updated_company),
         ) as update_company,
     ):
@@ -112,22 +109,20 @@ async def test_patch_onboarding_company_updates_company_state(client: AsyncClien
 
     assert response.status_code == 200
     assert response.json()["onboarding_completed"] is True
-    update_company.assert_awaited_once_with(
-        str(current_user.company_id),
-        None,
-        "#3B5BDB",
-        True,
-        False,
-        True,
-        True,
-    )
+    update_company.assert_awaited_once()
+    assert update_company.await_args.args[0] == str(current_user.company_id)
+    update = update_company.await_args.args[1]
+    assert update.primary_color == "#3B5BDB"
+    assert update.onboarding_completed is True
+    assert update.update_primary_color is True
+    assert update.update_onboarding_completed is True
 
 
 async def test_create_onboarding_invite_returns_created_invite(client: AsyncClient) -> None:
     current_user = build_admin_user()
     access_token = security.create_access_token(current_user)
     created_at = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
-    invite = InviteCreatedResponse(
+    invite = InviteCreated(
         id=uuid4(),
         email="new.user@lekk.nl",
         role="admin",
@@ -141,14 +136,9 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding_queries.has_pending_invite",
-            AsyncMock(return_value=False),
-        ),
-        patch(
-            "src.routes.onboarding.onboarding_queries.create_invite",
+            "src.routes.onboarding.onboarding.create_invite",
             AsyncMock(return_value=invite),
         ) as create_invite,
-        patch("src.routes.onboarding.secrets.token_hex", return_value="token"),
     ):
         response = await client.post(
             "/api/v1/onboarding/invites",
@@ -163,7 +153,11 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
         "role": "admin",
         "created_at": "2026-06-01T12:00:00Z",
     }
-    assert create_invite.await_args.args[1:4] == ("NEW.User@LEKK.nl", "admin", "token")
+    assert create_invite.await_args.args == (
+        str(current_user.company_id),
+        "NEW.User@LEKK.nl",
+        "admin",
+    )
 
 
 async def test_create_onboarding_invite_rejects_duplicate_pending_invite(
@@ -179,8 +173,8 @@ async def test_create_onboarding_invite_rejects_duplicate_pending_invite(
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding_queries.has_pending_invite",
-            AsyncMock(return_value=True),
+            "src.routes.onboarding.onboarding.create_invite",
+            AsyncMock(side_effect=InviteAlreadyExists("new.user@lekk.nl")),
         ),
     ):
         response = await client.post(
@@ -198,7 +192,7 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
     access_token = security.create_access_token(current_user)
     created_at = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
     expires_at = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
-    invite = InviteResponse(
+    invite = InviteRecord(
         id=uuid4(),
         email="new.user@lekk.nl",
         role="inspector",
@@ -214,7 +208,7 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding_queries.list_invites",
+            "src.routes.onboarding.onboarding.list_invites",
             AsyncMock(return_value=[invite]),
         ),
     ):
@@ -248,7 +242,7 @@ async def test_delete_onboarding_invite_deletes_pending_invite(client: AsyncClie
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding_queries.delete_pending_invite",
+            "src.routes.onboarding.onboarding.delete_pending_invite",
             AsyncMock(return_value=True),
         ) as delete_invite,
     ):
@@ -275,7 +269,7 @@ async def test_delete_onboarding_invite_returns_not_found_for_missing_invite(
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding_queries.delete_pending_invite",
+            "src.routes.onboarding.onboarding.delete_pending_invite",
             AsyncMock(return_value=False),
         ),
     ):

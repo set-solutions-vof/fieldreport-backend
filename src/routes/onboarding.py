@@ -1,10 +1,8 @@
-import secrets
-from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from src.db import onboarding_queries
+from src.exceptions import InviteAlreadyExists
 from src.http.v1.request.onboarding import CreateInviteRequest, UpdateCompanyOnboardingRequest
 from src.http.v1.response.onboarding import (
     CompanyOnboardingResponse,
@@ -12,7 +10,9 @@ from src.http.v1.response.onboarding import (
     InviteResponse,
 )
 from src.models.auth.authentication import CurrentUser
+from src.models.onboarding import CompanyOnboardingUpdate
 from src.security.authentication import require_admin
+from src.services import onboarding
 
 router = APIRouter(tags=["Onboarding"])
 
@@ -26,7 +26,9 @@ router = APIRouter(tags=["Onboarding"])
 async def get_company(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> CompanyOnboardingResponse:
-    return await onboarding_queries.get_company(str(current_user.company_id))
+    company = await onboarding.get_company(str(current_user.company_id))
+
+    return CompanyOnboardingResponse.model_validate(company.model_dump())
 
 
 @router.patch(
@@ -40,16 +42,19 @@ async def update_company(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> CompanyOnboardingResponse:
     fields = request_body.model_dump(exclude_unset=True)
-
-    return await onboarding_queries.update_company(
+    company = await onboarding.update_company(
         str(current_user.company_id),
-        request_body.logo_url,
-        request_body.primary_color,
-        request_body.onboarding_completed,
-        "logo_url" in fields,
-        "primary_color" in fields,
-        "onboarding_completed" in fields,
+        CompanyOnboardingUpdate(
+            logo_url=request_body.logo_url,
+            primary_color=request_body.primary_color,
+            onboarding_completed=request_body.onboarding_completed,
+            update_logo_url="logo_url" in fields,
+            update_primary_color="primary_color" in fields,
+            update_onboarding_completed="onboarding_completed" in fields,
+        ),
     )
+
+    return CompanyOnboardingResponse.model_validate(company.model_dump())
 
 
 @router.post(
@@ -62,24 +67,16 @@ async def create_invite(
     request_body: CreateInviteRequest,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> InviteCreatedResponse:
-    has_pending_invite = await onboarding_queries.has_pending_invite(
-        str(current_user.company_id),
-        request_body.email,
-    )
-
-    if has_pending_invite:
+    try:
+        invite = await onboarding.create_invite(
+            str(current_user.company_id),
+            request_body.email,
+            request_body.role,
+        )
+    except InviteAlreadyExists:
         raise HTTPException(status_code=409, detail="Invite already exists")
 
-    token = secrets.token_hex(32)
-    expires_at = datetime.now(UTC) + timedelta(days=7)
-
-    return await onboarding_queries.create_invite(
-        str(current_user.company_id),
-        request_body.email,
-        request_body.role,
-        token,
-        expires_at,
-    )
+    return InviteCreatedResponse.model_validate(invite.model_dump())
 
 
 @router.get(
@@ -91,7 +88,9 @@ async def create_invite(
 async def list_invites(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> list[InviteResponse]:
-    return await onboarding_queries.list_invites(str(current_user.company_id))
+    invites = await onboarding.list_invites(str(current_user.company_id))
+
+    return [InviteResponse.model_validate(invite.model_dump()) for invite in invites]
 
 
 @router.delete(
@@ -104,7 +103,7 @@ async def delete_invite(
     invite_id: str,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> Response:
-    was_deleted = await onboarding_queries.delete_pending_invite(
+    was_deleted = await onboarding.delete_pending_invite(
         str(current_user.company_id),
         invite_id,
     )

@@ -6,8 +6,8 @@ from fastapi import HTTPException
 from starlette.datastructures import UploadFile
 
 from src.http.v1.request.inspection import CreateInspectionRequest
-from src.models.reports.metadata import ReportMetadata
 from src.models.auth.authentication import CurrentUser
+from src.models.reports.metadata import ReportMetadata
 from src.models.templates.domain import (
     TemplateScalarMetadataField,
     TemplateSelectMetadataField,

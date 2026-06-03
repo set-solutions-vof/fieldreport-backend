@@ -2,11 +2,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from src.db.onboarding_mapper import map_company, map_created_invite, map_invite
-from src.http.v1.response.onboarding import (
-    CompanyOnboardingResponse,
-    InviteCreatedResponse,
-    InviteResponse,
-)
+from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
 
 
 def test_map_company_returns_company_response() -> None:
@@ -22,7 +18,7 @@ def test_map_company_returns_company_response() -> None:
         }
     )
 
-    assert company == CompanyOnboardingResponse(
+    assert company == CompanyOnboarding(
         id=company_id,
         name="LEKK BV",
         logo_url=None,
@@ -44,7 +40,7 @@ def test_map_created_invite_returns_created_invite_response() -> None:
         },
     )
 
-    assert invite == InviteCreatedResponse(
+    assert invite == InviteCreated(
         id=invite_id,
         email="new.user@lekk.nl",
         role="admin",
@@ -68,7 +64,7 @@ def test_map_invite_returns_invite_response() -> None:
         }
     )
 
-    assert invite == InviteResponse(
+    assert invite == InviteRecord(
         id=invite_id,
         email="new.user@lekk.nl",
         role="inspector",

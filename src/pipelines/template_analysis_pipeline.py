@@ -4,7 +4,7 @@ from src.db import template_queries
 from src.llm import deepseek_client, gpt4o_client
 from src.models.templates.pipeline import TemplateAnalysisDocument
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.storage import template_file_storage
+from src.storage import blob
 from src.utils import pdf_text_extractor
 
 
@@ -47,11 +47,11 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | No
 
 async def build_template_analysis_document(
     original_file_name: str,
-    stored_file_path: str,
+    blob_key: str,
 ) -> TemplateAnalysisDocument:
-    file_content = template_file_storage.load_template_analysis_file(stored_file_path)
+    file_content = await blob.download_file("templates", blob_key)
     extracted_text, visual_summary = await asyncio.gather(
-        asyncio.to_thread(pdf_text_extractor.extract_text_from_pdf, stored_file_path),
+        asyncio.to_thread(pdf_text_extractor.extract_text_from_pdf, file_content),
         gpt4o_client.analyze_pdf_visuals(original_file_name, file_content),
     )
 

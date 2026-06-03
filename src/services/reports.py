@@ -1,7 +1,12 @@
 from src.db import report_queries, template_queries
 from src.db.report_mapper import map_report_detail_sections
 from src.models.auth.authentication import CurrentUser
-from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
+from src.models.reports.report import (
+    ReportDetail,
+    ReportDetailSection,
+    ReportSection,
+    ReportSummary,
+)
 from src.models.templates.domain import TemplateSection
 
 
@@ -52,7 +57,9 @@ async def list_reports_for_user(user: CurrentUser) -> list[ReportSummary]:
     return await report_queries.list_report_summaries_by_company_id(str(user.company_id))
 
 
-def apply_template_section(section: ReportSection, template_section: TemplateSection) -> ReportSection:
+def apply_template_section[SectionT: ReportSection | ReportDetailSection](
+    section: SectionT, template_section: TemplateSection
+) -> SectionT:
     return section.model_copy(
         update={
             "label": template_section.label,
@@ -60,4 +67,3 @@ def apply_template_section(section: ReportSection, template_section: TemplateSec
             "groups": template_section.groups,
         }
     )
-

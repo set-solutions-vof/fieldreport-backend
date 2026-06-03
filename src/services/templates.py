@@ -1,8 +1,10 @@
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import UploadFile
 
 from src.db import template_queries
+from src.exceptions import TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.templates import status_resolver
 from src.models.templates.configuration import (
@@ -11,8 +13,9 @@ from src.models.templates.configuration import (
     TemplateStatusProcessing,
 )
 from src.models.templates.domain import TemplateStructure
+from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.storage import template_file_storage
+from src.storage import blob
 
 
 async def load_template_configuration(company_id: str) -> TemplateStatus:
@@ -25,10 +28,11 @@ async def get_template_analysis_job(
     user: CurrentUser,
     job_id: str,
 ) -> TemplateAnalysisJobRecord:
-    job_row = await template_queries.get_template_analysis_job(job_id, str(user.company_id))
+    company_id = str(user.company_id)
+    job_row = await template_queries.get_template_analysis_job(job_id, company_id)
 
     if job_row is None:
-        raise LookupError
+        raise TemplateAnalysisJobNotFound(job_id, company_id)
 
     return job_row
 
@@ -39,11 +43,15 @@ async def start_template_analysis(
 ) -> TemplateStatusProcessing:
     company_id = str(user.company_id)
     job_id = str(uuid4())
-    stored_files = await template_file_storage.store_template_analysis_files(
-        company_id,
-        job_id,
-        files,
-    )
+
+    stored_files: list[TemplateAnalysisFile] = []
+    for file in files:
+        original_file_name = file.filename or f"{uuid4()}.pdf"
+        key = f"{company_id}/{job_id}/{uuid4()}{Path(original_file_name).suffix}"
+        await blob.upload_form_file("templates", key, file)
+        stored_files.append(
+            TemplateAnalysisFile(original_file_name=original_file_name, stored_file_path=key)
+        )
 
     await template_queries.replace_template_analysis_job(job_id, company_id, stored_files)
 

@@ -24,17 +24,14 @@ class Settings(BaseSettings):
     gpt4o_transcribe_api_version: str = Field(
         default="2024-10-21", validation_alias="GPT4O_TRANSCRIBE_API_VERSION"
     )
-    template_analysis_stored_file_path: str = Field(
-        default=".data/template-analysis", validation_alias="TEMPLATE_ANALYSIS_STORAGE_PATH"
-    )
     template_analysis_worker_poll_seconds: float = Field(
         default=2.0, validation_alias="TEMPLATE_ANALYSIS_WORKER_POLL_SECONDS"
     )
-    inspection_stored_file_path: str = Field(
-        default=".data/inspections", validation_alias="INSPECTION_STORAGE_PATH"
-    )
     audio_pipeline_worker_poll_seconds: float = Field(
         default=5.0, validation_alias="AUDIO_PIPELINE_WORKER_POLL_SECONDS"
+    )
+    azure_storage_connection_string: str = Field(
+        default="", validation_alias="AZURE_STORAGE_CONNECTION_STRING"
     )
 
 
