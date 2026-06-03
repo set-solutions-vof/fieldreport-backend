@@ -32,7 +32,7 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
             "status": "draft",
             "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
             "inspection_date": inspection_date,
-            "inspector_name": "Jeroen van Dijk",
+            "inspector_name": "Inspector User",
         },
         {
             "id": uuid4(),
@@ -40,7 +40,7 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
             "status": "approved",
             "metadata": {"naam_opdrachtgever": "Globex", "adres_schadeadres": "Second Street 2"},
             "inspection_date": inspection_date,
-            "inspector_name": "Sanne de Vries",
+            "inspector_name": "Admin User",
         },
     ]
     connection = build_connection(rows)
@@ -60,7 +60,7 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
     ]
     assert reports[0].metadata.model_dump()["adres_schadeadres"] == "Main Street 1"
     assert reports[0].inspection_date == inspection_date
-    assert reports[0].inspector_name == "Jeroen van Dijk"
+    assert reports[0].inspector_name == "Inspector User"
     connection.fetch.assert_awaited_once()
     connection.close.assert_awaited_once()
 
@@ -75,7 +75,7 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
         "status": "draft",
         "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         "inspection_date": inspection_date,
-        "inspector_name": "Jeroen van Dijk",
+        "inspector_name": "Inspector User",
         "updated_at": updated_at,
     }
     connection = build_connection(row=row)
@@ -96,7 +96,7 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
         }
     )
     assert report.inspection_date == inspection_date
-    assert report.inspector_name == "Jeroen van Dijk"
+    assert report.inspector_name == "Inspector User"
     assert report.updated_at == updated_at
     assert report.sections == []
     connection.fetchrow.assert_awaited_once()

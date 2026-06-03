@@ -21,7 +21,6 @@ from src.models.templates.domain import (
     TemplateStructure,
 )
 from src.pipelines import audio_pipeline
-from src.pipelines.audio_pipeline import PipelineContext
 
 
 def build_report(status: str = "generating") -> ReportPipelineContext:
@@ -152,8 +151,8 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
             ),
         ),
         patch.object(
-            audio_pipeline.inspection_file_storage,
-            "load_inspection_file",
+            audio_pipeline.blob,
+            "download_file",
             side_effect=[b"audio", b"photo"],
         ),
         patch.object(
@@ -219,7 +218,7 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
         await audio_pipeline.run_audio_pipeline("report-id")
 
     insert_section.assert_awaited_once()
-    assert insert_section.await_args.args[0] == "report-id"
+    assert insert_section.await_args.args[0] == str(report.id)
     assert insert_section.await_args.args[1] == str(report.company_id)
     assert insert_section.await_args.args[2] == generated_section
     insert_segment_source.assert_awaited_once_with("section-id", str(segment_id))
@@ -268,8 +267,8 @@ async def test_run_audio_pipeline_marks_failed_when_media_file_fails() -> None:
             AsyncMock(return_value=[]),
         ),
         patch.object(
-            audio_pipeline.inspection_file_storage,
-            "load_inspection_file",
+            audio_pipeline.blob,
+            "download_file",
             side_effect=ValueError("missing file"),
         ),
         patch.object(audio_pipeline.report_queries, "set_report_status", AsyncMock()) as set_status,
@@ -378,12 +377,7 @@ def test_build_report_generation_prompt_omits_context_when_empty() -> None:
 
 
 async def test_transcribe_inspection_audio_files_persists_transcription() -> None:
-    context = PipelineContext(
-        report_id="report-id",
-        inspection_id="inspection-id",
-        company_id="company-id",
-        template_id="template-id",
-    )
+    report = build_report()
     repository = MagicMock()
     repository.insert_transcription = AsyncMock(return_value="transcription-id")
     repository.insert_transcription_segments = AsyncMock(return_value=["segment-id"])
@@ -414,8 +408,8 @@ async def test_transcribe_inspection_audio_files_persists_transcription() -> Non
             ),
         ),
         patch.object(
-            audio_pipeline.inspection_file_storage,
-            "load_inspection_file",
+            audio_pipeline.blob,
+            "download_file",
             return_value=b"audio",
         ),
         patch.object(
@@ -424,19 +418,14 @@ async def test_transcribe_inspection_audio_files_persists_transcription() -> Non
             AsyncMock(return_value=transcription_result),
         ),
     ):
-        await audio_pipeline.transcribe_inspection_audio_files(context, repository)
+        await audio_pipeline.transcribe_inspection_audio_files(report, repository)
 
     repository.insert_transcription.assert_awaited_once()
     repository.insert_transcription_segments.assert_awaited_once()
 
 
 async def test_analyze_inspection_photo_files_persists_analysis() -> None:
-    context = PipelineContext(
-        report_id="report-id",
-        inspection_id="inspection-id",
-        company_id="company-id",
-        template_id="template-id",
-    )
+    report = build_report()
     repository = MagicMock()
     repository.insert_image_analysis = AsyncMock(return_value="image-id")
 
@@ -454,8 +443,8 @@ async def test_analyze_inspection_photo_files_persists_analysis() -> None:
             ),
         ),
         patch.object(
-            audio_pipeline.inspection_file_storage,
-            "load_inspection_file",
+            audio_pipeline.blob,
+            "download_file",
             return_value=b"photo",
         ),
         patch.object(
@@ -464,18 +453,13 @@ async def test_analyze_inspection_photo_files_persists_analysis() -> None:
             AsyncMock(return_value="Fotoanalyse"),
         ),
     ):
-        await audio_pipeline.analyze_inspection_photo_files(context, repository)
+        await audio_pipeline.analyze_inspection_photo_files(report, repository)
 
     repository.insert_image_analysis.assert_awaited_once()
 
 
 async def test_analyze_inspection_photo_files_raises_when_photo_analysis_fails() -> None:
-    context = PipelineContext(
-        report_id="report-id",
-        inspection_id="inspection-id",
-        company_id="company-id",
-        template_id="template-id",
-    )
+    report = build_report()
     repository = MagicMock()
 
     with (
@@ -492,13 +476,13 @@ async def test_analyze_inspection_photo_files_raises_when_photo_analysis_fails()
             ),
         ),
         patch.object(
-            audio_pipeline.inspection_file_storage,
-            "load_inspection_file",
+            audio_pipeline.blob,
+            "download_file",
             side_effect=ValueError("missing photo"),
         ),
     ):
         with pytest.raises(ValueError, match="missing photo"):
-            await audio_pipeline.analyze_inspection_photo_files(context, repository)
+            await audio_pipeline.analyze_inspection_photo_files(report, repository)
 
 
 async def test_generate_report_sections_parses_llm_response() -> None:
@@ -536,12 +520,7 @@ async def test_generate_report_sections_parses_llm_response() -> None:
 
 
 async def test_persist_pipeline_results_links_evidence() -> None:
-    context = PipelineContext(
-        report_id="report-id",
-        inspection_id="inspection-id",
-        company_id="company-id",
-        template_id="template-id",
-    )
+    report = build_report()
     repository = MagicMock()
     repository.insert_report_section = AsyncMock(return_value="section-id")
     repository.insert_report_section_source_transcription = AsyncMock()
@@ -562,7 +541,7 @@ async def test_persist_pipeline_results_links_evidence() -> None:
 
     await audio_pipeline.persist_pipeline_results(
         repository,
-        context,
+        report,
         template_sections,
         generated_sections,
         [StoredTranscriptionSegment(id=segment_id, text="Segment")],

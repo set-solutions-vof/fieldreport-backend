@@ -10,7 +10,7 @@ from src.http.v1.response.onboarding import (
     InviteResponse,
 )
 from src.models.auth.authentication import CurrentUser
-from src.models.onboarding import CompanyOnboardingUpdate
+from src.models.onboarding.company import CompanyOnboardingUpdate
 from src.security.authentication import require_admin
 from src.services import onboarding
 

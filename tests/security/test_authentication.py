@@ -12,9 +12,9 @@ def build_current_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="sanne.devries@lekk.nl",
-        name="Sanne de Vries",
+        company_name="Demo Company",
+        email="admin.user@example.com",
+        name="Admin User",
         role="admin",
     )
 
@@ -23,9 +23,9 @@ def build_inspector_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="jeroen.vandijk@lekk.nl",
-        name="Jeroen van Dijk",
+        company_name="Demo Company",
+        email="inspector.user@example.com",
+        name="Inspector User",
         role="inspector",
     )
 

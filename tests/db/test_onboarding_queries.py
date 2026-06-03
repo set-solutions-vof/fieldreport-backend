@@ -4,7 +4,8 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from src.db import onboarding_queries
-from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
+from src.models.onboarding.company import CompanyOnboarding
+from src.models.onboarding.invite import InviteCreated, InviteRecord
 
 
 def build_connection(
@@ -22,7 +23,7 @@ async def test_get_company_returns_company_response() -> None:
     company_id = uuid4()
     row = {
         "id": company_id,
-        "name": "LEKK BV",
+        "name": "Demo Company",
         "logo_url": None,
         "primary_color": "#3B5BDB",
         "onboarding_completed": False,
@@ -37,7 +38,7 @@ async def test_get_company_returns_company_response() -> None:
 
     assert company == CompanyOnboarding(
         id=company_id,
-        name="LEKK BV",
+        name="Demo Company",
         logo_url=None,
         primary_color="#3B5BDB",
         onboarding_completed=False,
@@ -49,7 +50,7 @@ async def test_update_company_returns_updated_company_response() -> None:
     company_id = uuid4()
     row = {
         "id": company_id,
-        "name": "LEKK BV",
+        "name": "Demo Company",
         "logo_url": "https://cdn.example/logo.png",
         "primary_color": "#3B5BDB",
         "onboarding_completed": True,
@@ -93,7 +94,7 @@ async def test_has_pending_invite_returns_true_for_existing_pending_invite() -> 
     ):
         has_pending_invite = await onboarding_queries.has_pending_invite(
             str(uuid4()),
-            "new.user@lekk.nl",
+            "new.user@example.com",
         )
 
     assert has_pending_invite is True
@@ -106,7 +107,7 @@ async def test_create_invite_returns_created_invite_response() -> None:
     expires_at = datetime.now(UTC)
     row = {
         "id": invite_id,
-        "email": "new.user@lekk.nl",
+        "email": "new.user@example.com",
         "role": "admin",
         "created_at": created_at,
     }
@@ -118,7 +119,7 @@ async def test_create_invite_returns_created_invite_response() -> None:
     ):
         invite = await onboarding_queries.create_invite(
             str(uuid4()),
-            "new.user@lekk.nl",
+            "new.user@example.com",
             "admin",
             "token",
             expires_at,
@@ -126,7 +127,7 @@ async def test_create_invite_returns_created_invite_response() -> None:
 
     assert invite == InviteCreated(
         id=invite_id,
-        email="new.user@lekk.nl",
+        email="new.user@example.com",
         role="admin",
         created_at=created_at,
     )
@@ -139,7 +140,7 @@ async def test_list_invites_returns_company_invites() -> None:
     invite_id = uuid4()
     row = {
         "id": invite_id,
-        "email": "new.user@lekk.nl",
+        "email": "new.user@example.com",
         "role": "inspector",
         "is_accepted": False,
         "created_at": created_at,
@@ -156,7 +157,7 @@ async def test_list_invites_returns_company_invites() -> None:
     assert invites == [
         InviteRecord(
             id=invite_id,
-            email="new.user@lekk.nl",
+            email="new.user@example.com",
             role="inspector",
             is_accepted=False,
             created_at=created_at,

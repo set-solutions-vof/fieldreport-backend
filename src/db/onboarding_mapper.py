@@ -1,6 +1,7 @@
 import asyncpg
 
-from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
+from src.models.onboarding.company import CompanyOnboarding
+from src.models.onboarding.invite import InviteCreated, InviteRecord
 
 
 def map_company(row: asyncpg.Record) -> CompanyOnboarding:

@@ -23,7 +23,7 @@ def build_report_summary(company_id: UUID) -> ReportSummary:
         status="draft",
         metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
     )
 
 
@@ -31,7 +31,7 @@ async def test_list_reports_for_user_returns_repository_reports() -> None:
     current_user = CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
+        company_name="Demo Company",
         email="demo@fieldreport.local",
         name="Demo User",
         role="admin",
@@ -56,7 +56,7 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
     current_user = CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
+        company_name="Demo Company",
         email="demo@fieldreport.local",
         name="Demo User",
         role="admin",
@@ -67,7 +67,7 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
         status="draft",
         metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
         sections=[],
     )
     shared_transcription_segment_id = uuid4()
@@ -176,7 +176,7 @@ async def test_update_report_section_returns_repository_section() -> None:
     current_user = CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
+        company_name="Demo Company",
         email="demo@fieldreport.local",
         name="Demo User",
         role="inspector",

@@ -43,7 +43,7 @@ def test_report_detail_response_serializes_missing_updated_at() -> None:
         status="draft",
         metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
         updated_at=None,
         sections=[],
         evidence_items=[],
@@ -60,7 +60,7 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
         status="draft",
         metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
         sections=[
             ReportDetailSection(
                 id=section_id,

@@ -9,7 +9,8 @@ from httpx import ASGITransport, AsyncClient
 from src.exceptions import InviteAlreadyExists
 from src.main import app
 from src.models.auth.authentication import CurrentUser
-from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
+from src.models.onboarding.company import CompanyOnboarding
+from src.models.onboarding.invite import InviteCreated, InviteRecord
 from src.security import authentication as security
 from src.services import authentication as auth_service
 
@@ -24,8 +25,8 @@ def build_admin_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="admin@lekk.nl",
+        company_name="Demo Company",
+        email="admin@example.com",
         name="Admin",
         role="admin",
     )
@@ -35,8 +36,8 @@ def build_inspector_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="inspector@lekk.nl",
+        company_name="Demo Company",
+        email="inspector@example.com",
         name="Inspector",
         role="inspector",
     )
@@ -47,7 +48,7 @@ async def test_get_onboarding_company_returns_company_state(client: AsyncClient)
     access_token = security.create_access_token(current_user)
     company = CompanyOnboarding(
         id=current_user.company_id,
-        name="LEKK BV",
+        name="Demo Company",
         logo_url="https://cdn.example/logo.png",
         primary_color="#3B5BDB",
         onboarding_completed=False,
@@ -72,7 +73,7 @@ async def test_get_onboarding_company_returns_company_state(client: AsyncClient)
     assert response.status_code == 200
     assert response.json() == {
         "id": str(current_user.company_id),
-        "name": "LEKK BV",
+        "name": "Demo Company",
         "logo_url": "https://cdn.example/logo.png",
         "primary_color": "#3B5BDB",
         "onboarding_completed": False,
@@ -84,7 +85,7 @@ async def test_patch_onboarding_company_updates_company_state(client: AsyncClien
     access_token = security.create_access_token(current_user)
     updated_company = CompanyOnboarding(
         id=current_user.company_id,
-        name="LEKK BV",
+        name="Demo Company",
         logo_url=None,
         primary_color="#3B5BDB",
         onboarding_completed=True,
@@ -124,7 +125,7 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
     created_at = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
     invite = InviteCreated(
         id=uuid4(),
-        email="new.user@lekk.nl",
+        email="new.user@example.com",
         role="admin",
         created_at=created_at,
     )
@@ -143,19 +144,19 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
         response = await client.post(
             "/api/v1/onboarding/invites",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={"email": "NEW.User@LEKK.nl", "role": "admin"},
+            json={"email": "NEW.User@example.com", "role": "admin"},
         )
 
     assert response.status_code == 200
     assert response.json() == {
         "id": str(invite.id),
-        "email": "new.user@lekk.nl",
+        "email": "new.user@example.com",
         "role": "admin",
         "created_at": "2026-06-01T12:00:00Z",
     }
     assert create_invite.await_args.args == (
         str(current_user.company_id),
-        "NEW.User@LEKK.nl",
+        "NEW.User@example.com",
         "admin",
     )
 
@@ -174,13 +175,13 @@ async def test_create_onboarding_invite_rejects_duplicate_pending_invite(
         ),
         patch(
             "src.routes.onboarding.onboarding.create_invite",
-            AsyncMock(side_effect=InviteAlreadyExists("new.user@lekk.nl")),
+            AsyncMock(side_effect=InviteAlreadyExists("new.user@example.com")),
         ),
     ):
         response = await client.post(
             "/api/v1/onboarding/invites",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={"email": "new.user@lekk.nl", "role": "inspector"},
+            json={"email": "new.user@example.com", "role": "inspector"},
         )
 
     assert response.status_code == 409
@@ -194,7 +195,7 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
     expires_at = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
     invite = InviteRecord(
         id=uuid4(),
-        email="new.user@lekk.nl",
+        email="new.user@example.com",
         role="inspector",
         is_accepted=False,
         created_at=created_at,
@@ -221,7 +222,7 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
     assert response.json() == [
         {
             "id": str(invite.id),
-            "email": "new.user@lekk.nl",
+            "email": "new.user@example.com",
             "role": "inspector",
             "is_accepted": False,
             "created_at": "2026-06-01T12:00:00Z",

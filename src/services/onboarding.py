@@ -4,12 +4,8 @@ from datetime import UTC, datetime, timedelta
 from src.db import onboarding_queries
 from src.exceptions import InviteAlreadyExists
 from src.models.enums.user_role import UserRole
-from src.models.onboarding import (
-    CompanyOnboarding,
-    CompanyOnboardingUpdate,
-    InviteCreated,
-    InviteRecord,
-)
+from src.models.onboarding.company import CompanyOnboarding, CompanyOnboardingUpdate
+from src.models.onboarding.invite import InviteCreated, InviteRecord
 
 
 async def get_company(company_id: str) -> CompanyOnboarding:

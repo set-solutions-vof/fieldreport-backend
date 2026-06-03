@@ -2,7 +2,8 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from src.db.onboarding_mapper import map_company, map_created_invite, map_invite
-from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
+from src.models.onboarding.company import CompanyOnboarding
+from src.models.onboarding.invite import InviteCreated, InviteRecord
 
 
 def test_map_company_returns_company_response() -> None:
@@ -11,7 +12,7 @@ def test_map_company_returns_company_response() -> None:
     company = map_company(
         {
             "id": company_id,
-            "name": "LEKK BV",
+            "name": "Demo Company",
             "logo_url": None,
             "primary_color": "#3B5BDB",
             "onboarding_completed": True,
@@ -20,7 +21,7 @@ def test_map_company_returns_company_response() -> None:
 
     assert company == CompanyOnboarding(
         id=company_id,
-        name="LEKK BV",
+        name="Demo Company",
         logo_url=None,
         primary_color="#3B5BDB",
         onboarding_completed=True,
@@ -34,7 +35,7 @@ def test_map_created_invite_returns_created_invite_response() -> None:
     invite = map_created_invite(
         {
             "id": invite_id,
-            "email": "new.user@lekk.nl",
+            "email": "new.user@example.com",
             "role": "admin",
             "created_at": created_at,
         },
@@ -42,7 +43,7 @@ def test_map_created_invite_returns_created_invite_response() -> None:
 
     assert invite == InviteCreated(
         id=invite_id,
-        email="new.user@lekk.nl",
+        email="new.user@example.com",
         role="admin",
         created_at=created_at,
     )
@@ -56,7 +57,7 @@ def test_map_invite_returns_invite_response() -> None:
     invite = map_invite(
         {
             "id": invite_id,
-            "email": "new.user@lekk.nl",
+            "email": "new.user@example.com",
             "role": "inspector",
             "is_accepted": False,
             "created_at": created_at,
@@ -66,7 +67,7 @@ def test_map_invite_returns_invite_response() -> None:
 
     assert invite == InviteRecord(
         id=invite_id,
-        email="new.user@lekk.nl",
+        email="new.user@example.com",
         role="inspector",
         is_accepted=False,
         created_at=created_at,

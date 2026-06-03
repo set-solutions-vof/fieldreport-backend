@@ -11,9 +11,9 @@ from src.pipelines import template_analysis_pipeline
 async def test_build_template_analysis_document_combines_text_and_visual_outputs() -> None:
     with (
         patch.object(
-            template_analysis_pipeline.template_file_storage,
-            "load_template_analysis_file",
-            return_value=b"pdf-bytes",
+            template_analysis_pipeline.blob,
+            "download_file",
+            AsyncMock(return_value=b"pdf-bytes"),
         ),
         patch.object(
             template_analysis_pipeline.pdf_text_extractor,

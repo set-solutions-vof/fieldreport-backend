@@ -28,15 +28,15 @@ async def client() -> AsyncIterator[AsyncClient]:
 
 
 def build_authenticated_user() -> AuthenticatedUser:
-    password_hash = bcrypt.hashpw(b"LekkDemo2026!", bcrypt.gensalt()).decode()
+    password_hash = bcrypt.hashpw(b"TestPassword2026!", bcrypt.gensalt()).decode()
 
     return AuthenticatedUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="sanne.devries@lekk.nl",
+        company_name="Demo Company",
+        email="admin.user@example.com",
         password_hash=password_hash,
-        name="Sanne de Vries",
+        name="Admin User",
         role="admin",
     )
 
@@ -45,9 +45,9 @@ def build_current_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="jeroen.vandijk@lekk.nl",
-        name="Jeroen van Dijk",
+        company_name="Demo Company",
+        email="inspector.user@example.com",
+        name="Inspector User",
         role="inspector",
     )
 
@@ -59,7 +59,7 @@ def build_report_summary(company_id: UUID) -> ReportSummary:
         status="draft",
         metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
     )
 
 
@@ -71,7 +71,7 @@ async def test_login_json_returns_tokens_for_valid_credentials(client: AsyncClie
     ):
         response = await client.post(
             "/api/v1/auth/login/json",
-            json={"email": authenticated_user.email, "password": "LekkDemo2026!"},
+            json={"email": authenticated_user.email, "password": "TestPassword2026!"},
         )
 
     assert response.status_code == 200
@@ -88,7 +88,7 @@ async def test_login_form_returns_tokens_for_valid_credentials(client: AsyncClie
     ):
         response = await client.post(
             "/api/v1/auth/login",
-            data={"username": authenticated_user.email, "password": "LekkDemo2026!"},
+            data={"username": authenticated_user.email, "password": "TestPassword2026!"},
         )
 
     assert response.status_code == 200
@@ -205,7 +205,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
             "status": "draft",
             "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
             "inspection_date": "2026-05-08T12:30:00Z",
-            "inspector_name": "Jeroen van Dijk",
+            "inspector_name": "Inspector User",
         }
     ]
 
@@ -222,7 +222,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         status="draft",
         metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
         updated_at=updated_at,
         sections=[
             ReportDetailSection(
@@ -268,7 +268,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
         "status": "draft",
         "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         "inspection_date": "2026-05-08T12:30:00Z",
-        "inspector_name": "Jeroen van Dijk",
+        "inspector_name": "Inspector User",
         "updated_at": "2026-05-09T08:15:00Z",
         "sections": [
             {

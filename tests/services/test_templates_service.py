@@ -10,7 +10,6 @@ from src.exceptions import TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.enums.template_analysis_job_status import TemplateAnalysisJobStatus
 from src.models.templates.domain import TemplateSection, TemplateStructure
-from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import TemplateAnalysisJobRecord
 from src.services import templates as templates_service
 
@@ -44,7 +43,7 @@ def build_current_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
+        company_name="Demo Company",
         email="demo@fieldreport.local",
         name="Demo User",
         role="admin",
@@ -83,17 +82,12 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
         build_upload_file("one.pdf"),
         build_upload_file("two.pdf"),
     ]
-    stored_files = [
-        TemplateAnalysisFile(original_file_name="one.pdf", stored_file_path="/tmp/one.pdf"),
-        TemplateAnalysisFile(original_file_name="two.pdf", stored_file_path="/tmp/two.pdf"),
-    ]
-
     with (
         patch.object(
-            templates_service.template_file_storage,
-            "store_template_analysis_files",
-            AsyncMock(return_value=stored_files),
-        ) as store_files,
+            templates_service.blob,
+            "upload_form_file",
+            AsyncMock(return_value="https://storage.example/blob"),
+        ) as upload_file,
         patch.object(
             templates_service.template_queries,
             "replace_template_analysis_job",
@@ -104,8 +98,10 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
 
     assert result.status == "processing"
     assert result.source_reports_count == 2
-    store_files.assert_awaited_once_with(str(current_user.company_id), result.job_id, files)
-    replace_job.assert_awaited_once_with(result.job_id, str(current_user.company_id), stored_files)
+    assert upload_file.await_count == 2
+    replace_job.assert_awaited_once()
+    stored_files = replace_job.await_args.args[2]
+    assert [file.original_file_name for file in stored_files] == ["one.pdf", "two.pdf"]
 
 
 async def test_get_template_analysis_job_returns_pending_review_job() -> None:

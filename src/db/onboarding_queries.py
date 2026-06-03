@@ -5,7 +5,8 @@ import asyncpg
 
 from src.db.connection import get_connection_url
 from src.db.onboarding_mapper import map_company, map_created_invite, map_invite
-from src.models.onboarding import CompanyOnboarding, InviteCreated, InviteRecord
+from src.models.onboarding.company import CompanyOnboarding
+from src.models.onboarding.invite import InviteCreated, InviteRecord
 
 
 async def get_company(company_id: str) -> CompanyOnboarding:

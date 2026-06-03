@@ -33,9 +33,9 @@ def build_current_user(*, role: str = "admin") -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="jeroen.vandijk@lekk.nl",
-        name="Jeroen van Dijk",
+        company_name="Demo Company",
+        email="inspector.user@example.com",
+        name="Inspector User",
         role=role,
     )
 

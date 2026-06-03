@@ -5,19 +5,15 @@ from uuid import uuid4
 import pytest
 
 from src.exceptions import InviteAlreadyExists
-from src.models.onboarding import (
-    CompanyOnboarding,
-    CompanyOnboardingUpdate,
-    InviteCreated,
-    InviteRecord,
-)
+from src.models.onboarding.company import CompanyOnboarding, CompanyOnboardingUpdate
+from src.models.onboarding.invite import InviteCreated, InviteRecord
 from src.services import onboarding as onboarding_service
 
 
 async def test_get_company_returns_company() -> None:
     company = CompanyOnboarding(
         id=uuid4(),
-        name="LEKK BV",
+        name="Demo Company",
         logo_url=None,
         primary_color="#3B5BDB",
         onboarding_completed=False,
@@ -36,7 +32,7 @@ async def test_get_company_returns_company() -> None:
 async def test_update_company_returns_updated_company() -> None:
     company = CompanyOnboarding(
         id=uuid4(),
-        name="LEKK BV",
+        name="Demo Company",
         logo_url="https://cdn.example/logo.png",
         primary_color="#3B5BDB",
         onboarding_completed=True,
@@ -74,7 +70,7 @@ async def test_create_invite_returns_created_invite() -> None:
     created_at = datetime.now(UTC)
     invite = InviteCreated(
         id=uuid4(),
-        email="new.user@lekk.nl",
+        email="new.user@example.com",
         role="admin",
         created_at=created_at,
     )
@@ -94,13 +90,13 @@ async def test_create_invite_returns_created_invite() -> None:
     ):
         result = await onboarding_service.create_invite(
             company_id,
-            "new.user@lekk.nl",
+            "new.user@example.com",
             "admin",
         )
 
     assert result == invite
     assert create_invite.await_args.args[0] == company_id
-    assert create_invite.await_args.args[1:3] == ("new.user@lekk.nl", "admin")
+    assert create_invite.await_args.args[1:3] == ("new.user@example.com", "admin")
     assert create_invite.await_args.args[3] == "token"
 
 
@@ -113,7 +109,7 @@ async def test_create_invite_raises_when_pending_invite_exists() -> None:
         with pytest.raises(InviteAlreadyExists):
             await onboarding_service.create_invite(
                 str(uuid4()),
-                "new.user@lekk.nl",
+                "new.user@example.com",
                 "inspector",
             )
 
@@ -121,7 +117,7 @@ async def test_create_invite_raises_when_pending_invite_exists() -> None:
 async def test_list_invites_returns_invites() -> None:
     invite = InviteRecord(
         id=uuid4(),
-        email="new.user@lekk.nl",
+        email="new.user@example.com",
         role="inspector",
         created_at=datetime.now(UTC),
         expires_at=datetime.now(UTC),

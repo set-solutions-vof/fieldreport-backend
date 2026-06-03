@@ -22,8 +22,8 @@ def build_admin_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="admin@lekk.nl",
+        company_name="Demo Company",
+        email="admin@example.com",
         name="Admin",
         role="admin",
     )
