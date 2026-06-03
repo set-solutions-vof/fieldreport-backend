@@ -182,11 +182,14 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             AsyncMock(),
         ) as delete_job,
     ):
-        result = await templates_service.confirm_template(current_user, sections)
+        result = await templates_service.confirm_template(
+            current_user, TemplateStructure(sections=sections)
+        )
 
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "source_reports_count": 3,
+        "metadata_fields": [],
         "sections": [
             {
                 "id": "summary",

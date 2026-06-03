@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 from src.db import report_queries
+from src.models.reports.metadata import ReportMetadata
 from src.db.report_mapper import map_report_detail_sections
 from src.models.reports.transcription import TranscriptionSegment
 
@@ -30,8 +31,7 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
             "id": uuid4(),
             "company_id": company_id,
             "status": "draft",
-            "client_name": "ACME",
-            "address": "Main Street 1",
+            "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
             "inspection_date": inspection_date,
             "inspector_name": "Jeroen van Dijk",
         },
@@ -39,8 +39,7 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
             "id": uuid4(),
             "company_id": company_id,
             "status": "approved",
-            "client_name": "Globex",
-            "address": "Second Street 2",
+            "metadata": {"naam_opdrachtgever": "Globex", "adres_schadeadres": "Second Street 2"},
             "inspection_date": inspection_date,
             "inspector_name": "Sanne de Vries",
         },
@@ -56,8 +55,10 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
     assert [report.id for report in reports] == [rows[0]["id"], rows[1]["id"]]
     assert all(report.company_id == company_id for report in reports)
     assert [report.status for report in reports] == ["draft", "approved"]
-    assert [report.client_name for report in reports] == ["ACME", "Globex"]
-    assert reports[0].address == "Main Street 1"
+    assert [
+        report.metadata.model_dump()["naam_opdrachtgever"] for report in reports
+    ] == ["ACME", "Globex"]
+    assert reports[0].metadata.model_dump()["adres_schadeadres"] == "Main Street 1"
     assert reports[0].inspection_date == inspection_date
     assert reports[0].inspector_name == "Jeroen van Dijk"
     connection.fetch.assert_awaited_once()
@@ -72,8 +73,7 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     row = {
         "id": report_id,
         "status": "draft",
-        "client_name": "ACME",
-        "address": "Main Street 1",
+        "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         "inspection_date": inspection_date,
         "inspector_name": "Jeroen van Dijk",
         "updated_at": updated_at,
@@ -89,8 +89,12 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     assert report is not None
     assert report.id == report_id
     assert report.status == "draft"
-    assert report.client_name == "ACME"
-    assert report.address == "Main Street 1"
+    assert report.metadata == ReportMetadata.model_validate(
+        {
+            "naam_opdrachtgever": "ACME",
+            "adres_schadeadres": "Main Street 1",
+        }
+    )
     assert report.inspection_date == inspection_date
     assert report.inspector_name == "Jeroen van Dijk"
     assert report.updated_at == updated_at
@@ -233,7 +237,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         "src.db.report_queries.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
-        rows = await report_queries.fetch_report_section_rows(str(uuid4()))
+        rows = await report_queries.fetch_report_section_rows(str(uuid4()), str(uuid4()))
         sections, evidence_items = map_report_detail_sections(rows)
 
     assert [section.id for section in sections] == [
@@ -292,6 +296,7 @@ async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None
 async def test_get_report_for_pipeline_returns_report_context() -> None:
     from src.models.reports.pipeline import ReportPipelineContext
 
+    metadata = {"type_onderzoek": "Lekdetectie", "type_klant": "Zakelijk"}
     row = {
         "id": uuid4(),
         "inspection_id": uuid4(),
@@ -299,8 +304,7 @@ async def test_get_report_for_pipeline_returns_report_context() -> None:
         "template_id": uuid4(),
         "status": "generating",
         "extra_context": "",
-        "investigation_type": "Lekdetectie",
-        "client_type": "Zakelijk",
+        "metadata": metadata,
     }
     connection = build_connection(row=row)
 

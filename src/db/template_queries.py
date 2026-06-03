@@ -349,7 +349,7 @@ async def get_template_analysis_job_files(job_id: str) -> list[TemplateAnalysisF
     return [map_template_analysis_file(row) for row in rows]
 
 
-async def fetch_template_structure(template_id: str) -> TemplateStructure:
+async def fetch_template_structure(template_id: str, company_id: str) -> TemplateStructure:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
@@ -358,8 +358,10 @@ async def fetch_template_structure(template_id: str) -> TemplateStructure:
             SELECT structure
             FROM templates
             WHERE id = $1::uuid
+            AND company_id = $2::uuid
             """,
             template_id,
+            company_id,
         )
     finally:
         await connection.close()

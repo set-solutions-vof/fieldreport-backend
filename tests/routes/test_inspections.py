@@ -2,11 +2,17 @@ from io import BytesIO
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+from fastapi import HTTPException
 from starlette.datastructures import UploadFile
 
 from src.http.v1.request.inspection import CreateInspectionRequest
+from src.models.reports.metadata import ReportMetadata
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.domain import TemplateStructure
+from src.models.templates.domain import (
+    TemplateScalarMetadataField,
+    TemplateSelectMetadataField,
+    TemplateStructure,
+)
 from src.models.templates.records import ActiveCompanyTemplateRecord
 from src.routes import inspections
 
@@ -34,7 +40,37 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
             AsyncMock(
                 return_value=ActiveCompanyTemplateRecord(
                     current_template_id=template_id,
-                    structure=TemplateStructure(sections=[]),
+                    structure=TemplateStructure(
+                        metadata_fields=[
+                            TemplateSelectMetadataField(
+                                key="type_onderzoek",
+                                label="Type onderzoek",
+                                type="select",
+                                options=["Lekdetectie"],
+                                required=True,
+                            ),
+                            TemplateSelectMetadataField(
+                                key="type_klant",
+                                label="Type klant",
+                                type="select",
+                                options=["Zakelijk"],
+                                required=True,
+                            ),
+                            TemplateScalarMetadataField(
+                                key="naam_opdrachtgever",
+                                label="Naam opdrachtgever",
+                                type="text",
+                                required=True,
+                            ),
+                            TemplateScalarMetadataField(
+                                key="adres_schadeadres",
+                                label="Adres schadeadres",
+                                type="text",
+                                required=True,
+                            ),
+                        ],
+                        sections=[],
+                    ),
                 )
             ),
         ),
@@ -61,10 +97,10 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
     ):
         response = await inspections.create_inspection(
             CreateInspectionRequest(
-                address="Main Street 1",
-                inspection_date="2026-05-25",
-                investigation_type="Lekdetectie",
-                client_type="Zakelijk",
+                metadata=(
+                    '{"type_onderzoek":"Lekdetectie","type_klant":"Zakelijk",'
+                    '"naam_opdrachtgever":"ACME","adres_schadeadres":"Main Street 1"}'
+                ),
                 extra_context="Extra",
                 audio_files=[audio_file],
                 photo_files=[photo_file],
@@ -76,13 +112,62 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
     assert response.report_id
     store_files.assert_awaited_once()
     inspection_id = insert_inspection.await_args.args[0]
-    assert insert_inspection.await_args.args[4:9] == (
-        "Main Street 1",
-        "Main Street 1",
-        "Lekdetectie",
-        "Zakelijk",
+    assert insert_inspection.await_args.args[4:6] == (
+        ReportMetadata.model_validate(
+            {
+                "type_onderzoek": "Lekdetectie",
+                "type_klant": "Zakelijk",
+                "naam_opdrachtgever": "ACME",
+                "adres_schadeadres": "Main Street 1",
+            }
+        ),
         "Extra",
     )
     insert_audio.assert_awaited_once_with(inspection_id, "/tmp/audio.m4a", "audio.m4a")
     insert_photo.assert_awaited_once_with(inspection_id, "/tmp/photo.jpg", "photo.jpg")
     insert_report.assert_awaited_once()
+
+
+async def test_create_inspection_returns_missing_required_metadata_keys() -> None:
+    current_user = build_current_user()
+
+    with (
+        patch(
+            "src.routes.inspections.template_queries.fetch_active_company_template",
+            AsyncMock(
+                return_value=ActiveCompanyTemplateRecord(
+                    current_template_id=uuid4(),
+                    structure=TemplateStructure(
+                        metadata_fields=[
+                            TemplateScalarMetadataField(
+                                key="naam_opdrachtgever",
+                                label="Naam opdrachtgever",
+                                type="text",
+                                required=True,
+                            )
+                        ],
+                        sections=[],
+                    ),
+                )
+            ),
+        ),
+        patch(
+            "src.routes.inspections.inspection_file_storage.store_inspection_files",
+            AsyncMock(),
+        ) as store_files,
+    ):
+        try:
+            await inspections.create_inspection(
+                CreateInspectionRequest(
+                    metadata="{}",
+                    audio_files=[UploadFile(filename="audio.m4a", file=BytesIO(b"audio"))],
+                ),
+                current_user,
+            )
+        except HTTPException as error:
+            assert error.status_code == 422
+            assert error.detail == {"missing_keys": ["naam_opdrachtgever"]}
+        else:
+            raise AssertionError("Expected HTTPException")
+
+    store_files.assert_not_awaited()

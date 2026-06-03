@@ -28,14 +28,14 @@ async def client() -> AsyncIterator[AsyncClient]:
         yield c
 
 
-def build_current_user() -> CurrentUser:
+def build_current_user(*, role: str = "admin") -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
         company_name="LEKK BV",
         email="jeroen.vandijk@lekk.nl",
         name="Jeroen van Dijk",
-        role="admin",
+        role=role,
     )
 
 
@@ -59,6 +59,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
             AsyncMock(
                 return_value=TemplateStatusActive(
                     status="active",
+                    metadata_fields=[],
                     sections=[
                         TemplateSection(id="summary", label="Summary", render_type="text_block")
                     ],
@@ -76,6 +77,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
     assert response.json() == {
         "status": "active",
         "source_reports_count": 3,
+        "metadata_fields": [],
         "sections": [
             {
                 "id": "summary",
@@ -88,6 +90,50 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
             }
         ],
     }
+
+
+async def test_get_template_allows_inspector(client: AsyncClient) -> None:
+    current_user = build_current_user(role="inspector")
+    access_token = security.create_access_token(current_user)
+
+    with (
+        patch.object(
+            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
+        ),
+        patch(
+            "src.routes.template.templates.load_template_configuration",
+            AsyncMock(
+                return_value=TemplateStatusActive(
+                    status="active",
+                    metadata_fields=[],
+                    sections=[],
+                    source_reports_count=1,
+                )
+            ),
+        ),
+    ):
+        response = await client.get(
+            "/api/v1/template",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert response.status_code == 200
+
+
+async def test_post_template_analysis_requires_admin(client: AsyncClient) -> None:
+    current_user = build_current_user(role="inspector")
+    access_token = security.create_access_token(current_user)
+
+    with patch.object(
+        auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
+    ):
+        response = await client.post(
+            "/api/v1/template/analysis",
+            headers={"Authorization": f"Bearer {access_token}"},
+            files=[("files", ("one.pdf", BytesIO(b"%PDF-1.4"), "application/pdf"))],
+        )
+
+    assert response.status_code == 403
 
 
 async def test_post_template_analysis_accepts_repeated_files_field(client: AsyncClient) -> None:
@@ -201,6 +247,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
         "status": "pending_review",
         "job_id": str(job_id),
         "source_reports_count": 3,
+        "metadata_fields": [],
         "sections": [
             {
                 "id": "findings",
@@ -264,6 +311,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
                 return_value=TemplateStatusActive(
                     status="active",
                     source_reports_count=3,
+                    metadata_fields=[],
                     sections=[
                         TemplateSection(
                             id="summary",
@@ -291,6 +339,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
     assert response.json() == {
         "status": "active",
         "source_reports_count": 3,
+        "metadata_fields": [],
         "sections": [
             {
                 "id": "summary",

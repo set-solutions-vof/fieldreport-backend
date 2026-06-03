@@ -3,6 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from src.db import inspection_queries
+from src.models.reports.metadata import ReportMetadata
 
 
 def build_connection(rows: list[dict[str, object]] | None = None) -> SimpleNamespace:
@@ -23,10 +24,7 @@ async def test_insert_inspection_executes_insert() -> None:
             "company-id",
             "inspector-id",
             "template-id",
-            "Client",
-            "Address",
-            "Investigation",
-            "Business",
+            ReportMetadata.model_validate({"type_onderzoek": "Investigation"}),
             "Context",
             date(2026, 5, 25),
         )

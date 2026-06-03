@@ -18,9 +18,21 @@ GENERALIZATION — apply strictly:
 
 RENDER TYPES:
 
+METADATA FIELDS:
+Project metadata fields belong in top-level metadata_fields, not in sections.
+Each metadata field has:
+- key: Dutch snake_case derived from the label
+- label: generic Dutch label
+- type: one of text, select, date, phone, email, boolean
+- options: only when type is select
+- required: true when the example reports consistently require the field, otherwise false
+
 key_value_table
-  Use for: administrative project metadata: fields that describe WHO, WHEN, and WHERE.
+  Use for: structured report content that remains part of the generated report body.
   fields: list of field label strings as they appear in the document
+  groups: preserve visual sub-headings when fields are organized into blocks, for example
+  "Algemeen", "Opdrachtgever", "Projectgegevens / Schadeadres", "Verzekeraar", or
+  "Expertisebureau"
 
 measurement_table
   Use for: technical inspection activities and findings — what was TESTED and what was FOUND.
@@ -37,6 +49,8 @@ photo_grid
 
 GROUPS (optional, any section with fields):
 - groups: when field labels are organized under sub-headings, each group has id, label, and fields
+- use groups for key_value_table sections when the PDF visually separates metadata into
+  named blocks or columns
 - omit groups when fields are a single flat list
 
 OUTPUT FORMAT — each section must have:
@@ -48,10 +62,25 @@ OUTPUT FORMAT — each section must have:
 - found_in: number of input reports where this section was found
 - groups: only when sub-headings organize the fields
 
-Return valid JSON only with a top-level "sections" array.
+Return valid JSON only with top-level "metadata_fields" and "sections" arrays.
 
 Example:
 {
+  "metadata_fields": [
+    {
+      "key": "type_onderzoek",
+      "label": "Type onderzoek",
+      "type": "select",
+      "options": ["Leidinglekkage (lekdetectie)", "Bouwkundig", "Droogtechniek"],
+      "required": true
+    },
+    {
+      "key": "naam_opdrachtgever",
+      "label": "Naam opdrachtgever",
+      "type": "text",
+      "required": false
+    }
+  ],
   "sections": [
     {
       "id": "projectgegevens",
@@ -59,7 +88,24 @@ Example:
       "order": 0,
       "render_type": "key_value_table",
       "fields": ["DATUM RAPPORTAGE", "NAAM ONDERZOEKER", "PROJECTNUMMER", "TYPE ONDERZOEK"],
-      "found_in": 3
+      "found_in": 3,
+      "groups": [
+        {
+          "id": "algemeen",
+          "label": "Algemeen",
+          "fields": ["DATUM RAPPORTAGE", "DATUM ONDERZOEK", "VERVOLGONDERZOEK"]
+        },
+        {
+          "id": "onderzoeker",
+          "label": "Onderzoeker",
+          "fields": ["NAAM ONDERZOEKER", "EMAIL ONDERZOEKER", "TEL. ONDERZOEKER"]
+        },
+        {
+          "id": "opdrachtgever",
+          "label": "Opdrachtgever",
+          "fields": ["NAAM", "CONTACTPERSOON", "ADRES", "POSTCODE", "PLAATS"]
+        }
+      ]
     },
     {
       "id": "werkomschrijving_opdracht",
@@ -123,6 +169,9 @@ For each section:
 - fields: actual field names or column headers from the documents, or null
 - found_in: number of input reports where this section was found
 - groups: sub-headings that organize fields, with id, label, and fields — omit when not needed
+
+Also extract project metadata fields into top-level metadata_fields using the schema from the
+system prompt.
 
 Documents:
 {documents_json}

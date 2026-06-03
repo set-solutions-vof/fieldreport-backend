@@ -10,7 +10,8 @@ Identify every section in this document. Classify each section into one of these
   (e.g. pressure readings, GPS coordinates, inspection results per location)
 - photo_grid: areas that contain or are designed to hold photos
  
-For key_value_table sections: list every field label you can read.
+For key_value_table sections: list every field label you can read and mention any visible
+sub-headings that group those labels.
 For measurement_table sections: list every column header you can read.
 For photo sections: list any captions or labels near the photo areas.
  

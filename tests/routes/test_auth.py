@@ -57,8 +57,7 @@ def build_report_summary(company_id: UUID) -> ReportSummary:
         id=uuid4(),
         company_id=company_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
         inspector_name="Jeroen van Dijk",
     )
@@ -204,8 +203,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
             "id": str(fake_report.id),
             "company_id": str(current_user.company_id),
             "status": "draft",
-            "client_name": "ACME",
-            "address": "Main Street 1",
+            "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
             "inspection_date": "2026-05-08T12:30:00Z",
             "inspector_name": "Jeroen van Dijk",
         }
@@ -222,8 +220,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     fake_report = ReportDetail(
         id=report_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
         inspector_name="Jeroen van Dijk",
         updated_at=updated_at,
@@ -269,8 +266,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     assert response.json() == {
         "id": str(report_id),
         "status": "draft",
-        "client_name": "ACME",
-        "address": "Main Street 1",
+        "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         "inspection_date": "2026-05-08T12:30:00Z",
         "inspector_name": "Jeroen van Dijk",
         "updated_at": "2026-05-09T08:15:00Z",

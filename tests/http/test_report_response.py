@@ -41,8 +41,7 @@ def test_report_detail_response_serializes_missing_updated_at() -> None:
     response = ReportDetailResponse(
         id=uuid4(),
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
         inspector_name="Jeroen van Dijk",
         updated_at=None,
@@ -59,8 +58,7 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
     report = ReportDetail(
         id=report_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
         inspector_name="Jeroen van Dijk",
         sections=[

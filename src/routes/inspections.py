@@ -2,18 +2,25 @@ from datetime import date
 from typing import Annotated
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, Form
+from fastapi import APIRouter, Depends, Form, HTTPException
 
 from src.db import inspection_queries, template_queries
 from src.http.v1.request.inspection import CreateInspectionRequest
 from src.http.v1.response.inspection import CreateInspectionResponse
 from src.models.auth.authentication import CurrentUser
+from src.models.reports.metadata import ReportMetadata
 from src.security.authentication import get_current_user
 from src.storage import inspection_file_storage
 
 router = APIRouter(tags=["Inspections"])
 
 
+@router.post(
+    "/api/v1/reports",
+    response_model=CreateInspectionResponse,
+    summary="Create report",
+    description="Creates an inspection with audio and photo uploads and starts report generation.",
+)
 @router.post(
     "/api/v1/inspections",
     response_model=CreateInspectionResponse,
@@ -28,7 +35,16 @@ async def create_inspection(
         str(current_user.company_id)
     )
 
-    parsed_inspection_date = date.fromisoformat(request_body.inspection_date)
+    metadata = ReportMetadata.model_validate_json(request_body.metadata)
+    metadata_values = metadata.model_dump()
+    missing_metadata_keys = [
+        metadata_field.key
+        for metadata_field in company_template.structure.metadata_fields
+        if metadata_field.required and metadata_field.key not in metadata_values
+    ]
+
+    if missing_metadata_keys:
+        raise HTTPException(status_code=422, detail={"missing_keys": missing_metadata_keys})
 
     inspection_id = str(uuid4())
     report_id = str(uuid4())
@@ -45,12 +61,9 @@ async def create_inspection(
         str(current_user.company_id),
         str(current_user.id),
         template_id,
-        request_body.address,
-        request_body.address,
-        request_body.investigation_type,
-        request_body.client_type,
+        metadata,
         request_body.extra_context or "",
-        parsed_inspection_date,
+        date.today(),
     )
 
     for audio_file, storage_key in zip(request_body.audio_files, audio_storage_keys, strict=True):

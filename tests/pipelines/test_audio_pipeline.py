@@ -9,7 +9,12 @@ from src.models.reports.pipeline import (
     StoredTranscriptionSegment,
 )
 from src.models.reports.transcription import TranscriptionResult, TranscriptionSegment
-from src.models.templates.domain import TemplateSection, TemplateStructure
+from src.models.templates.domain import (
+    TemplateScalarMetadataField,
+    TemplateSection,
+    TemplateSelectMetadataField,
+    TemplateStructure,
+)
 from src.pipelines import audio_pipeline
 
 
@@ -21,8 +26,10 @@ def build_report(status: str = "generating") -> ReportPipelineContext:
         template_id=uuid4(),
         status=status,
         extra_context="Extra",
-        investigation_type="Lekdetectie",
-        client_type="Zakelijk",
+        metadata={
+            "type_onderzoek": "Lekdetectie",
+            "type_klant": "Zakelijk",
+        },
     )
 
 
@@ -31,6 +38,19 @@ async def test_run_audio_pipeline_processes_media_and_persists_sections() -> Non
     segment_id = uuid4()
     image_id = uuid4()
     template_structure = TemplateStructure(
+        metadata_fields=[
+            TemplateSelectMetadataField(
+                key="type_onderzoek",
+                label="Type onderzoek",
+                type="select",
+                options=["Lekdetectie"],
+            ),
+            TemplateScalarMetadataField(
+                key="type_klant",
+                label="Type klant",
+                type="text",
+            ),
+        ],
         sections=[
             TemplateSection(
                 id="conclusie",

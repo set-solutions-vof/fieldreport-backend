@@ -153,7 +153,7 @@ async def test_fetch_template_structure_returns_stored_structure() -> None:
         "src.db.template_queries.asyncpg.connect",
         AsyncMock(return_value=connection),
     ):
-        structure = await template_queries.fetch_template_structure("template-id")
+        structure = await template_queries.fetch_template_structure("template-id", "company-id")
 
     assert structure.sections[0].id == "conclusie"
     connection.fetchrow.assert_awaited_once()

@@ -2,7 +2,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from src.models.templates.domain import TemplateSection
+from src.models.templates.domain import TemplateMetadataField, TemplateSection
 
 
 class TemplateStatusNotConfigured(BaseModel):
@@ -19,12 +19,14 @@ class TemplateStatusPendingReview(BaseModel):
     status: Literal["pending_review"]
     job_id: str
     source_reports_count: int
+    metadata_fields: list[TemplateMetadataField] = Field(default_factory=list)
     sections: list[TemplateSection]
 
 
 class TemplateStatusActive(BaseModel):
     status: Literal["active"]
     source_reports_count: int
+    metadata_fields: list[TemplateMetadataField] = Field(default_factory=list)
     sections: list[TemplateSection]
 
 

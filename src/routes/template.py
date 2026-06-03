@@ -10,7 +10,7 @@ from src.models.templates.configuration import (
     TemplateStatusActive,
 )
 from src.models.templates.domain import TemplateStructure
-from src.security.authentication import require_admin
+from src.security.authentication import get_current_user, require_admin
 from src.services import templates
 
 router = APIRouter(tags=["Template"])
@@ -23,7 +23,7 @@ router = APIRouter(tags=["Template"])
     description="Returns the company's template configuration status.",
 )
 async def get_template_configuration(
-    current_user: Annotated[CurrentUser, Depends(require_admin)],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> TemplateStatus:
     return await templates.load_template_configuration(str(current_user.company_id))
 
@@ -69,4 +69,4 @@ async def confirm_template(
     request_body: TemplateStructure,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateStatusActive:
-    return await templates.confirm_template(current_user, request_body.sections)
+    return await templates.confirm_template(current_user, request_body)

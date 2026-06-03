@@ -21,8 +21,7 @@ def build_report_summary(company_id: UUID) -> ReportSummary:
         id=uuid4(),
         company_id=company_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
         inspector_name="Jeroen van Dijk",
     )
@@ -66,8 +65,7 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
     report = ReportDetail(
         id=report_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
         inspector_name="Jeroen van Dijk",
         sections=[],
@@ -170,7 +168,7 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
     assert result.sections == sections
     assert result.evidence_items == evidence_items
     get_report.assert_awaited_once_with(str(report_id), str(current_user.company_id))
-    fetch_rows.assert_awaited_once_with(str(report_id))
+    fetch_rows.assert_awaited_once_with(str(report_id), str(current_user.company_id))
     map_sections.assert_called_once()
 
 

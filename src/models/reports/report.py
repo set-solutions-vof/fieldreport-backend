@@ -8,6 +8,7 @@ from src.models.enums.evidence_source_type import EvidenceSourceType
 from src.models.enums.report_evidence_item_type import ReportEvidenceItemType
 from src.models.enums.report_status import ReportStatus
 from src.models.enums.template_section_render_type import TemplateSectionRenderType
+from src.models.reports.metadata import ReportMetadata
 from src.models.templates.domain import TemplateSectionGroup
 
 
@@ -15,8 +16,7 @@ class ReportSummary(BaseModel):
     id: UUID
     company_id: UUID
     status: ReportStatus
-    client_name: str
-    address: str
+    metadata: ReportMetadata
     inspection_date: datetime
     inspector_name: str
 
@@ -64,8 +64,7 @@ class ReportDetailSection(ReportSectionContent):
 class ReportDetail(BaseModel):
     id: UUID
     status: ReportStatus
-    client_name: str
-    address: str
+    metadata: ReportMetadata
     inspection_date: datetime
     inspector_name: str
     updated_at: datetime | None = None

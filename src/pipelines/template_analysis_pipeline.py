@@ -2,7 +2,6 @@ import asyncio
 
 from src.db import template_queries
 from src.llm import deepseek_client, gpt4o_client
-from src.models.templates.domain import TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisDocument
 from src.models.templates.records import TemplateAnalysisJobRecord
 from src.storage import template_file_storage
@@ -27,8 +26,7 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | No
                 for file in files
             ]
         )
-        sections = await deepseek_client.synthesize_template_sections(documents)
-        structure = TemplateStructure(sections=sections)
+        structure = await deepseek_client.synthesize_template_structure(documents)
 
         await template_queries.update_template_analysis_job(
             job_id,

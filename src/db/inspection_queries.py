@@ -5,6 +5,7 @@ import asyncpg
 
 from src.db.connection import get_connection_url
 from src.db.inspection_mapper import map_inspection_media_file
+from src.models.reports.metadata import ReportMetadata
 from src.models.reports.pipeline import InspectionMediaFile
 
 
@@ -13,10 +14,7 @@ async def insert_inspection(
     company_id: str,
     inspector_id: str,
     template_id: str,
-    client_name: str,
-    address: str,
-    investigation_type: str,
-    client_type: str,
+    metadata: ReportMetadata,
     extra_context: str,
     inspection_date: date,
 ) -> None:
@@ -30,10 +28,7 @@ async def insert_inspection(
                 company_id,
                 inspector_id,
                 template_id,
-                client_name,
-                address,
-                investigation_type,
-                client_type,
+                metadata,
                 extra_context,
                 inspection_date,
                 created_at
@@ -43,12 +38,9 @@ async def insert_inspection(
                 $2::uuid,
                 $3::uuid,
                 $4::uuid,
-                $5::text,
+                $5::jsonb,
                 $6::text,
-                $7::text,
-                $8::text,
-                $9::text,
-                $10::date,
+                $7::date,
                 NOW()
             )
             """,
@@ -56,10 +48,7 @@ async def insert_inspection(
             company_id,
             inspector_id,
             template_id,
-            client_name,
-            address,
-            investigation_type,
-            client_type,
+            metadata.model_dump(),
             extra_context,
             inspection_date,
         )

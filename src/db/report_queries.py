@@ -34,8 +34,7 @@ async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSum
                 reports.id,
                 reports.company_id,
                 reports.status,
-                inspections.client_name,
-                inspections.address,
+                inspections.metadata,
                 inspections.inspection_date::timestamp AS inspection_date,
                 users.name AS inspector_name
             FROM reports
@@ -62,8 +61,7 @@ async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
                 reports.id,
                 reports.status,
                 reports.updated_at,
-                inspections.client_name,
-                inspections.address,
+                inspections.metadata,
                 inspections.inspection_date::timestamp AS inspection_date,
                 users.name AS inspector_name
             FROM reports
@@ -81,7 +79,7 @@ async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
     return map_report_detail(row)
 
 
-async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
+async def fetch_report_section_rows(report_id: str, company_id: str) -> list[asyncpg.Record]:
     connection = await asyncpg.connect(get_connection_url())
 
     try:
@@ -126,9 +124,11 @@ async def fetch_report_section_rows(report_id: str) -> list[asyncpg.Record]:
             LEFT JOIN image_analyses
                 ON image_analyses.id = report_section_evidence.image_analysis_id
             WHERE report_sections.report_id = $1::uuid
+            AND reports.company_id = $2::uuid
             ORDER BY report_sections.section_order ASC, report_section_evidence.created_at ASC
             """,
             report_id,
+            company_id,
         )
     finally:
         await connection.close()
@@ -257,8 +257,7 @@ async def get_report_for_pipeline(report_id: str) -> ReportPipelineContext:
                 reports.template_id,
                 reports.status,
                 inspections.extra_context,
-                inspections.investigation_type,
-                inspections.client_type
+                inspections.metadata
             FROM reports
             JOIN inspections ON inspections.id = reports.inspection_id
             WHERE reports.id = $1::uuid

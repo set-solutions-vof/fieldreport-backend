@@ -11,7 +11,7 @@ from src.models.reports.pipeline import (
     StoredImageAnalysis,
     StoredTranscriptionSegment,
 )
-from src.models.templates.domain import TemplateSection
+from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.prompts.report_generation import REPORT_GENERATION_PROMPT
 from src.storage import inspection_file_storage
 
@@ -20,7 +20,9 @@ async def run_audio_pipeline(report_id: str) -> None:
     report = await report_queries.get_report_for_pipeline(report_id)
     inspection_id = str(report.inspection_id)
     company_id = str(report.company_id)
-    template_structure = await template_queries.fetch_template_structure(str(report.template_id))
+    template_structure = await template_queries.fetch_template_structure(
+        str(report.template_id), company_id
+    )
     template_sections = template_structure.sections
 
     await transcribe_inspection_audio_files(inspection_id, company_id)
@@ -32,6 +34,7 @@ async def run_audio_pipeline(report_id: str) -> None:
     try:
         parsed_sections = await generate_report_sections(
             report,
+            template_structure,
             template_sections,
             segment_rows,
             image_rows,
@@ -108,6 +111,7 @@ async def analyze_inspection_photo_files(inspection_id: str, company_id: str) ->
 
 
 def build_report_generation_prompt(
+    template_structure: TemplateStructure,
     template_sections: list[TemplateSection],
     segment_rows: list[StoredTranscriptionSegment],
     image_rows: list[StoredImageAnalysis],
@@ -121,11 +125,16 @@ def build_report_generation_prompt(
         f"{image_index}. {image.analysis_text}"
         for image_index, image in enumerate(image_rows, start=1)
     )
+    metadata_values = report.metadata.model_dump()
+    metadata_context = [
+        f"{metadata_field.label}: {metadata_values[metadata_field.key]}"
+        for metadata_field in template_structure.metadata_fields
+        if metadata_field.key in metadata_values
+    ]
     extra_context = "\n".join(
         [
-            f"Type onderzoek: {report.investigation_type}",
-            f"Type klant: {report.client_type}",
-            f"Extra opmerkingen: {report.extra_context}",
+            *metadata_context,
+            *([f"Extra opmerkingen: {report.extra_context}"] if report.extra_context else []),
         ]
     )
     context_text = f"\nExtra context:\n{extra_context}\n" if extra_context else ""
@@ -140,11 +149,18 @@ def build_report_generation_prompt(
 
 async def generate_report_sections(
     report: ReportPipelineContext,
+    template_structure: TemplateStructure,
     template_sections: list[TemplateSection],
     segment_rows: list[StoredTranscriptionSegment],
     image_rows: list[StoredImageAnalysis],
 ) -> list[GeneratedReportSection]:
-    prompt = build_report_generation_prompt(template_sections, segment_rows, image_rows, report)
+    prompt = build_report_generation_prompt(
+        template_structure,
+        template_sections,
+        segment_rows,
+        image_rows,
+        report,
+    )
     client = client_factory.get_gpt4o_client()
     response = await client.chat.completions.create(
         model=settings.gpt4o_deployment,

@@ -1,5 +1,8 @@
+import json
+
 import asyncpg
 
+from src.models.reports.metadata import ReportMetadata
 from src.models.reports.pipeline import (
     ReportPipelineContext,
     StoredImageAnalysis,
@@ -15,29 +18,21 @@ from src.models.reports.report import (
 )
 
 
+def row_data(row: asyncpg.Record) -> dict[str, object]:
+    row_data = dict(row)
+    metadata = row_data["metadata"]
+    parsed_metadata = json.loads(metadata) if isinstance(metadata, str) else metadata
+    row_data["metadata"] = ReportMetadata.model_validate(parsed_metadata)
+
+    return row_data
+
+
 def map_report_summary(row: asyncpg.Record) -> ReportSummary:
-    return ReportSummary(
-        id=row["id"],
-        company_id=row["company_id"],
-        status=row["status"],
-        client_name=row["client_name"],
-        address=row["address"],
-        inspection_date=row["inspection_date"],
-        inspector_name=row["inspector_name"],
-    )
+    return ReportSummary.model_validate(row_data(row))
 
 
 def map_report_detail(row: asyncpg.Record) -> ReportDetail:
-    return ReportDetail(
-        id=row["id"],
-        status=row["status"],
-        client_name=row["client_name"],
-        address=row["address"],
-        inspection_date=row["inspection_date"],
-        inspector_name=row["inspector_name"],
-        updated_at=row["updated_at"],
-        sections=[],
-    )
+    return ReportDetail.model_validate({**row_data(row), "sections": []})
 
 
 def map_report_section_source(row: asyncpg.Record) -> ReportEvidenceSource:
@@ -153,27 +148,12 @@ def map_report_detail_sections(
 
 
 def map_report_pipeline_context(row: asyncpg.Record) -> ReportPipelineContext:
-    return ReportPipelineContext(
-        id=row["id"],
-        inspection_id=row["inspection_id"],
-        company_id=row["company_id"],
-        template_id=row["template_id"],
-        status=row["status"],
-        extra_context=row["extra_context"],
-        investigation_type=row["investigation_type"],
-        client_type=row["client_type"],
-    )
+    return ReportPipelineContext.model_validate(row_data(row))
 
 
 def map_stored_transcription_segment(row: asyncpg.Record) -> StoredTranscriptionSegment:
-    return StoredTranscriptionSegment(
-        id=row["id"],
-        text=row["text"],
-    )
+    return StoredTranscriptionSegment.model_validate(dict(row))
 
 
 def map_stored_image_analysis(row: asyncpg.Record) -> StoredImageAnalysis:
-    return StoredImageAnalysis(
-        id=row["id"],
-        analysis_text=row["analysis_text"],
-    )
+    return StoredImageAnalysis.model_validate(dict(row))

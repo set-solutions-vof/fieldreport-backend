@@ -64,7 +64,9 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
             stored_file_path="/tmp/report.pdf",
         )
     ]
-    sections = [TemplateSection(id="summary", label="Summary", render_type="text_block")]
+    structure = TemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
+    )
 
     with (
         patch.object(
@@ -90,8 +92,8 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
         ),
         patch.object(
             template_analysis_pipeline.deepseek_client,
-            "synthesize_template_sections",
-            AsyncMock(return_value=sections),
+            "synthesize_template_structure",
+            AsyncMock(return_value=structure),
         ),
         patch.object(
             template_analysis_pipeline.template_queries,
@@ -105,7 +107,7 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
     update_job.assert_awaited_once_with(
         str(job.id),
         "pending_review",
-        TemplateStructure(sections=sections),
+        structure,
     )
 
 
@@ -149,7 +151,7 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
         ),
         patch.object(
             template_analysis_pipeline.deepseek_client,
-            "synthesize_template_sections",
+            "synthesize_template_structure",
             AsyncMock(side_effect=ValueError("bad json")),
         ),
         patch.object(

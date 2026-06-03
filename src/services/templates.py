@@ -10,7 +10,7 @@ from src.models.templates.configuration import (
     TemplateStatusActive,
     TemplateStatusProcessing,
 )
-from src.models.templates.domain import TemplateSection, TemplateStructure
+from src.models.templates.domain import TemplateStructure
 from src.models.templates.records import TemplateAnalysisJobRecord
 from src.storage import template_file_storage
 
@@ -56,11 +56,10 @@ async def start_template_analysis(
 
 async def confirm_template(
     user: CurrentUser,
-    sections: list[TemplateSection],
+    structure: TemplateStructure,
 ) -> TemplateStatusActive:
     company_id = str(user.company_id)
     job = await template_queries.fetch_latest_template_analysis_job(company_id)
-    structure = TemplateStructure(sections=sections)
     template_id = str(uuid4())
 
     await template_queries.create_template(company_id, template_id, structure)
@@ -70,5 +69,6 @@ async def confirm_template(
     return TemplateStatusActive(
         status="active",
         source_reports_count=job.source_reports_count,
-        sections=sections,
+        metadata_fields=structure.metadata_fields,
+        sections=structure.sections,
     )
