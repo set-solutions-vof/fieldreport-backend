@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 
 from src.exceptions import TemplateAnalysisJobNotFound
 from src.http.v1.request.template import StartTemplateAnalysisRequest
@@ -32,6 +32,7 @@ async def get_template_configuration(
 @router.post(
     "/api/v1/template/analysis",
     response_model=TemplateStatus,
+    status_code=status.HTTP_202_ACCEPTED,
     summary="Start template analysis",
     description="Uploads example PDFs and queues template structure analysis.",
 )
@@ -63,6 +64,7 @@ async def get_template_analysis(
 @router.post(
     "/api/v1/template",
     response_model=TemplateStatusActive,
+    status_code=status.HTTP_201_CREATED,
     summary="Confirm template",
     description="Activates the reviewed template structure for the company.",
 )

@@ -60,6 +60,7 @@ async def update_company(
 @router.post(
     "/api/v1/onboarding/invites",
     response_model=InviteCreatedResponse,
+    status_code=status.HTTP_201_CREATED,
     summary="Create onboarding invite",
     description="Creates an invite for the current company.",
 )

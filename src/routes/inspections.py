@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 
 from src.exceptions import MissingMetadataKeys
 from src.http.v1.request.inspection import CreateInspectionRequest
@@ -15,12 +15,14 @@ router = APIRouter(tags=["Inspections"])
 @router.post(
     "/api/v1/reports",
     response_model=CreateInspectionResponse,
+    status_code=status.HTTP_201_CREATED,
     summary="Create report",
     description="Creates an inspection with audio and photo uploads and starts report generation.",
 )
 @router.post(
     "/api/v1/inspections",
     response_model=CreateInspectionResponse,
+    status_code=status.HTTP_201_CREATED,
     summary="Create inspection",
     description="Creates an inspection with audio and photo uploads and starts report generation.",
 )
