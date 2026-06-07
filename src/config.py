@@ -33,6 +33,16 @@ class Settings(BaseSettings):
     azure_storage_connection_string: str = Field(
         default="", validation_alias="AZURE_STORAGE_CONNECTION_STRING"
     )
+    smtp_host: str = Field(default="", validation_alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
+    smtp_use_starttls: bool = Field(default=True, validation_alias="SMTP_USE_STARTTLS")
+    smtp_username: str = Field(default="", validation_alias="SMTP_USERNAME")
+    smtp_password: str = Field(default="", validation_alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="", validation_alias="SMTP_FROM_EMAIL")
+    smtp_from_name: str = Field(default="FieldReport", validation_alias="SMTP_FROM_NAME")
+    frontend_base_url: str = Field(
+        default="http://localhost:5173", validation_alias="FRONTEND_BASE_URL"
+    )
 
 
 settings = Settings()

@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from src.exceptions import InviteAlreadyExists
+from src.exceptions import InviteAlreadyExists, InviteEmailDeliveryFailed
 from src.main import app
 from src.models.auth.authentication import CurrentUser
 from src.models.onboarding.company import CompanyOnboarding
@@ -159,6 +159,33 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
         "NEW.User@example.com",
         "admin",
     )
+
+
+async def test_create_onboarding_invite_returns_bad_gateway_when_email_delivery_fails(
+    client: AsyncClient,
+) -> None:
+    current_user = build_admin_user()
+    access_token = security.create_access_token(current_user)
+
+    with (
+        patch.object(
+            auth_service.auth_queries,
+            "get_user_by_id",
+            AsyncMock(return_value=current_user),
+        ),
+        patch(
+            "src.routes.onboarding.onboarding.create_invite",
+            AsyncMock(side_effect=InviteEmailDeliveryFailed()),
+        ),
+    ):
+        response = await client.post(
+            "/api/v1/onboarding/invites",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"email": "new.user@example.com", "role": "admin"},
+        )
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Invite email could not be sent"}
 
 
 async def test_create_onboarding_invite_rejects_duplicate_pending_invite(

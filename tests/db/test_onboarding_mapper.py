@@ -1,9 +1,15 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from src.db.onboarding_mapper import map_company, map_created_invite, map_invite
+from src.db.onboarding_mapper import (
+    map_company,
+    map_created_invite,
+    map_invite,
+    map_invite_details,
+)
 from src.models.onboarding.company import CompanyOnboarding
 from src.models.onboarding.invite import InviteCreated, InviteRecord
+from src.models.onboarding.invite_details import InviteDetails
 
 
 def test_map_company_returns_company_response() -> None:
@@ -71,5 +77,33 @@ def test_map_invite_returns_invite_response() -> None:
         role="inspector",
         is_accepted=False,
         created_at=created_at,
+        expires_at=expires_at,
+    )
+
+
+def test_map_invite_details_returns_invite_details() -> None:
+    invite_id = uuid4()
+    company_id = uuid4()
+    expires_at = datetime.now(UTC)
+
+    invite = map_invite_details(
+        {
+            "id": invite_id,
+            "company_id": company_id,
+            "company_name": "Demo Company",
+            "email": "new.user@example.com",
+            "role": "admin",
+            "is_accepted": False,
+            "expires_at": expires_at,
+        }
+    )
+
+    assert invite == InviteDetails(
+        id=invite_id,
+        company_id=company_id,
+        company_name="Demo Company",
+        email="new.user@example.com",
+        role="admin",
+        is_accepted=False,
         expires_at=expires_at,
     )

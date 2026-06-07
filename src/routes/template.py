@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, HTTPException, status
 
-from src.exceptions import TemplateAnalysisJobNotFound
+from src.exceptions import ActiveTemplateNotFound, TemplateAnalysisJobNotFound
 from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.models.auth.authentication import CurrentUser
 from src.models.templates import status_resolver
@@ -72,4 +72,7 @@ async def confirm_template(
     request_body: TemplateStructure,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> TemplateStatusActive:
-    return await templates.confirm_template(current_user, request_body)
+    try:
+        return await templates.confirm_template(current_user, request_body)
+    except ActiveTemplateNotFound:
+        raise HTTPException(status_code=400, detail="Template not configured")

@@ -1,0 +1,2 @@
+class InviteInvalid(Exception):
+    pass

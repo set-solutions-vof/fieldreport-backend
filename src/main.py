@@ -6,7 +6,17 @@ from starlette.middleware.cors import CORSMiddleware
 
 from src.db import connection
 from src.llm import client_factory
-from src.routes import auth, health, inspections, onboarding, reports, template, uploads
+from src.routes import (
+    auth,
+    health,
+    inspections,
+    invites,
+    onboarding,
+    reports,
+    team,
+    template,
+    uploads,
+)
 from src.storage import blob
 from src.workers import audio_pipeline_worker, template_analysis_worker
 
@@ -51,6 +61,8 @@ app.include_router(health.router)
 app.include_router(auth.router)
 app.include_router(inspections.router)
 app.include_router(onboarding.router)
+app.include_router(invites.router)
+app.include_router(team.router)
 app.include_router(reports.router)
 app.include_router(template.router)
 app.include_router(uploads.router)

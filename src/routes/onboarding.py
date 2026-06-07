@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from src.exceptions import InviteAlreadyExists
+from src.exceptions import InviteAlreadyExists, InviteEmailDeliveryFailed
 from src.http.v1.request.onboarding import CreateInviteRequest, UpdateCompanyOnboardingRequest
 from src.http.v1.response.onboarding import (
     CompanyOnboardingResponse,
@@ -76,6 +76,8 @@ async def create_invite(
         )
     except InviteAlreadyExists:
         raise HTTPException(status_code=409, detail="Invite already exists")
+    except InviteEmailDeliveryFailed:
+        raise HTTPException(status_code=502, detail="Invite email could not be sent")
 
     return InviteCreatedResponse.model_validate(invite.model_dump())
 

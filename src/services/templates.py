@@ -4,7 +4,7 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from src.db import template_queries
-from src.exceptions import TemplateAnalysisJobNotFound
+from src.exceptions import ActiveTemplateNotFound, TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.templates import status_resolver
 from src.models.templates.configuration import (
@@ -67,16 +67,36 @@ async def confirm_template(
     structure: TemplateStructure,
 ) -> TemplateStatusActive:
     company_id = str(user.company_id)
-    job = await template_queries.fetch_latest_template_analysis_job(company_id)
-    template_id = str(uuid4())
+    job = await template_queries.fetch_optional_latest_template_analysis_job(company_id)
 
-    await template_queries.create_template(company_id, template_id, structure)
-    await template_queries.set_active_template(company_id, template_id)
-    await template_queries.delete_template_analysis_job(str(job.id), company_id)
+    if job is not None:
+        template_id = str(uuid4())
+
+        await template_queries.create_template(company_id, template_id, structure)
+        await template_queries.set_active_template(company_id, template_id)
+        await template_queries.delete_template_analysis_job(str(job.id), company_id)
+
+        return TemplateStatusActive(
+            status="active",
+            source_reports_count=job.source_reports_count,
+            metadata_fields=structure.metadata_fields,
+            sections=structure.sections,
+        )
+
+    active_template = await template_queries.fetch_optional_active_company_template(company_id)
+
+    if active_template is None:
+        raise ActiveTemplateNotFound(company_id)
+
+    await template_queries.update_template_structure(
+        str(active_template.current_template_id),
+        company_id,
+        structure,
+    )
 
     return TemplateStatusActive(
         status="active",
-        source_reports_count=job.source_reports_count,
+        source_reports_count=0,
         metadata_fields=structure.metadata_fields,
         sections=structure.sections,
     )

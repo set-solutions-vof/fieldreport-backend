@@ -2,6 +2,7 @@ import asyncpg
 
 from src.models.onboarding.company import CompanyOnboarding
 from src.models.onboarding.invite import InviteCreated, InviteRecord
+from src.models.onboarding.invite_details import InviteDetails
 
 
 def map_company(row: asyncpg.Record) -> CompanyOnboarding:
@@ -14,3 +15,7 @@ def map_created_invite(row: asyncpg.Record) -> InviteCreated:
 
 def map_invite(row: asyncpg.Record) -> InviteRecord:
     return InviteRecord.model_validate(dict(row))
+
+
+def map_invite_details(row: asyncpg.Record) -> InviteDetails:
+    return InviteDetails.model_validate(dict(row))

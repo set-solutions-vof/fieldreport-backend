@@ -6,6 +6,7 @@ from uuid import uuid4
 from src.db import onboarding_queries
 from src.models.onboarding.company import CompanyOnboarding
 from src.models.onboarding.invite import InviteCreated, InviteRecord
+from src.models.onboarding.invite_details import InviteDetails
 
 
 def build_connection(
@@ -160,3 +161,86 @@ async def test_delete_pending_invite_returns_true_when_deleted() -> None:
         was_deleted = await onboarding_queries.delete_pending_invite(str(uuid4()), str(uuid4()))
 
     assert was_deleted is True
+
+
+async def test_get_invite_by_token_hash_returns_invite_details() -> None:
+    invite_id = uuid4()
+    company_id = uuid4()
+    expires_at = datetime.now(UTC)
+    row = {
+        "id": invite_id,
+        "company_id": company_id,
+        "company_name": "Demo Company",
+        "email": "new.user@example.com",
+        "role": "admin",
+        "is_accepted": False,
+        "expires_at": expires_at,
+    }
+    connection = build_connection(row)
+
+    with mock_pool(connection):
+        invite = await onboarding_queries.get_invite_by_token_hash("token-hash")
+
+    assert invite == InviteDetails(
+        id=invite_id,
+        company_id=company_id,
+        company_name="Demo Company",
+        email="new.user@example.com",
+        role="admin",
+        is_accepted=False,
+        expires_at=expires_at,
+    )
+
+
+async def test_get_invite_by_token_hash_returns_none_when_missing() -> None:
+    connection = build_connection(None)
+
+    with mock_pool(connection):
+        invite = await onboarding_queries.get_invite_by_token_hash("missing-token")
+
+    assert invite is None
+
+
+async def test_accept_invite_and_create_user_returns_user_id() -> None:
+    invite_id = uuid4()
+    user_id = uuid4()
+    connection = build_connection(None)
+    connection.fetchrow = AsyncMock(side_effect=[{"id": invite_id}, {"id": user_id}])
+    connection.execute = AsyncMock()
+    transaction = MagicMock()
+    transaction.__aenter__ = AsyncMock(return_value=None)
+    transaction.__aexit__ = AsyncMock(return_value=None)
+    connection.transaction = MagicMock(return_value=transaction)
+
+    with mock_pool(connection):
+        result = await onboarding_queries.accept_invite_and_create_user(
+            str(invite_id),
+            str(uuid4()),
+            "new.user@example.com",
+            "New User",
+            "inspector",
+            "hashed-password",
+        )
+
+    assert result == str(user_id)
+
+
+async def test_accept_invite_and_create_user_returns_empty_string_when_invite_missing() -> None:
+    connection = build_connection(None)
+    connection.fetchrow = AsyncMock(return_value=None)
+    transaction = MagicMock()
+    transaction.__aenter__ = AsyncMock(return_value=None)
+    transaction.__aexit__ = AsyncMock(return_value=None)
+    connection.transaction = MagicMock(return_value=transaction)
+
+    with mock_pool(connection):
+        result = await onboarding_queries.accept_invite_and_create_user(
+            str(uuid4()),
+            str(uuid4()),
+            "new.user@example.com",
+            "New User",
+            "inspector",
+            "hashed-password",
+        )
+
+    assert result == ""

@@ -208,7 +208,8 @@ async def test_fetch_latest_template_analysis_job_returns_latest_company_job() -
         "failure_message": None,
         "created_at": created_at,
     }
-    connection = build_connection(rows=[job_row])
+    connection = build_connection(job_row=job_row)
+    connection.fetchrow = AsyncMock(return_value=job_row)
 
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
@@ -357,3 +358,68 @@ async def test_set_active_template_updates_company_current_template_id() -> None
         await template_queries.set_active_template(str(uuid4()), str(uuid4()))
 
     assert "UPDATE company" in connection.execute.await_args.args[0]
+
+
+async def test_fetch_optional_active_company_template_returns_none_without_template() -> None:
+    connection = build_connection(
+        company_row={"current_template_id": None, "structure": None},
+    )
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.template_queries.get_pool", return_value=pool):
+        result = await template_queries.fetch_optional_active_company_template(str(uuid4()))
+
+    assert result is None
+
+
+async def test_fetch_latest_template_analysis_job_raises_when_no_job_exists() -> None:
+    connection = build_connection()
+    connection.fetchrow = AsyncMock(return_value=None)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.template_queries.get_pool", return_value=pool):
+        try:
+            await template_queries.fetch_latest_template_analysis_job(str(uuid4()))
+        except IndexError:
+            pass
+        else:
+            raise AssertionError("Expected IndexError")
+
+
+async def test_fetch_optional_latest_template_analysis_job_returns_none_when_missing() -> None:
+    connection = build_connection()
+    connection.fetchrow = AsyncMock(return_value=None)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.template_queries.get_pool", return_value=pool):
+        result = await template_queries.fetch_optional_latest_template_analysis_job(str(uuid4()))
+
+    assert result is None
+
+
+async def test_update_template_structure_updates_template_row() -> None:
+    connection = build_connection()
+    template_id = str(uuid4())
+    company_id = str(uuid4())
+    structure = TemplateStructure(
+        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
+    )
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.template_queries.get_pool", return_value=pool):
+        await template_queries.update_template_structure(template_id, company_id, structure)
+
+    assert "UPDATE templates" in connection.execute.await_args.args[0]
+    assert connection.execute.await_args.args[1:] == (
+        template_id,
+        company_id,
+        structure.model_dump_json(),
+    )

@@ -21,6 +21,14 @@ def test_settings_loads_values_from_environment() -> None:
             "DEEPSEEK_DEPLOYMENT": "DeepSeek-V3.2-Speciale",
             "GPT4O_DEPLOYMENT": "gpt-4o",
             "GPT4O_TRANSCRIBE_DEPLOYMENT": "gpt-4o-transcribe",
+            "SMTP_HOST": "smtp.office365.com",
+            "SMTP_PORT": "587",
+            "SMTP_USE_STARTTLS": "true",
+            "SMTP_USERNAME": "smtp-user",
+            "SMTP_PASSWORD": "smtp-pass",
+            "SMTP_FROM_EMAIL": "no-reply@example.com",
+            "SMTP_FROM_NAME": "FieldReport",
+            "FRONTEND_BASE_URL": "http://localhost:5173",
         },
         clear=False,
     ):
@@ -37,3 +45,11 @@ def test_settings_loads_values_from_environment() -> None:
     assert settings.deepseek_deployment == "DeepSeek-V3.2-Speciale"
     assert settings.gpt4o_deployment == "gpt-4o"
     assert settings.gpt4o_transcribe_deployment == "gpt-4o-transcribe"
+    assert settings.smtp_host == "smtp.office365.com"
+    assert settings.smtp_port == 587
+    assert settings.smtp_use_starttls is True
+    assert settings.smtp_username == "smtp-user"
+    assert settings.smtp_password == "smtp-pass"
+    assert settings.smtp_from_email == "no-reply@example.com"
+    assert settings.smtp_from_name == "FieldReport"
+    assert settings.frontend_base_url == "http://localhost:5173"

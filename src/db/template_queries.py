@@ -37,29 +37,36 @@ async def fetch_active_company_template(company_id: str) -> ActiveCompanyTemplat
     return map_active_company_template(company_row)
 
 
+async def fetch_optional_active_company_template(
+    company_id: str,
+) -> ActiveCompanyTemplateRecord | None:
+    async with get_pool().acquire() as connection:
+        company_row = await _fetch_optional_active_company_template_row(connection, company_id)
+
+    return map_optional_active_company_template(company_row)
+
+
+async def fetch_optional_latest_template_analysis_job(
+    company_id: str,
+) -> TemplateAnalysisJobRecord | None:
+    async with get_pool().acquire() as connection:
+        job_row = await _fetch_latest_template_analysis_job_row(connection, company_id)
+
+    if job_row is None:
+        return None
+
+    return map_template_analysis_job(job_row)
+
+
 async def fetch_latest_template_analysis_job(
     company_id: str,
 ) -> TemplateAnalysisJobRecord:
-    async with get_pool().acquire() as connection:
-        rows = await connection.fetch(
-            """
-            SELECT
-                id,
-                company_id,
-                status,
-                source_reports_count,
-                structure,
-                failure_message,
-                created_at
-            FROM template_analysis_jobs
-            WHERE company_id = $1::uuid
-            ORDER BY created_at DESC
-            LIMIT 1
-            """,
-            company_id,
-        )
+    job = await fetch_optional_latest_template_analysis_job(company_id)
 
-    return map_template_analysis_job(rows[0])
+    if job is None:
+        raise IndexError(f"No template analysis job found for company {company_id}")
+
+    return job
 
 
 async def get_template_analysis_job(
@@ -268,6 +275,25 @@ async def fetch_template_structure(template_id: str, company_id: str) -> Templat
         )
 
     return TemplateStructure.model_validate_json(row["structure"])
+
+
+async def update_template_structure(
+    template_id: str,
+    company_id: str,
+    structure: TemplateStructure,
+) -> None:
+    async with get_pool().acquire() as connection:
+        await connection.execute(
+            """
+            UPDATE templates
+            SET structure = $3::jsonb
+            WHERE id = $1::uuid
+            AND company_id = $2::uuid
+            """,
+            template_id,
+            company_id,
+            structure.model_dump_json(),
+        )
 
 
 async def create_template(
