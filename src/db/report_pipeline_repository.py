@@ -1,9 +1,17 @@
 from uuid import uuid4
 
-import asyncpg
+import sqlalchemy as sa
 from pydantic import TypeAdapter
 
+from src.db.connection import DatabaseConnection
 from src.db.report_mapper import map_stored_image_analysis, map_stored_transcription_segment
+from src.db.tables import (
+    image_analyses,
+    report_section_evidence,
+    report_sections,
+    transcription_segments,
+    transcriptions,
+)
 from src.models.reports.generation import GeneratedReportSection
 from src.models.reports.pipeline import StoredImageAnalysis, StoredTranscriptionSegment
 from src.models.reports.transcription import TranscriptionSegment
@@ -14,7 +22,7 @@ _groups_adapter: TypeAdapter[list[TemplateSectionGroup]] = TypeAdapter(list[Temp
 
 
 class ReportPipelineRepository:
-    def __init__(self, connection: asyncpg.Connection) -> None:
+    def __init__(self, connection: DatabaseConnection) -> None:
         self.connection = connection
 
     async def insert_transcription(
@@ -26,32 +34,16 @@ class ReportPipelineRepository:
         duration_seconds: float,
     ) -> str:
         transcription_id = str(uuid4())
-
-        await self.connection.execute(
-            """
-            INSERT INTO transcriptions (
-                id,
-                inspection_id,
-                company_id,
-                storage_key,
-                raw_text,
-                created_at
-            )
-            VALUES (
-                $1::uuid,
-                $2::uuid,
-                $3::uuid,
-                $4::text,
-                $5::text,
-                NOW()
-            )
-            """,
-            transcription_id,
-            inspection_id,
-            company_id,
-            storage_key,
-            raw_text,
+        statement = transcriptions.insert().values(
+            id=transcription_id,
+            inspection_id=inspection_id,
+            company_id=company_id,
+            storage_key=storage_key,
+            raw_text=raw_text,
+            created_at=sa.func.now(),
         )
+
+        await self.connection.execute(statement)
 
         return transcription_id
 
@@ -63,38 +55,25 @@ class ReportPipelineRepository:
     ) -> list[str]:
         segment_ids = [str(uuid4()) for _ in segments]
 
-        for segment_id, segment in zip(segment_ids, segments, strict=True):
-            await self.connection.execute(
-                """
-                INSERT INTO transcription_segments (
-                    id,
-                    transcription_id,
-                    inspection_id,
-                    segment_index,
-                    start_seconds,
-                    end_seconds,
-                    text,
-                    created_at
-                )
-                VALUES (
-                    $1::uuid,
-                    $2::uuid,
-                    $3::uuid,
-                    $4::integer,
-                    $5::double precision,
-                    $6::double precision,
-                    $7::text,
-                    NOW()
-                )
-                """,
-                segment_id,
-                transcription_id,
-                inspection_id,
-                segment.segment_index,
-                segment.start_seconds,
-                segment.end_seconds,
-                segment.text,
-            )
+        if not segments:
+            return segment_ids
+
+        statement = transcription_segments.insert().values(
+            [
+                {
+                    "id": segment_id,
+                    "transcription_id": transcription_id,
+                    "inspection_id": inspection_id,
+                    "segment_index": segment.segment_index,
+                    "start_seconds": segment.start_seconds,
+                    "end_seconds": segment.end_seconds,
+                    "text": segment.text,
+                    "created_at": sa.func.now(),
+                }
+                for segment_id, segment in zip(segment_ids, segments, strict=True)
+            ]
+        )
+        await self.connection.execute(statement)
 
         return segment_ids
 
@@ -106,38 +85,19 @@ class ReportPipelineRepository:
         analysis_text: str,
     ) -> str:
         image_analysis_id = str(uuid4())
-
-        await self.connection.execute(
-            """
-            INSERT INTO image_analyses (
-                id,
-                inspection_id,
-                company_id,
-                storage_key,
-                analysis_text,
-                geotag_lat,
-                geotag_lng,
-                captured_at,
-                created_at
-            )
-            VALUES (
-                $1::uuid,
-                $2::uuid,
-                $3::uuid,
-                $4::text,
-                $5::text,
-                NULL,
-                NULL,
-                NULL,
-                NOW()
-            )
-            """,
-            image_analysis_id,
-            inspection_id,
-            company_id,
-            storage_key,
-            analysis_text,
+        statement = image_analyses.insert().values(
+            id=image_analysis_id,
+            inspection_id=inspection_id,
+            company_id=company_id,
+            storage_key=storage_key,
+            analysis_text=analysis_text,
+            geotag_lat=None,
+            geotag_lng=None,
+            captured_at=None,
+            created_at=sa.func.now(),
         )
+
+        await self.connection.execute(statement)
 
         return image_analysis_id
 
@@ -145,23 +105,26 @@ class ReportPipelineRepository:
         self,
         inspection_id: str,
     ) -> list[StoredTranscriptionSegment]:
-        rows = await self.connection.fetch(
-            """
-            SELECT
-                id,
-                transcription_id,
-                inspection_id,
-                segment_index,
-                start_seconds,
-                end_seconds,
-                text,
-                created_at
-            FROM transcription_segments
-            WHERE inspection_id = $1::uuid
-            ORDER BY transcription_id ASC, segment_index ASC
-            """,
-            inspection_id,
+        statement = (
+            sa.select(
+                transcription_segments.c.id,
+                transcription_segments.c.transcription_id,
+                transcription_segments.c.inspection_id,
+                transcription_segments.c.segment_index,
+                transcription_segments.c.start_seconds,
+                transcription_segments.c.end_seconds,
+                transcription_segments.c.text,
+                transcription_segments.c.created_at,
+            )
+            .where(transcription_segments.c.inspection_id == inspection_id)
+            .order_by(
+                transcription_segments.c.transcription_id.asc(),
+                transcription_segments.c.segment_index.asc(),
+            )
         )
+
+        result = await self.connection.execute(statement)
+        rows = result.mappings().all()
 
         return [map_stored_transcription_segment(row) for row in rows]
 
@@ -169,22 +132,22 @@ class ReportPipelineRepository:
         self,
         inspection_id: str,
     ) -> list[StoredImageAnalysis]:
-        rows = await self.connection.fetch(
-            """
-            SELECT
-                id,
-                inspection_id,
-                company_id,
-                storage_key,
-                analysis_text,
-                captured_at,
-                created_at
-            FROM image_analyses
-            WHERE inspection_id = $1::uuid
-            ORDER BY created_at ASC
-            """,
-            inspection_id,
+        statement = (
+            sa.select(
+                image_analyses.c.id,
+                image_analyses.c.inspection_id,
+                image_analyses.c.company_id,
+                image_analyses.c.storage_key,
+                image_analyses.c.analysis_text,
+                image_analyses.c.captured_at,
+                image_analyses.c.created_at,
+            )
+            .where(image_analyses.c.inspection_id == inspection_id)
+            .order_by(image_analyses.c.created_at.asc())
         )
+
+        result = await self.connection.execute(statement)
+        rows = result.mappings().all()
 
         return [map_stored_image_analysis(row) for row in rows]
 
@@ -196,63 +159,30 @@ class ReportPipelineRepository:
         template_section: TemplateSection,
     ) -> str:
         report_section_id = str(uuid4())
-
-        await self.connection.execute(
-            """
-            INSERT INTO report_sections (
-                id,
-                report_id,
-                company_id,
-                section_id,
-                section_order,
-                render_type,
-                generated_content,
-                reviewed_content,
-                edit_distance,
-                approved,
-                confidence_level,
-                confidence_score,
-                label,
-                fields,
-                groups,
-                updated_at
-            )
-            VALUES (
-                $1::uuid,
-                $2::uuid,
-                $3::uuid,
-                $4::text,
-                $5::integer,
-                $6::render_type_enum,
-                to_jsonb(ARRAY[$7::text]),
-                NULL,
-                NULL,
-                false,
-                $8::confidence_level_enum,
-                $9::numeric,
-                $10::text,
-                $11::jsonb,
-                $12::jsonb,
-                NOW()
-            )
-            """,
-            report_section_id,
-            report_id,
-            company_id,
-            section.id,
-            template_section.order,
-            template_section.render_type,
-            section.generated_content,
-            section.confidence_level,
-            section.confidence_score,
-            template_section.label,
-            _fields_adapter.dump_json(template_section.fields).decode()
+        statement = report_sections.insert().values(
+            id=report_section_id,
+            report_id=report_id,
+            company_id=company_id,
+            section_id=section.id,
+            section_order=template_section.order,
+            render_type=template_section.render_type,
+            generated_content=[section.generated_content],
+            reviewed_content=None,
+            edit_distance=None,
+            approved=False,
+            confidence_level=section.confidence_level,
+            confidence_score=section.confidence_score,
+            label=template_section.label,
+            fields=_fields_adapter.dump_python(template_section.fields, mode="json")
             if template_section.fields is not None
             else None,
-            _groups_adapter.dump_json(template_section.groups).decode()
+            groups=_groups_adapter.dump_python(template_section.groups, mode="json")
             if template_section.groups is not None
             else None,
+            updated_at=sa.func.now(),
         )
+
+        await self.connection.execute(statement)
 
         return report_section_id
 
@@ -261,55 +191,27 @@ class ReportPipelineRepository:
         report_section_id: str,
         transcription_segment_id: str,
     ) -> None:
-        await self.connection.execute(
-            """
-            INSERT INTO report_section_evidence (
-                id,
-                report_section_id,
-                evidence_type,
-                transcription_segment_id,
-                image_analysis_id,
-                created_at
-            )
-            VALUES (
-                $1::uuid,
-                $2::uuid,
-                'transcription_segment'::report_evidence_type,
-                $3::uuid,
-                NULL,
-                NOW()
-            )
-            """,
-            str(uuid4()),
-            report_section_id,
-            transcription_segment_id,
+        statement = report_section_evidence.insert().values(
+            id=str(uuid4()),
+            report_section_id=report_section_id,
+            evidence_type="transcription_segment",
+            transcription_segment_id=transcription_segment_id,
+            image_analysis_id=None,
+            created_at=sa.func.now(),
         )
+        await self.connection.execute(statement)
 
     async def insert_report_section_source_image(
         self,
         report_section_id: str,
         image_analysis_id: str,
     ) -> None:
-        await self.connection.execute(
-            """
-            INSERT INTO report_section_evidence (
-                id,
-                report_section_id,
-                evidence_type,
-                transcription_segment_id,
-                image_analysis_id,
-                created_at
-            )
-            VALUES (
-                $1::uuid,
-                $2::uuid,
-                'image_analysis'::report_evidence_type,
-                NULL,
-                $3::uuid,
-                NOW()
-            )
-            """,
-            str(uuid4()),
-            report_section_id,
-            image_analysis_id,
+        statement = report_section_evidence.insert().values(
+            id=str(uuid4()),
+            report_section_id=report_section_id,
+            evidence_type="image_analysis",
+            transcription_segment_id=None,
+            image_analysis_id=image_analysis_id,
+            created_at=sa.func.now(),
         )
+        await self.connection.execute(statement)

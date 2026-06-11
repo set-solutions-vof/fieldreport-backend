@@ -1,11 +1,21 @@
 from uuid import uuid4
 
+import sqlalchemy as sa
+from sqlalchemy import text
+
 from src.db.connection import get_pool
+from src.db.tables import (
+    company,
+    template_analysis_job_files,
+    template_analysis_jobs,
+    templates,
+)
 from src.db.template_mapper import (
     map_active_company_template,
     map_optional_active_company_template,
     map_template_analysis_file,
     map_template_analysis_job,
+    parse_template_structure,
 )
 from src.models.templates.domain import TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile
@@ -13,6 +23,18 @@ from src.models.templates.records import (
     ActiveCompanyTemplateRecord,
     TemplateAnalysisJobRecord,
 )
+
+
+def _template_analysis_job_columns():
+    return (
+        template_analysis_jobs.c.id,
+        template_analysis_jobs.c.company_id,
+        template_analysis_jobs.c.status,
+        template_analysis_jobs.c.source_reports_count,
+        template_analysis_jobs.c.structure,
+        template_analysis_jobs.c.failure_message,
+        template_analysis_jobs.c.created_at,
+    )
 
 
 async def fetch_template_configuration_context(
@@ -72,24 +94,14 @@ async def fetch_latest_template_analysis_job(
 async def get_template_analysis_job(
     job_id: str, company_id: str
 ) -> TemplateAnalysisJobRecord | None:
+    statement = sa.select(*_template_analysis_job_columns()).where(
+        template_analysis_jobs.c.id == job_id,
+        template_analysis_jobs.c.company_id == company_id,
+    )
+
     async with get_pool().acquire() as connection:
-        job_row = await connection.fetchrow(
-            """
-            SELECT
-                id,
-                company_id,
-                status,
-                source_reports_count,
-                structure,
-                failure_message,
-                created_at
-            FROM template_analysis_jobs
-            WHERE id = $1::uuid
-            AND company_id = $2::uuid
-            """,
-            job_id,
-            company_id,
-        )
+        result = await connection.execute(statement)
+        job_row = result.mappings().first()
 
     if job_row is None:
         return None
@@ -104,64 +116,31 @@ async def replace_template_analysis_job(
 ) -> None:
     async with get_pool().acquire() as connection:
         await connection.execute(
-            """
-            DELETE FROM template_analysis_jobs
-            WHERE company_id = $1::uuid
-            """,
-            company_id,
+            template_analysis_jobs.delete().where(template_analysis_jobs.c.company_id == company_id)
         )
         await connection.execute(
-            """
-            INSERT INTO template_analysis_jobs (
-                id,
-                company_id,
-                status,
-                source_reports_count,
-                structure,
-                failure_message,
-                started_at,
-                finished_at,
-                created_at
+            template_analysis_jobs.insert().values(
+                id=job_id,
+                company_id=company_id,
+                status="queued",
+                source_reports_count=len(files),
+                structure=None,
+                failure_message=None,
+                started_at=None,
+                finished_at=None,
+                created_at=sa.func.now(),
             )
-            VALUES (
-                $1::uuid,
-                $2::uuid,
-                'queued'::template_analysis_status_enum,
-                $3::integer,
-                NULL,
-                NULL,
-                NULL,
-                NULL,
-                NOW()
-            )
-            """,
-            job_id,
-            company_id,
-            len(files),
         )
 
         for file in files:
             await connection.execute(
-                """
-                INSERT INTO template_analysis_job_files (
-                    id,
-                    job_id,
-                    original_file_name,
-                    stored_file_path,
-                    created_at
+                template_analysis_job_files.insert().values(
+                    id=str(uuid4()),
+                    job_id=job_id,
+                    original_file_name=file.original_file_name,
+                    stored_file_path=file.stored_file_path,
+                    created_at=sa.func.now(),
                 )
-                VALUES (
-                    $4::uuid,
-                    $1::uuid,
-                    $2::text,
-                    $3::text,
-                    NOW()
-                )
-                """,
-                job_id,
-                file.original_file_name,
-                file.stored_file_path,
-                str(uuid4()),
             )
 
 
@@ -171,72 +150,66 @@ async def update_template_analysis_job(
     structure: TemplateStructure | None,
     failure_message: str | None = None,
 ) -> None:
-    async with get_pool().acquire() as connection:
-        await connection.execute(
-            """
-            UPDATE template_analysis_jobs
-            SET status = $2::template_analysis_status_enum,
-                structure = $3::jsonb,
-                failure_message = $4::text,
-                finished_at = CASE
-                    WHEN $2::template_analysis_status_enum IN (
-                        'pending_review'::template_analysis_status_enum,
-                        'active'::template_analysis_status_enum,
-                        'failed'::template_analysis_status_enum
-                    )
-                    THEN NOW()
-                    ELSE finished_at
-                END
-            WHERE id = $1::uuid
-            """,
-            job_id,
-            status,
-            structure.model_dump_json() if structure is not None else None,
-            failure_message,
+    finished_statuses = ("pending_review", "active", "failed")
+    statement = (
+        template_analysis_jobs.update()
+        .where(template_analysis_jobs.c.id == job_id)
+        .values(
+            status=status,
+            structure=structure.model_dump(mode="json") if structure is not None else None,
+            failure_message=failure_message,
+            finished_at=sa.case(
+                (sa.literal(status).in_(finished_statuses), sa.func.now()),
+                else_=template_analysis_jobs.c.finished_at,
+            ),
         )
+    )
+
+    async with get_pool().acquire() as connection:
+        await connection.execute(statement)
 
 
 async def delete_template_analysis_job(job_id: str, company_id: str) -> None:
+    statement = template_analysis_jobs.delete().where(
+        template_analysis_jobs.c.id == job_id,
+        template_analysis_jobs.c.company_id == company_id,
+    )
+
     async with get_pool().acquire() as connection:
-        await connection.execute(
-            """
-            DELETE FROM template_analysis_jobs
-            WHERE id = $1::uuid
-            AND company_id = $2::uuid
-            """,
-            job_id,
-            company_id,
-        )
+        await connection.execute(statement)
 
 
 async def claim_next_template_analysis_job() -> TemplateAnalysisJobRecord | None:
-    async with get_pool().acquire() as connection:
-        row = await connection.fetchrow(
-            """
-            WITH next_job AS (
-                SELECT id
-                FROM template_analysis_jobs
-                WHERE status = 'queued'::template_analysis_status_enum
-                ORDER BY created_at ASC
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-            )
-            UPDATE template_analysis_jobs
-            SET status = 'processing'::template_analysis_status_enum,
-                started_at = NOW(),
-                failure_message = NULL,
-                finished_at = NULL
-            WHERE id IN (SELECT id FROM next_job)
-            RETURNING
-                id,
-                company_id,
-                status,
-                source_reports_count,
-                structure,
-                failure_message,
-                created_at
-            """
+    statement = text(
+        """
+        WITH next_job AS (
+            SELECT id
+            FROM template_analysis_jobs
+            WHERE status = 'queued'::template_analysis_status_enum
+            ORDER BY created_at ASC
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
         )
+        UPDATE template_analysis_jobs
+        SET status = 'processing'::template_analysis_status_enum,
+            started_at = NOW(),
+            failure_message = NULL,
+            finished_at = NULL
+        WHERE id IN (SELECT id FROM next_job)
+        RETURNING
+            id,
+            company_id,
+            status,
+            source_reports_count,
+            structure,
+            failure_message,
+            created_at
+        """
+    )
+
+    async with get_pool().acquire() as connection:
+        result = await connection.execute(statement)
+        row = result.mappings().first()
 
     if row is None:
         return None
@@ -245,36 +218,33 @@ async def claim_next_template_analysis_job() -> TemplateAnalysisJobRecord | None
 
 
 async def get_template_analysis_job_files(job_id: str) -> list[TemplateAnalysisFile]:
-    async with get_pool().acquire() as connection:
-        rows = await connection.fetch(
-            """
-            SELECT
-                original_file_name AS original_file_name,
-                stored_file_path AS stored_file_path
-            FROM template_analysis_job_files
-            WHERE job_id = $1::uuid
-            ORDER BY created_at ASC
-            """,
-            job_id,
+    statement = (
+        sa.select(
+            template_analysis_job_files.c.original_file_name,
+            template_analysis_job_files.c.stored_file_path,
         )
+        .where(template_analysis_job_files.c.job_id == job_id)
+        .order_by(template_analysis_job_files.c.created_at.asc())
+    )
+
+    async with get_pool().acquire() as connection:
+        result = await connection.execute(statement)
+        rows = result.mappings().all()
 
     return [map_template_analysis_file(row) for row in rows]
 
 
 async def fetch_template_structure(template_id: str, company_id: str) -> TemplateStructure:
-    async with get_pool().acquire() as connection:
-        row = await connection.fetchrow(
-            """
-            SELECT structure
-            FROM templates
-            WHERE id = $1::uuid
-            AND company_id = $2::uuid
-            """,
-            template_id,
-            company_id,
-        )
+    statement = sa.select(templates.c.structure).where(
+        templates.c.id == template_id,
+        templates.c.company_id == company_id,
+    )
 
-    return TemplateStructure.model_validate_json(row["structure"])
+    async with get_pool().acquire() as connection:
+        result = await connection.execute(statement)
+        row = result.mappings().one()
+
+    return parse_template_structure(row["structure"])
 
 
 async def update_template_structure(
@@ -282,18 +252,17 @@ async def update_template_structure(
     company_id: str,
     structure: TemplateStructure,
 ) -> None:
-    async with get_pool().acquire() as connection:
-        await connection.execute(
-            """
-            UPDATE templates
-            SET structure = $3::jsonb
-            WHERE id = $1::uuid
-            AND company_id = $2::uuid
-            """,
-            template_id,
-            company_id,
-            structure.model_dump_json(),
+    statement = (
+        templates.update()
+        .where(
+            templates.c.id == template_id,
+            templates.c.company_id == company_id,
         )
+        .values(structure=structure.model_dump(mode="json"))
+    )
+
+    async with get_pool().acquire() as connection:
+        await connection.execute(statement)
 
 
 async def create_template(
@@ -301,88 +270,60 @@ async def create_template(
     template_id: str,
     structure: TemplateStructure,
 ) -> None:
+    statement = templates.insert().values(
+        id=template_id,
+        company_id=company_id,
+        structure=structure.model_dump(mode="json"),
+        logo_url="",
+        primary_color="",
+        created_at=sa.func.now(),
+    )
+
     async with get_pool().acquire() as connection:
-        await connection.execute(
-            """
-            INSERT INTO templates (
-                id,
-                company_id,
-                structure,
-                logo_url,
-                primary_color,
-                created_at
-            )
-            VALUES (
-                $1::uuid,
-                $2::uuid,
-                $3::jsonb,
-                '',
-                '',
-                NOW()
-            )
-            """,
-            template_id,
-            company_id,
-            structure.model_dump_json(),
-        )
+        await connection.execute(statement)
 
 
 async def set_active_template(company_id: str, template_id: str) -> None:
+    statement = (
+        company.update().where(company.c.id == company_id).values(current_template_id=template_id)
+    )
+
     async with get_pool().acquire() as connection:
-        await connection.execute(
-            """
-            UPDATE company
-            SET current_template_id = $2::uuid
-            WHERE id = $1::uuid
-            """,
-            company_id,
-            template_id,
-        )
+        await connection.execute(statement)
 
 
 async def _fetch_optional_active_company_template_row(connection, company_id: str):
-    return await connection.fetchrow(
-        """
-        SELECT
-            company.current_template_id AS current_template_id,
-            templates.structure AS structure
-        FROM company
-        LEFT JOIN templates ON templates.id = company.current_template_id
-        WHERE company.id = $1::uuid
-        """,
-        company_id,
+    statement = (
+        sa.select(
+            company.c.current_template_id,
+            templates.c.structure,
+        )
+        .select_from(company.outerjoin(templates, templates.c.id == company.c.current_template_id))
+        .where(company.c.id == company_id)
     )
+    result = await connection.execute(statement)
+    return result.mappings().first()
 
 
 async def _fetch_active_company_template_row(connection, company_id: str):
-    return await connection.fetchrow(
-        """
-        SELECT
-            company.current_template_id AS current_template_id,
-            templates.structure AS structure
-        FROM company
-        JOIN templates ON templates.id = company.current_template_id
-        WHERE company.id = $1::uuid
-        """,
-        company_id,
+    statement = (
+        sa.select(
+            company.c.current_template_id,
+            templates.c.structure,
+        )
+        .select_from(company.join(templates, templates.c.id == company.c.current_template_id))
+        .where(company.c.id == company_id)
     )
+    result = await connection.execute(statement)
+    return result.mappings().one()
 
 
 async def _fetch_latest_template_analysis_job_row(connection, company_id: str):
-    return await connection.fetchrow(
-        """
-        SELECT
-            id,
-            company_id,
-            status,
-            source_reports_count,
-            structure,
-            failure_message,
-            created_at
-        FROM template_analysis_jobs
-        WHERE company_id = $1::uuid
-        ORDER BY created_at DESC
-        LIMIT 1
-        """,
-        company_id,
+    statement = (
+        sa.select(*_template_analysis_job_columns())
+        .where(template_analysis_jobs.c.company_id == company_id)
+        .order_by(template_analysis_jobs.c.created_at.desc())
+        .limit(1)
     )
+    result = await connection.execute(statement)
+    return result.mappings().first()

@@ -1,16 +1,10 @@
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 from src.db import team_queries
 from src.models.team.member import TeamMember
-
-
-def build_connection(rows: list[dict[str, object]]) -> SimpleNamespace:
-    return SimpleNamespace(
-        fetch=AsyncMock(return_value=rows),
-    )
+from tests.db.sqlalchemy_fakes import build_connection
 
 
 def mock_pool(connection):
@@ -30,7 +24,7 @@ async def test_list_company_members_returns_members() -> None:
         "role": "admin",
         "created_at": created_at,
     }
-    connection = build_connection([row])
+    connection = build_connection(rows=[row])
 
     with mock_pool(connection):
         members = await team_queries.list_company_members(str(uuid4()))
@@ -44,3 +38,4 @@ async def test_list_company_members_returns_members() -> None:
             created_at=created_at,
         )
     ]
+    connection.execute.assert_awaited_once()

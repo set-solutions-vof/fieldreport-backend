@@ -10,7 +10,7 @@ from src.exceptions import TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.enums.template_analysis_job_status import TemplateAnalysisJobStatus
 from src.models.templates.domain import TemplateSection, TemplateStructure
-from src.models.templates.records import ActiveCompanyTemplateRecord, TemplateAnalysisJobRecord
+from src.models.templates.records import TemplateAnalysisJobRecord
 from src.services import templates as templates_service
 
 
@@ -289,7 +289,3 @@ async def test_confirm_template_does_not_fetch_active_template_without_analysis_
         await templates_service.confirm_template(current_user, TemplateStructure(sections=[]))
 
     fetch_active_template.assert_not_awaited()
-
-
-
-

@@ -82,5 +82,3 @@ async def confirm_template(
         metadata_fields=structure.metadata_fields,
         sections=structure.sections,
     )
-
-

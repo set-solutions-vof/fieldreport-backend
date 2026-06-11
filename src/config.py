@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     frontend_base_url: str = Field(
         default="http://localhost:5173", validation_alias="FRONTEND_BASE_URL"
     )
+    cors_origins: list[str] = Field(
+        default=["http://localhost:5173"],
+        validation_alias="CORS_ORIGINS",
+    )
 
 
 settings = Settings()

@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -7,16 +6,7 @@ from src.db import onboarding_queries
 from src.models.onboarding.company import CompanyOnboarding
 from src.models.onboarding.invite import InviteCreated, InviteRecord
 from src.models.onboarding.invite_details import InviteDetails
-
-
-def build_connection(
-    row: dict[str, object] | None = None,
-    rows: list[dict[str, object]] | None = None,
-) -> SimpleNamespace:
-    return SimpleNamespace(
-        fetchrow=AsyncMock(return_value=row),
-        fetch=AsyncMock(return_value=rows or []),
-    )
+from tests.db.sqlalchemy_fakes import FakeResult, build_connection
 
 
 def mock_pool(connection):
@@ -73,15 +63,7 @@ async def test_update_company_returns_updated_company_response() -> None:
 
     assert company.logo_url == "https://cdn.example/logo.png"
     assert company.onboarding_completed is True
-    assert connection.fetchrow.await_args.args[1:] == (
-        str(company_id),
-        True,
-        "https://cdn.example/logo.png",
-        True,
-        "#3B5BDB",
-        True,
-        True,
-    )
+    connection.execute.assert_awaited_once()
 
 
 async def test_has_pending_invite_returns_true_for_existing_pending_invite() -> None:
@@ -94,6 +76,7 @@ async def test_has_pending_invite_returns_true_for_existing_pending_invite() -> 
         )
 
     assert has_pending_invite is True
+    connection.execute.assert_awaited_once()
 
 
 async def test_create_invite_returns_created_invite_response() -> None:
@@ -123,6 +106,7 @@ async def test_create_invite_returns_created_invite_response() -> None:
         role="admin",
         created_at=created_at,
     )
+    connection.execute.assert_awaited_once()
 
 
 async def test_list_invites_returns_company_invites() -> None:
@@ -152,6 +136,7 @@ async def test_list_invites_returns_company_invites() -> None:
             expires_at=expires_at,
         )
     ]
+    connection.execute.assert_awaited_once()
 
 
 async def test_delete_pending_invite_returns_true_when_deleted() -> None:
@@ -161,6 +146,7 @@ async def test_delete_pending_invite_returns_true_when_deleted() -> None:
         was_deleted = await onboarding_queries.delete_pending_invite(str(uuid4()), str(uuid4()))
 
     assert was_deleted is True
+    connection.execute.assert_awaited_once()
 
 
 async def test_get_invite_by_token_hash_returns_invite_details() -> None:
@@ -190,6 +176,7 @@ async def test_get_invite_by_token_hash_returns_invite_details() -> None:
         is_accepted=False,
         expires_at=expires_at,
     )
+    connection.execute.assert_awaited_once()
 
 
 async def test_get_invite_by_token_hash_returns_none_when_missing() -> None:
@@ -199,14 +186,19 @@ async def test_get_invite_by_token_hash_returns_none_when_missing() -> None:
         invite = await onboarding_queries.get_invite_by_token_hash("missing-token")
 
     assert invite is None
+    connection.execute.assert_awaited_once()
 
 
 async def test_accept_invite_and_create_user_returns_user_id() -> None:
     invite_id = uuid4()
     user_id = uuid4()
-    connection = build_connection(None)
-    connection.fetchrow = AsyncMock(side_effect=[{"id": invite_id}, {"id": user_id}])
-    connection.execute = AsyncMock()
+    connection = build_connection(
+        results=[
+            FakeResult(row={"id": invite_id}),
+            FakeResult(row={"id": user_id}),
+            FakeResult(),
+        ]
+    )
     transaction = MagicMock()
     transaction.__aenter__ = AsyncMock(return_value=None)
     transaction.__aexit__ = AsyncMock(return_value=None)
@@ -223,11 +215,11 @@ async def test_accept_invite_and_create_user_returns_user_id() -> None:
         )
 
     assert result == str(user_id)
+    assert connection.execute.await_count == 3
 
 
 async def test_accept_invite_and_create_user_returns_empty_string_when_invite_missing() -> None:
     connection = build_connection(None)
-    connection.fetchrow = AsyncMock(return_value=None)
     transaction = MagicMock()
     transaction.__aenter__ = AsyncMock(return_value=None)
     transaction.__aexit__ = AsyncMock(return_value=None)
@@ -244,3 +236,4 @@ async def test_accept_invite_and_create_user_returns_empty_string_when_invite_mi
         )
 
     assert result == ""
+    connection.execute.assert_awaited_once()

@@ -66,10 +66,15 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
             ),
         ),
         patch.object(
-            inspections_service.blob,
-            "upload_form_file",
-            AsyncMock(return_value="https://storage.example/blob"),
-        ) as upload_file,
+            inspections_service,
+            "upload_files",
+            AsyncMock(return_value=["https://storage.example/audio"]),
+        ) as upload_audio_files,
+        patch.object(
+            inspections_service,
+            "upload_images",
+            AsyncMock(return_value=["https://storage.example/photo"]),
+        ) as upload_photo_files,
         patch.object(
             inspections_service.inspection_queries,
             "insert_inspection",
@@ -107,7 +112,8 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
 
     assert response.status == "generating"
     assert response.report_id
-    assert upload_file.await_count == 2
+    upload_audio_files.assert_awaited_once()
+    upload_photo_files.assert_awaited_once()
     inspection_id = insert_inspection.await_args.args[0]
     assert insert_inspection.await_args.args[4:6] == (
         ReportMetadata.model_validate(

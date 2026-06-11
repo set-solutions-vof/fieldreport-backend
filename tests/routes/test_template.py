@@ -364,5 +364,3 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
             },
         ],
     }
-
-

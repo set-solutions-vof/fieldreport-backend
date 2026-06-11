@@ -1,26 +1,30 @@
+import sqlalchemy as sa
+
 from src.db.auth_mapper import map_authenticated_user, map_current_user
 from src.db.connection import get_pool
+from src.db.tables import company, users
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 
 
+def _user_company_select():
+    return sa.select(
+        users.c.id,
+        users.c.company_id,
+        company.c.name.label("company_name"),
+        users.c.email,
+        users.c.name,
+        users.c.role,
+    ).select_from(users.join(company, company.c.id == users.c.company_id))
+
+
 async def get_user_by_email(email: str) -> AuthenticatedUser | None:
+    statement = (
+        _user_company_select().add_columns(users.c.password_hash).where(users.c.email == email)
+    )
+
     async with get_pool().acquire() as connection:
-        row = await connection.fetchrow(
-            """
-            SELECT
-                users.id,
-                users.company_id,
-                company.name AS company_name,
-                email,
-                password_hash,
-                users.name,
-                role
-            FROM users
-            JOIN company ON company.id = users.company_id
-            WHERE email = $1
-            """,
-            email,
-        )
+        result = await connection.execute(statement)
+        row = result.mappings().first()
 
     if row is None:
         return None
@@ -29,22 +33,11 @@ async def get_user_by_email(email: str) -> AuthenticatedUser | None:
 
 
 async def get_user_by_id(user_id: str) -> CurrentUser | None:
+    statement = _user_company_select().where(users.c.id == user_id)
+
     async with get_pool().acquire() as connection:
-        row = await connection.fetchrow(
-            """
-            SELECT
-                users.id,
-                users.company_id,
-                company.name AS company_name,
-                email,
-                users.name,
-                role
-            FROM users
-            JOIN company ON company.id = users.company_id
-            WHERE users.id = $1::uuid
-            """,
-            user_id,
-        )
+        result = await connection.execute(statement)
+        row = result.mappings().first()
 
     if row is None:
         return None

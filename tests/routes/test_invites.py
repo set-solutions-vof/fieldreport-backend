@@ -9,6 +9,8 @@ from src.exceptions import InviteInvalid
 from src.main import app
 from src.models.auth.authentication import TokenPair
 from src.models.onboarding.invite_preview import InvitePreview
+
+
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:

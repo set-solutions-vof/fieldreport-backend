@@ -1,16 +1,17 @@
-import json
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
 from uuid import uuid4
 
 from src.db.report_pipeline_repository import ReportPipelineRepository
+from src.db.tables import (
+    image_analyses,
+    report_section_evidence,
+    report_sections,
+    transcription_segments,
+    transcriptions,
+)
 from src.models.reports.generation import GeneratedReportSection
 from src.models.reports.transcription import TranscriptionSegment
 from src.models.templates.domain import TemplateSection, TemplateSectionGroup
-
-
-def build_connection() -> SimpleNamespace:
-    return SimpleNamespace(execute=AsyncMock())
+from tests.db.sqlalchemy_fakes import build_connection
 
 
 async def test_insert_transcription_executes_insert_and_returns_id() -> None:
@@ -27,12 +28,8 @@ async def test_insert_transcription_executes_insert_and_returns_id() -> None:
 
     assert transcription_id
     connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        "inspection-id",
-        "company-id",
-        "/tmp/audio.m4a",
-        "Tekst",
-    )
+    statement = connection.execute.await_args.args[0]
+    assert statement.table is transcriptions
 
 
 async def test_insert_transcription_segments_executes_inserts_and_returns_ids() -> None:
@@ -55,12 +52,22 @@ async def test_insert_transcription_segments_executes_inserts_and_returns_ids() 
 
     assert len(segment_ids) == 1
     connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        0,
-        0.0,
-        1.5,
-        "Segment",
+    statement = connection.execute.await_args.args[0]
+    assert statement.table is transcription_segments
+
+
+async def test_insert_transcription_segments_returns_empty_list_without_segments() -> None:
+    connection = build_connection()
+    repository = ReportPipelineRepository(connection)
+
+    segment_ids = await repository.insert_transcription_segments(
+        "transcription-id",
+        "inspection-id",
+        [],
     )
+
+    assert segment_ids == []
+    connection.execute.assert_not_awaited()
 
 
 async def test_insert_image_analysis_executes_insert_and_returns_id() -> None:
@@ -76,12 +83,8 @@ async def test_insert_image_analysis_executes_insert_and_returns_id() -> None:
 
     assert image_analysis_id
     connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        "inspection-id",
-        "company-id",
-        "/tmp/photo.jpg",
-        "Fotoanalyse",
-    )
+    statement = connection.execute.await_args.args[0]
+    assert statement.table is image_analyses
 
 
 async def test_insert_report_section_executes_insert_and_returns_id() -> None:
@@ -111,22 +114,8 @@ async def test_insert_report_section_executes_insert_and_returns_id() -> None:
 
     assert report_section_id
     connection.execute.assert_awaited_once()
-    query, *values = connection.execute.await_args.args
-    assert "to_jsonb(ARRAY[$7::text])" in query
-    assert "$10::text" in query
-    assert "$11::jsonb" in query
-    assert "$12::jsonb" in query
-    assert values[3:] == [
-        "conclusie",
-        1,
-        "text_block",
-        "Concept",
-        "high",
-        0.9,
-        "Conclusie",
-        json.dumps(["Issue", "Advice"]),
-        json.dumps([{"id": "main", "label": "Main", "fields": ["Issue"]}]),
-    ]
+    statement = connection.execute.await_args.args[0]
+    assert statement.table is report_sections
 
 
 async def test_insert_report_section_source_transcription_executes_insert() -> None:
@@ -139,7 +128,8 @@ async def test_insert_report_section_source_transcription_executes_insert() -> N
     )
 
     connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-2:] == ("section-id", "segment-id")
+    statement = connection.execute.await_args.args[0]
+    assert statement.table is report_section_evidence
 
 
 async def test_insert_report_section_source_image_executes_insert() -> None:
@@ -149,26 +139,25 @@ async def test_insert_report_section_source_image_executes_insert() -> None:
     await repository.insert_report_section_source_image("section-id", "image-id")
 
     connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-2:] == ("section-id", "image-id")
+    statement = connection.execute.await_args.args[0]
+    assert statement.table is report_section_evidence
 
 
 async def test_fetch_transcription_segments_for_inspection_returns_mapped_rows() -> None:
     segment_id = uuid4()
-    connection = SimpleNamespace(
-        fetch=AsyncMock(
-            return_value=[
-                {
-                    "id": segment_id,
-                    "transcription_id": uuid4(),
-                    "inspection_id": uuid4(),
-                    "segment_index": 0,
-                    "start_seconds": 0.0,
-                    "end_seconds": 1.5,
-                    "text": "Segment",
-                    "created_at": None,
-                }
-            ]
-        )
+    connection = build_connection(
+        rows=[
+            {
+                "id": segment_id,
+                "transcription_id": uuid4(),
+                "inspection_id": uuid4(),
+                "segment_index": 0,
+                "start_seconds": 0.0,
+                "end_seconds": 1.5,
+                "text": "Segment",
+                "created_at": None,
+            }
+        ]
     )
     repository = ReportPipelineRepository(connection)
 
@@ -177,24 +166,23 @@ async def test_fetch_transcription_segments_for_inspection_returns_mapped_rows()
     assert len(segments) == 1
     assert segments[0].id == segment_id
     assert segments[0].text == "Segment"
+    connection.execute.assert_awaited_once()
 
 
 async def test_fetch_image_analyses_for_inspection_returns_mapped_rows() -> None:
     image_id = uuid4()
-    connection = SimpleNamespace(
-        fetch=AsyncMock(
-            return_value=[
-                {
-                    "id": image_id,
-                    "inspection_id": uuid4(),
-                    "company_id": uuid4(),
-                    "storage_key": "/tmp/photo.jpg",
-                    "analysis_text": "Fotoanalyse",
-                    "captured_at": None,
-                    "created_at": None,
-                }
-            ]
-        )
+    connection = build_connection(
+        rows=[
+            {
+                "id": image_id,
+                "inspection_id": uuid4(),
+                "company_id": uuid4(),
+                "storage_key": "/tmp/photo.jpg",
+                "analysis_text": "Fotoanalyse",
+                "captured_at": None,
+                "created_at": None,
+            }
+        ]
     )
     repository = ReportPipelineRepository(connection)
 
@@ -203,3 +191,4 @@ async def test_fetch_image_analyses_for_inspection_returns_mapped_rows() -> None
     assert len(images) == 1
     assert images[0].id == image_id
     assert images[0].analysis_text == "Fotoanalyse"
+    connection.execute.assert_awaited_once()

@@ -1,26 +1,11 @@
-import asyncpg
+from collections.abc import Mapping
 
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 
 
-def map_authenticated_user(row: asyncpg.Record) -> AuthenticatedUser:
-    return AuthenticatedUser(
-        id=row["id"],
-        company_id=row["company_id"],
-        company_name=row["company_name"],
-        email=row["email"],
-        password_hash=row["password_hash"],
-        name=row["name"],
-        role=row["role"],
-    )
+def map_authenticated_user(row: Mapping[str, object]) -> AuthenticatedUser:
+    return AuthenticatedUser.model_validate(dict(row))
 
 
-def map_current_user(row: asyncpg.Record) -> CurrentUser:
-    return CurrentUser(
-        id=row["id"],
-        company_id=row["company_id"],
-        company_name=row["company_name"],
-        email=row["email"],
-        name=row["name"],
-        role=row["role"],
-    )
+def map_current_user(row: Mapping[str, object]) -> CurrentUser:
+    return CurrentUser.model_validate(dict(row))
