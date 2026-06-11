@@ -41,7 +41,7 @@ async def test_transcribe_inspection_audio_files_persists_transcription() -> Non
         patch.object(
             transcription.blob,
             "download_file",
-            return_value=b"audio",
+            return_value=(b"audio", "audio/mpeg"),
         ),
         patch.object(
             transcription.gpt4o_transcribe_client,

@@ -27,7 +27,7 @@ async def test_analyze_inspection_photo_files_persists_analysis() -> None:
         patch.object(
             image_analysis.blob,
             "download_file",
-            return_value=b"photo",
+            return_value=(b"photo", "image/jpeg"),
         ),
         patch.object(
             image_analysis.gpt4o_client,

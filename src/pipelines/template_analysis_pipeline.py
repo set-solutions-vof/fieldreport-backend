@@ -49,7 +49,7 @@ async def build_template_analysis_document(
     original_file_name: str,
     blob_key: str,
 ) -> TemplateAnalysisDocument:
-    file_content = await blob.download_file("templates", blob_key)
+    file_content = (await blob.download_file("templates", blob_key))[0]
     extracted_text, visual_summary = await asyncio.gather(
         asyncio.to_thread(pdf_text_extractor.extract_text_from_pdf, file_content),
         gpt4o_client.analyze_pdf_visuals(original_file_name, file_content),

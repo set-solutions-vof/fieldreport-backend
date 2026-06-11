@@ -16,7 +16,7 @@ async def transcribe_inspection_audio_files(
     for audio_file in audio_files:
         audio_key = audio_file.storage_key
         try:
-            file_content = await blob.download_file("inspections", audio_key)
+            file_content = (await blob.download_file("inspections", audio_key))[0]
             result = await gpt4o_transcribe_client.transcribe_audio(
                 file_content,
                 audio_file.original_file_name,

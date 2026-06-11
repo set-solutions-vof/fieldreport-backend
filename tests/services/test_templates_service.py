@@ -85,7 +85,7 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
     with (
         patch.object(
             templates_service.blob,
-            "upload_form_file",
+            "upload_file",
             AsyncMock(return_value="https://storage.example/blob"),
         ) as upload_file,
         patch.object(

@@ -11,7 +11,13 @@ async def upload_files(container: str, prefix: str, files: list[UploadFile]) -> 
     keys = []
     for file in files:
         key = f"{prefix}/{uuid4()}{Path(file.filename or '').suffix}"
-        await blob.upload_form_file(container, key, file)
+        data = await file.read()
+        await blob.upload_file(
+            container,
+            key,
+            data,
+            file.content_type or "application/octet-stream",
+        )
         keys.append(key)
     return keys
 

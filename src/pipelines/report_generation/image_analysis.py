@@ -18,7 +18,7 @@ async def analyze_inspection_photo_files(
     for photo_file in photo_files:
         photo_key = photo_file.storage_key
         try:
-            file_content = await blob.download_file("inspections", photo_key)
+            file_content = (await blob.download_file("inspections", photo_key))[0]
             description = await gpt4o_client.analyze_inspection_photo(
                 Path(photo_key).name,
                 file_content,

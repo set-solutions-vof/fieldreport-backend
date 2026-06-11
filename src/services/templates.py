@@ -48,7 +48,13 @@ async def start_template_analysis(
     for file in files:
         original_file_name = file.filename or f"{uuid4()}.pdf"
         key = f"{company_id}/{job_id}/{uuid4()}{Path(original_file_name).suffix}"
-        await blob.upload_form_file("templates", key, file)
+        data = await file.read()
+        await blob.upload_file(
+            "templates",
+            key,
+            data,
+            file.content_type or "application/octet-stream",
+        )
         stored_files.append(
             TemplateAnalysisFile(original_file_name=original_file_name, stored_file_path=key)
         )

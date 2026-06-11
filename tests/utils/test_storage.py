@@ -11,15 +11,16 @@ async def test_upload_files_uploads_all_files_and_returns_keys() -> None:
 
     with (
         patch.object(storage, "uuid4", return_value="file-id"),
-        patch.object(storage.blob, "upload_form_file", AsyncMock()) as upload_form_file,
+        patch.object(storage.blob, "upload_file", AsyncMock()) as upload_file,
     ):
         keys = await storage.upload_files("inspections", "company/inspection/audio", [file])
 
     assert keys == ["company/inspection/audio/file-id.m4a"]
-    upload_form_file.assert_awaited_once_with(
+    upload_file.assert_awaited_once_with(
         "inspections",
         "company/inspection/audio/file-id.m4a",
-        file,
+        b"audio",
+        "application/octet-stream",
     )
 
 

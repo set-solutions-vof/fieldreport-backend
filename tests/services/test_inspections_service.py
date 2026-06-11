@@ -203,7 +203,7 @@ async def test_get_inspection_photo_returns_blob() -> None:
         ),
         patch.object(
             inspections_service.blob,
-            "download_file_with_content_type",
+            "download_file",
             AsyncMock(return_value=(b"photo", "image/jpeg")),
         ) as download,
     ):
@@ -242,7 +242,7 @@ async def test_get_inspection_photo_raises_when_blob_is_missing() -> None:
         ),
         patch.object(
             inspections_service.blob,
-            "download_file_with_content_type",
+            "download_file",
             AsyncMock(side_effect=ResourceNotFoundError("missing")),
         ),
     ):

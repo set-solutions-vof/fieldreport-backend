@@ -93,6 +93,6 @@ async def get_inspection_photo(company_id: str, key: str) -> tuple[bytes, str]:
         raise InspectionPhotoNotFound(key)
 
     try:
-        return await blob.download_file_with_content_type("inspections", key)
+        return await blob.download_file("inspections", key)
     except ResourceNotFoundError:
         raise InspectionPhotoNotFound(key)

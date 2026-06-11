@@ -13,7 +13,7 @@ async def test_build_template_analysis_document_combines_text_and_visual_outputs
         patch.object(
             template_analysis_pipeline.blob,
             "download_file",
-            AsyncMock(return_value=b"pdf-bytes"),
+            AsyncMock(return_value=(b"pdf-bytes", "application/pdf")),
         ),
         patch.object(
             template_analysis_pipeline.pdf_text_extractor,
