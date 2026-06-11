@@ -17,6 +17,7 @@ from src.routes import (
     team,
     template,
     uploads,
+    users,
 )
 from src.storage import blob
 from src.workers import report_generation_worker, template_analysis_worker
@@ -74,3 +75,4 @@ app.include_router(team.router)
 app.include_router(reports.router)
 app.include_router(template.router)
 app.include_router(uploads.router)
+app.include_router(users.router)
