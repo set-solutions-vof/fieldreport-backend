@@ -7,6 +7,7 @@ import bcrypt
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from src.exceptions import InvalidResetToken, InviteEmailDeliveryFailed
 from src.main import app
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 from src.models.reports.report import (
@@ -142,6 +143,69 @@ async def test_refresh_rejects_invalid_token(client: AsyncClient) -> None:
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid credentials"}
+
+
+async def test_password_reset_request_returns_no_content(client: AsyncClient) -> None:
+    with patch("src.routes.auth.password_reset.request_reset", AsyncMock()) as request_reset:
+        response = await client.post(
+            "/api/v1/auth/password-reset/request",
+            json={"email": "user@example.com"},
+        )
+
+    assert response.status_code == 204
+    request_reset.assert_awaited_once_with("user@example.com")
+
+
+async def test_password_reset_request_swallows_email_delivery_failure(
+    client: AsyncClient,
+) -> None:
+    with patch(
+        "src.routes.auth.password_reset.request_reset",
+        AsyncMock(side_effect=InviteEmailDeliveryFailed()),
+    ):
+        response = await client.post(
+            "/api/v1/auth/password-reset/request",
+            json={"email": "user@example.com"},
+        )
+
+    assert response.status_code == 204
+
+
+async def test_password_reset_confirm_returns_no_content(client: AsyncClient) -> None:
+    with patch("src.routes.auth.password_reset.confirm_reset", AsyncMock()) as confirm_reset:
+        response = await client.post(
+            "/api/v1/auth/password-reset/confirm",
+            json={"token": "raw-token", "new_password": "NewPassword2026!"},
+        )
+
+    assert response.status_code == 204
+    confirm_reset.assert_awaited_once_with("raw-token", "NewPassword2026!")
+
+
+async def test_password_reset_confirm_rejects_short_password(client: AsyncClient) -> None:
+    with patch("src.routes.auth.password_reset.confirm_reset", AsyncMock()) as confirm_reset:
+        response = await client.post(
+            "/api/v1/auth/password-reset/confirm",
+            json={"token": "raw-token", "new_password": "short"},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "password_too_short"}
+    confirm_reset.assert_not_awaited()
+
+
+async def test_password_reset_confirm_rejects_invalid_token(client: AsyncClient) -> None:
+    with patch(
+        "src.routes.auth.password_reset.confirm_reset",
+        AsyncMock(side_effect=InvalidResetToken()),
+    ):
+        response = await client.post(
+            "/api/v1/auth/password-reset/confirm",
+            json={"token": "raw-token", "new_password": "NewPassword2026!"},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "invalid_or_expired_token"}
 
 
 async def test_me_requires_access_token(client: AsyncClient) -> None:

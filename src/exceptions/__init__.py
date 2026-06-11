@@ -1,6 +1,7 @@
 from src.exceptions.authentication_failed import AuthenticationFailed
 from src.exceptions.inspection_photo_not_found import InspectionPhotoNotFound
 from src.exceptions.invalid_metadata_format import InvalidMetadataFormat
+from src.exceptions.invalid_reset_token import InvalidResetToken
 from src.exceptions.invite_already_exists import InviteAlreadyExists
 from src.exceptions.invite_email_delivery_failed import InviteEmailDeliveryFailed
 from src.exceptions.invite_invalid import InviteInvalid
@@ -15,6 +16,7 @@ __all__ = [
     "InviteEmailDeliveryFailed",
     "InspectionPhotoNotFound",
     "InvalidMetadataFormat",
+    "InvalidResetToken",
     "InviteInvalid",
     "MissingMetadataKeys",
     "PasswordIncorrect",

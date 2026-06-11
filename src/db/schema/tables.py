@@ -236,3 +236,18 @@ invites = sa.Table(
     sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )
+
+password_reset_tokens = sa.Table(
+    "password_reset_tokens",
+    metadata,
+    sa.Column(
+        "id",
+        postgresql.UUID(as_uuid=False),
+        primary_key=True,
+        server_default=sa.text("gen_random_uuid()"),
+    ),
+    sa.Column("user_id", postgresql.UUID(as_uuid=False), nullable=False),
+    sa.Column("token_hash", sa.String(), nullable=False, unique=True),
+    sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("used_at", sa.DateTime(timezone=True), nullable=True),
+)

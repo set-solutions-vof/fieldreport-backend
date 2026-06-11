@@ -1,15 +1,21 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException
+from fastapi import APIRouter, Depends, Form, HTTPException, status
 from jwt import InvalidTokenError
 
-from src.exceptions import AuthenticationFailed
-from src.http.v1.request.auth import LoginFormRequest, LoginJsonRequest, RefreshTokenRequest
+from src.exceptions import AuthenticationFailed, InvalidResetToken, InviteEmailDeliveryFailed
+from src.http.v1.request.auth import (
+    LoginFormRequest,
+    LoginJsonRequest,
+    PasswordResetConfirmRequest,
+    PasswordResetRequestRequest,
+    RefreshTokenRequest,
+)
 from src.http.v1.response.auth import RefreshTokenResponse, TokenResponse
 from src.http.v1.response.user import CurrentUserResponse
 from src.models.auth.authentication import CurrentUser, LoginCredentials
 from src.security.authentication import get_current_user
-from src.services import authentication
+from src.services import authentication, password_reset
 
 router = APIRouter(tags=["Auth"])
 
@@ -63,6 +69,35 @@ async def refresh_token(request_body: RefreshTokenRequest) -> RefreshTokenRespon
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     return RefreshTokenResponse.model_validate(refreshed_token)
+
+
+@router.post(
+    "/api/v1/auth/password-reset/request",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Request password reset",
+    description="Sends a password reset email when the email address exists.",
+)
+async def request_password_reset(request_body: PasswordResetRequestRequest) -> None:
+    try:
+        await password_reset.request_reset(request_body.email)
+    except InviteEmailDeliveryFailed:
+        return
+
+
+@router.post(
+    "/api/v1/auth/password-reset/confirm",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Confirm password reset",
+    description="Sets a new password using a valid password reset token.",
+)
+async def confirm_password_reset(request_body: PasswordResetConfirmRequest) -> None:
+    if len(request_body.new_password) < 8:
+        raise HTTPException(status_code=422, detail="password_too_short")
+
+    try:
+        await password_reset.confirm_reset(request_body.token, request_body.new_password)
+    except InvalidResetToken:
+        raise HTTPException(status_code=422, detail="invalid_or_expired_token")
 
 
 @router.get(
