@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -5,7 +6,7 @@ from uuid import uuid4
 from src.db.report_pipeline_repository import ReportPipelineRepository
 from src.models.reports.generation import GeneratedReportSection
 from src.models.reports.transcription import TranscriptionSegment
-from src.models.templates.domain import TemplateSection
+from src.models.templates.domain import TemplateSection, TemplateSectionGroup
 
 
 def build_connection() -> SimpleNamespace:
@@ -97,6 +98,8 @@ async def test_insert_report_section_executes_insert_and_returns_id() -> None:
         label="Conclusie",
         order=1,
         render_type="text_block",
+        fields=["Issue", "Advice"],
+        groups=[TemplateSectionGroup(id="main", label="Main", fields=["Issue"])],
     )
 
     report_section_id = await repository.insert_report_section(
@@ -108,15 +111,22 @@ async def test_insert_report_section_executes_insert_and_returns_id() -> None:
 
     assert report_section_id
     connection.execute.assert_awaited_once()
-    assert "to_jsonb(ARRAY[$7::text])" in connection.execute.await_args.args[0]
-    assert connection.execute.await_args.args[-6:] == (
+    query, *values = connection.execute.await_args.args
+    assert "to_jsonb(ARRAY[$7::text])" in query
+    assert "$10::text" in query
+    assert "$11::jsonb" in query
+    assert "$12::jsonb" in query
+    assert values[3:] == [
         "conclusie",
         1,
         "text_block",
         "Concept",
         "high",
         0.9,
-    )
+        "Conclusie",
+        json.dumps(["Issue", "Advice"]),
+        json.dumps([{"id": "main", "label": "Main", "fields": ["Issue"]}]),
+    ]
 
 
 async def test_insert_report_section_source_transcription_executes_insert() -> None:

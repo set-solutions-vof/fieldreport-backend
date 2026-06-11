@@ -8,7 +8,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from pydantic import ValidationError
 
-from src.exceptions import ActiveTemplateNotFound, TemplateAnalysisJobNotFound
+from src.exceptions import TemplateAnalysisJobNotFound
 from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.main import app
 from src.models.auth.authentication import CurrentUser
@@ -366,26 +366,3 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
     }
 
 
-async def test_confirm_template_returns_bad_request_when_template_not_configured(
-    client: AsyncClient,
-) -> None:
-    current_user = build_current_user()
-    access_token = security.create_access_token(current_user)
-
-    with (
-        patch.object(
-            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
-        patch(
-            "src.routes.template.templates.confirm_template",
-            AsyncMock(side_effect=ActiveTemplateNotFound(str(current_user.company_id))),
-        ),
-    ):
-        response = await client.post(
-            "/api/v1/template",
-            headers={"Authorization": f"Bearer {access_token}"},
-            json={"sections": []},
-        )
-
-    assert response.status_code == 400
-    assert response.json() == {"detail": "Template not configured"}

@@ -1,12 +1,16 @@
 from uuid import uuid4
 
 import asyncpg
+from pydantic import TypeAdapter
 
 from src.db.report_mapper import map_stored_image_analysis, map_stored_transcription_segment
 from src.models.reports.generation import GeneratedReportSection
 from src.models.reports.pipeline import StoredImageAnalysis, StoredTranscriptionSegment
 from src.models.reports.transcription import TranscriptionSegment
-from src.models.templates.domain import TemplateSection
+from src.models.templates.domain import TemplateSection, TemplateSectionGroup
+
+_fields_adapter: TypeAdapter[list[str]] = TypeAdapter(list[str])
+_groups_adapter: TypeAdapter[list[TemplateSectionGroup]] = TypeAdapter(list[TemplateSectionGroup])
 
 
 class ReportPipelineRepository:
@@ -208,6 +212,9 @@ class ReportPipelineRepository:
                 approved,
                 confidence_level,
                 confidence_score,
+                label,
+                fields,
+                groups,
                 updated_at
             )
             VALUES (
@@ -223,6 +230,9 @@ class ReportPipelineRepository:
                 false,
                 $8::confidence_level_enum,
                 $9::numeric,
+                $10::text,
+                $11::jsonb,
+                $12::jsonb,
                 NOW()
             )
             """,
@@ -235,6 +245,13 @@ class ReportPipelineRepository:
             section.generated_content,
             section.confidence_level,
             section.confidence_score,
+            template_section.label,
+            _fields_adapter.dump_json(template_section.fields).decode()
+            if template_section.fields is not None
+            else None,
+            _groups_adapter.dump_json(template_section.groups).decode()
+            if template_section.groups is not None
+            else None,
         )
 
         return report_section_id

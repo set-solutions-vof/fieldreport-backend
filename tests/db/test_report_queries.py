@@ -113,6 +113,11 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": first_section_id,
             "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": ["Issue", "Action"],
+            "groups": [
+                {"id": "damage", "label": "Damage", "fields": ["Issue"]},
+            ],
             "section_order": 1,
             "generated_content": "Draft text",
             "reviewed_content": None,
@@ -132,6 +137,11 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": first_section_id,
             "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": ["Issue", "Action"],
+            "groups": [
+                {"id": "damage", "label": "Damage", "fields": ["Issue"]},
+            ],
             "section_order": 1,
             "generated_content": "Draft text",
             "reviewed_content": None,
@@ -151,6 +161,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": second_section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "generated_content": "Advice",
             "reviewed_content": None,
@@ -170,6 +183,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": second_section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "generated_content": "Advice",
             "reviewed_content": None,
@@ -189,6 +205,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": second_section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "generated_content": "Advice",
             "reviewed_content": None,
@@ -208,6 +227,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": third_section_id,
             "section_id": "samenvatting",
+            "label": "Samenvatting",
+            "fields": None,
+            "groups": None,
             "section_order": 3,
             "generated_content": "Summary",
             "reviewed_content": None,
@@ -245,6 +267,10 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         third_section_id,
     ]
     assert sections[0].render_type == "measurement_table"
+    assert sections[0].label == "Bevindingen"
+    assert sections[0].fields == ["Issue", "Action"]
+    assert sections[0].groups is not None
+    assert sections[0].groups[0].label == "Damage"
     assert sections[0].evidence_item_ids == [
         shared_image_analysis_id,
         shared_transcription_segment_id,
@@ -375,6 +401,9 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
         {
             "id": section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "render_type": "key_value_table",
             "generated_content": "Advice",

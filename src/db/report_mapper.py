@@ -16,6 +16,7 @@ from src.models.reports.report import (
     ReportSection,
     ReportSummary,
 )
+from src.models.templates.domain import TemplateSectionGroup
 
 
 def row_data(row: asyncpg.Record) -> dict[str, object]:
@@ -78,6 +79,14 @@ def map_report_evidence_item(row: asyncpg.Record) -> ReportEvidenceItem:
     )
 
 
+def map_template_section_groups(row: asyncpg.Record) -> list[TemplateSectionGroup] | None:
+    groups_raw = row["groups"]
+
+    return (
+        [TemplateSectionGroup.model_validate(group) for group in groups_raw] if groups_raw else None
+    )
+
+
 def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
     sections_by_id: dict[object, ReportSection] = {}
     sections: list[ReportSection] = []
@@ -89,13 +98,15 @@ def map_report_sections(rows: list[asyncpg.Record]) -> list[ReportSection]:
             section = ReportSection(
                 id=section_id,
                 section_id=row["section_id"],
-                label=row["section_id"].replace("_", " ").title(),
+                label=row["label"],
                 generated_content=row["generated_content"],
                 reviewed_content=row["reviewed_content"],
                 approved=row["approved"],
                 confidence_level=row["confidence_level"],
                 confidence_score=float(row["confidence_score"]),
                 render_type=row["render_type"],
+                fields=row["fields"],
+                groups=map_template_section_groups(row),
                 evidence_sources=[],
             )
             sections_by_id[section_id] = section
@@ -120,13 +131,15 @@ def map_report_detail_sections(
             section = ReportDetailSection(
                 id=section_id,
                 section_id=row["section_id"],
-                label=row["section_id"].replace("_", " ").title(),
+                label=row["label"],
                 generated_content=row["generated_content"],
                 reviewed_content=row["reviewed_content"],
                 approved=row["approved"],
                 confidence_level=row["confidence_level"],
                 confidence_score=float(row["confidence_score"]),
                 render_type=row["render_type"],
+                fields=row["fields"],
+                groups=map_template_section_groups(row),
                 evidence_item_ids=[],
             )
             sections_by_id[section_id] = section

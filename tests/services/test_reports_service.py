@@ -11,8 +11,6 @@ from src.models.reports.report import (
     ReportSection,
     ReportSummary,
 )
-from src.models.templates.domain import TemplateSection, TemplateStructure
-from src.models.templates.records import ActiveCompanyTemplateRecord
 from src.services import reports as reports_service
 
 
@@ -131,16 +129,6 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
             content_summary="Thermal image",
         ),
     ]
-    company_template = ActiveCompanyTemplateRecord(
-        current_template_id=uuid4(),
-        structure=TemplateStructure(
-            sections=[
-                TemplateSection(id="bevindingen", label="Bevindingen", render_type="text_block"),
-                TemplateSection(id="advies", label="Advies", render_type="text_block"),
-            ]
-        ),
-    )
-
     with (
         patch.object(
             reports_service.report_queries,
@@ -157,11 +145,6 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
             "map_report_detail_sections",
             return_value=(sections, evidence_items),
         ) as map_sections,
-        patch.object(
-            reports_service.template_queries,
-            "fetch_active_company_template",
-            AsyncMock(return_value=company_template),
-        ),
     ):
         result = await reports_service.get_report_detail(str(report_id), current_user)
 
@@ -202,25 +185,11 @@ async def test_update_report_section_returns_repository_section() -> None:
             )
         ],
     )
-    company_template = ActiveCompanyTemplateRecord(
-        current_template_id=uuid4(),
-        structure=TemplateStructure(
-            sections=[TemplateSection(id="advies", label="Advies", render_type="text_block")]
-        ),
-    )
-
-    with (
-        patch.object(
-            reports_service.report_queries,
-            "update_report_section",
-            AsyncMock(return_value=section),
-        ) as update_section,
-        patch.object(
-            reports_service.template_queries,
-            "fetch_active_company_template",
-            AsyncMock(return_value=company_template),
-        ),
-    ):
+    with patch.object(
+        reports_service.report_queries,
+        "update_report_section",
+        AsyncMock(return_value=section),
+    ) as update_section:
         result = await reports_service.update_report_section(
             str(report_id),
             str(section_id),

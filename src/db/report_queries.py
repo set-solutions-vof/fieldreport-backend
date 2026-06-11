@@ -73,6 +73,9 @@ async def fetch_report_section_rows(report_id: str, company_id: str) -> list:
             SELECT
                 report_sections.id,
                 report_sections.section_id,
+                report_sections.label,
+                report_sections.fields,
+                report_sections.groups,
                 report_sections.section_order,
                 report_sections.render_type,
                 report_sections.generated_content ->> 0 AS generated_content,
@@ -170,6 +173,9 @@ async def update_report_section(
             SELECT
                 report_sections.id,
                 report_sections.section_id,
+                report_sections.label,
+                report_sections.fields,
+                report_sections.groups,
                 report_sections.section_order,
                 report_sections.render_type,
                 report_sections.generated_content ->> 0 AS generated_content,

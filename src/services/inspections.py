@@ -1,15 +1,12 @@
 from datetime import date
-from pathlib import Path
 from uuid import uuid4
-
-from fastapi import UploadFile
 
 from src.db import inspection_queries, template_queries
 from src.exceptions import MissingMetadataKeys
 from src.http.v1.request.inspection import CreateInspectionRequest
 from src.http.v1.response.inspection import CreateInspectionResponse
 from src.models.reports.metadata import ReportMetadata
-from src.storage import blob
+from src.utils.storage import upload_files, upload_images
 
 
 async def create_inspection(
@@ -34,11 +31,11 @@ async def create_inspection(
     report_id = str(uuid4())
     template_id = str(company_template.current_template_id)
 
-    audio_storage_keys = await _upload_files(
-        company_id, inspection_id, request.audio_files, "audio"
+    audio_storage_keys = await upload_files(
+        "inspections", f"{company_id}/{inspection_id}/audio", request.audio_files
     )
-    photo_storage_keys = await _upload_files(
-        company_id, inspection_id, request.photo_files, "photos"
+    photo_storage_keys = await upload_images(
+        "inspections", f"{company_id}/{inspection_id}/photos", request.photo_files
     )
 
     await inspection_queries.insert_inspection(
@@ -68,19 +65,3 @@ async def create_inspection(
     await inspection_queries.insert_report(report_id, inspection_id, company_id, template_id)
 
     return CreateInspectionResponse(report_id=report_id, status="generating")
-
-
-async def _upload_files(
-    company_id: str,
-    inspection_id: str,
-    files: list[UploadFile],
-    subfolder: str,
-) -> list[str]:
-    keys = []
-    for file in files:
-        key = (
-            f"{company_id}/{inspection_id}/{subfolder}/{uuid4()}{Path(file.filename or '').suffix}"
-        )
-        await blob.upload_form_file("inspections", key, file)
-        keys.append(key)
-    return keys
