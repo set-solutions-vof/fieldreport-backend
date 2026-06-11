@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 
 from src.models.enums.user_role import UserRole
 
@@ -10,5 +10,5 @@ class UpdateCompanyOnboardingRequest(BaseModel):
 
 
 class CreateInviteRequest(BaseModel):
-    email: str
+    email: EmailStr
     role: UserRole

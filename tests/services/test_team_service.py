@@ -16,7 +16,7 @@ async def test_list_team_members_returns_members() -> None:
     )
 
     with patch.object(
-        team_service.team_queries,
+        team_service.queries,
         "list_company_members",
         AsyncMock(return_value=[member]),
     ):

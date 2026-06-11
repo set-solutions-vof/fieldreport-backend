@@ -1,11 +1,17 @@
 from datetime import date
 from uuid import uuid4
 
-from src.db import inspection_queries, template_queries
-from src.exceptions import MissingMetadataKeys
+from azure.core.exceptions import ResourceNotFoundError
+from pydantic import ValidationError
+
+from src.db.connection import get_database
+from src.db.inspection import queries
+from src.db.template.queries import fetch_active_company_template
+from src.exceptions import InspectionPhotoNotFound, InvalidMetadataFormat, MissingMetadataKeys
 from src.http.v1.request.inspection import CreateInspectionRequest
 from src.http.v1.response.inspection import CreateInspectionResponse
 from src.models.reports.metadata import ReportMetadata
+from src.storage import blob
 from src.utils.storage import upload_files, upload_images
 
 
@@ -14,9 +20,12 @@ async def create_inspection(
     user_id: str,
     request: CreateInspectionRequest,
 ) -> CreateInspectionResponse:
-    company_template = await template_queries.fetch_active_company_template(company_id)
+    company_template = await fetch_active_company_template(company_id)
 
-    metadata = ReportMetadata.model_validate_json(request.metadata)
+    try:
+        metadata = ReportMetadata.model_validate_json(request.metadata)
+    except ValidationError as error:
+        raise InvalidMetadataFormat() from error
     metadata_values = metadata.model_dump()
     missing_keys = [
         field.key
@@ -38,30 +47,52 @@ async def create_inspection(
         "inspections", f"{company_id}/{inspection_id}/photos", request.photo_files
     )
 
-    await inspection_queries.insert_inspection(
-        inspection_id,
-        company_id,
-        user_id,
-        template_id,
-        metadata,
-        request.extra_context or "",
-        date.today(),
-    )
-
-    for audio_file, storage_key in zip(request.audio_files, audio_storage_keys, strict=True):
-        await inspection_queries.insert_inspection_audio_file(
+    async with get_database().acquire() as connection:
+        await queries.insert_inspection(
+            connection,
             inspection_id,
-            storage_key,
-            audio_file.filename or "",
+            company_id,
+            user_id,
+            template_id,
+            metadata,
+            request.extra_context or "",
+            date.today(),
         )
 
-    for photo_file, storage_key in zip(request.photo_files, photo_storage_keys, strict=True):
-        await inspection_queries.insert_inspection_photo_file(
-            inspection_id,
-            storage_key,
-            photo_file.filename or "",
-        )
+        for audio_file, storage_key in zip(request.audio_files, audio_storage_keys, strict=True):
+            await queries.insert_inspection_audio_file(
+                connection,
+                inspection_id,
+                storage_key,
+                audio_file.filename or "",
+            )
 
-    await inspection_queries.insert_report(report_id, inspection_id, company_id, template_id)
+        for photo_file, storage_key in zip(request.photo_files, photo_storage_keys, strict=True):
+            await queries.insert_inspection_photo_file(
+                connection,
+                inspection_id,
+                storage_key,
+                photo_file.filename or "",
+            )
+
+        await queries.insert_report(
+            connection,
+            report_id,
+            inspection_id,
+            company_id,
+            template_id,
+        )
 
     return CreateInspectionResponse(report_id=report_id, status="generating")
+
+
+async def get_inspection_photo(company_id: str, key: str) -> tuple[bytes, str]:
+    belongs_to_company = await queries.inspection_photo_belongs_to_company(company_id, key)
+
+    if not belongs_to_company:
+        raise InspectionPhotoNotFound(key)
+
+    try:
+        return await blob.download_file_with_content_type("inspections", key)
+    except ResourceNotFoundError:
+        raise InspectionPhotoNotFound(key)

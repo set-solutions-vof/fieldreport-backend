@@ -52,9 +52,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
     access_token = security.create_access_token(current_user)
 
     with (
-        patch.object(
-            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.template.templates.load_template_configuration",
             AsyncMock(
@@ -98,9 +96,7 @@ async def test_get_template_allows_inspector(client: AsyncClient) -> None:
     access_token = security.create_access_token(current_user)
 
     with (
-        patch.object(
-            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.template.templates.load_template_configuration",
             AsyncMock(
@@ -125,9 +121,7 @@ async def test_post_template_analysis_requires_admin(client: AsyncClient) -> Non
     current_user = build_current_user(role="inspector")
     access_token = security.create_access_token(current_user)
 
-    with patch.object(
-        auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-    ):
+    with patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)):
         response = await client.post(
             "/api/v1/template/analysis",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -142,9 +136,7 @@ async def test_post_template_analysis_accepts_repeated_files_field(client: Async
     access_token = security.create_access_token(current_user)
 
     with (
-        patch.object(
-            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.template.templates.start_template_analysis",
             AsyncMock(
@@ -193,7 +185,7 @@ async def test_post_template_analysis_missing_files_returns_validation_error(
     access_token = security.create_access_token(current_user)
 
     with patch.object(
-        auth_service.auth_queries,
+        auth_service.queries,
         "get_user_by_id",
         AsyncMock(return_value=current_user),
     ):
@@ -212,9 +204,7 @@ async def test_get_template_analysis_returns_pending_review(client: AsyncClient)
     job_id = uuid4()
 
     with (
-        patch.object(
-            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.template.templates.get_template_analysis_job",
             AsyncMock(
@@ -269,7 +259,7 @@ async def test_get_template_analysis_returns_not_found_for_unknown_job(client: A
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -305,9 +295,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
     }
 
     with (
-        patch.object(
-            auth_service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)
-        ),
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.template.templates.confirm_template",
             AsyncMock(

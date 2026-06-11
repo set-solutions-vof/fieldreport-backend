@@ -61,7 +61,7 @@ async def test_get_template_analysis_job_returns_active_job() -> None:
     )
 
     with patch.object(
-        templates_service.template_queries,
+        templates_service.queries,
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
@@ -89,7 +89,7 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
             AsyncMock(return_value="https://storage.example/blob"),
         ) as upload_file,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "replace_template_analysis_job",
             AsyncMock(),
         ) as replace_job,
@@ -111,7 +111,7 @@ async def test_get_template_analysis_job_returns_pending_review_job() -> None:
     )
 
     with patch.object(
-        templates_service.template_queries,
+        templates_service.queries,
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
@@ -130,7 +130,7 @@ async def test_get_template_analysis_job_raises_for_missing_job() -> None:
     current_user = build_current_user()
 
     with patch.object(
-        templates_service.template_queries,
+        templates_service.queries,
         "get_template_analysis_job",
         AsyncMock(return_value=None),
     ):
@@ -156,22 +156,22 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "fetch_optional_latest_template_analysis_job",
             AsyncMock(return_value=job),
         ),
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "create_template",
             AsyncMock(),
         ) as create_template,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "set_active_template",
             AsyncMock(),
         ) as set_active_template,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "delete_template_analysis_job",
             AsyncMock(),
         ) as delete_job,
@@ -217,27 +217,22 @@ async def test_confirm_template_creates_active_template_when_no_analysis_job_exi
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "fetch_optional_latest_template_analysis_job",
             AsyncMock(return_value=None),
         ),
         patch.object(
-            templates_service.template_queries,
-            "update_template_structure",
-            AsyncMock(),
-        ) as update_template_structure,
-        patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "create_template",
             AsyncMock(),
         ) as create_template,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "set_active_template",
             AsyncMock(),
         ) as set_active_template,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "delete_template_analysis_job",
             AsyncMock(),
         ) as delete_job,
@@ -255,7 +250,6 @@ async def test_confirm_template_creates_active_template_when_no_analysis_job_exi
         TemplateStructure(sections=sections),
     )
     set_active_template.assert_awaited_once_with(str(current_user.company_id), str(template_id))
-    update_template_structure.assert_not_awaited()
     delete_job.assert_not_awaited()
 
 
@@ -266,22 +260,22 @@ async def test_confirm_template_does_not_fetch_active_template_without_analysis_
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "fetch_optional_latest_template_analysis_job",
             AsyncMock(return_value=None),
         ),
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "fetch_optional_active_company_template",
             AsyncMock(return_value=None),
         ) as fetch_active_template,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "create_template",
             AsyncMock(),
         ),
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "set_active_template",
             AsyncMock(),
         ),

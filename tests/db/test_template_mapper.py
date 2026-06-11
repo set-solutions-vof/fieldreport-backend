@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from src.db.template_mapper import (
+from src.db.template.mapper import (
     map_active_company_template,
     map_optional_active_company_template,
     map_template_analysis_job,

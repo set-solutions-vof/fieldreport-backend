@@ -1,11 +1,12 @@
 from io import BytesIO
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from azure.core.exceptions import ResourceNotFoundError
 from starlette.datastructures import UploadFile
 
-from src.exceptions import MissingMetadataKeys
+from src.exceptions import InspectionPhotoNotFound, InvalidMetadataFormat, MissingMetadataKeys
 from src.http.v1.request.inspection import CreateInspectionRequest
 from src.models.reports.metadata import ReportMetadata
 from src.models.templates.domain import (
@@ -23,11 +24,14 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
     template_id = uuid4()
     audio_file = UploadFile(filename="audio.m4a", file=BytesIO(b"audio"))
     photo_file = UploadFile(filename="photo.jpg", file=BytesIO(b"photo"))
+    connection = MagicMock()
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with (
-        patch.object(
-            inspections_service.template_queries,
-            "fetch_active_company_template",
+        patch(
+            "src.services.inspections.fetch_active_company_template",
             AsyncMock(
                 return_value=ActiveCompanyTemplateRecord(
                     current_template_id=template_id,
@@ -76,25 +80,26 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
             AsyncMock(return_value=["https://storage.example/photo"]),
         ) as upload_photo_files,
         patch.object(
-            inspections_service.inspection_queries,
+            inspections_service.queries,
             "insert_inspection",
             AsyncMock(),
         ) as insert_inspection,
         patch.object(
-            inspections_service.inspection_queries,
+            inspections_service.queries,
             "insert_inspection_audio_file",
             AsyncMock(),
         ) as insert_audio,
         patch.object(
-            inspections_service.inspection_queries,
+            inspections_service.queries,
             "insert_inspection_photo_file",
             AsyncMock(),
         ) as insert_photo,
         patch.object(
-            inspections_service.inspection_queries,
+            inspections_service.queries,
             "insert_report",
             AsyncMock(),
         ) as insert_report,
+        patch.object(inspections_service, "get_database", MagicMock(return_value=pool)),
     ):
         response = await inspections_service.create_inspection(
             company_id,
@@ -114,8 +119,8 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
     assert response.report_id
     upload_audio_files.assert_awaited_once()
     upload_photo_files.assert_awaited_once()
-    inspection_id = insert_inspection.await_args.args[0]
-    assert insert_inspection.await_args.args[4:6] == (
+    inspection_id = insert_inspection.await_args.args[1]
+    assert insert_inspection.await_args.args[5:7] == (
         ReportMetadata.model_validate(
             {
                 "type_onderzoek": "Lekdetectie",
@@ -127,18 +132,38 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
         "Extra",
     )
     insert_audio.assert_awaited_once()
-    assert insert_audio.await_args.args[0] == inspection_id
-    assert insert_audio.await_args.args[2] == "audio.m4a"
+    assert insert_audio.await_args.args[1] == inspection_id
+    assert insert_audio.await_args.args[3] == "audio.m4a"
     insert_photo.assert_awaited_once()
-    assert insert_photo.await_args.args[0] == inspection_id
-    assert insert_photo.await_args.args[2] == "photo.jpg"
+    assert insert_photo.await_args.args[1] == inspection_id
+    assert insert_photo.await_args.args[3] == "photo.jpg"
     insert_report.assert_awaited_once()
 
 
+async def test_create_inspection_raises_for_invalid_metadata_format() -> None:
+    with patch(
+        "src.services.inspections.fetch_active_company_template",
+        AsyncMock(
+            return_value=ActiveCompanyTemplateRecord(
+                current_template_id=uuid4(),
+                structure=TemplateStructure(metadata_fields=[], sections=[]),
+            )
+        ),
+    ):
+        with pytest.raises(InvalidMetadataFormat):
+            await inspections_service.create_inspection(
+                str(uuid4()),
+                str(uuid4()),
+                CreateInspectionRequest(
+                    metadata="{",
+                    audio_files=[UploadFile(filename="audio.m4a", file=BytesIO(b"audio"))],
+                ),
+            )
+
+
 async def test_create_inspection_raises_for_missing_required_metadata_keys() -> None:
-    with patch.object(
-        inspections_service.template_queries,
-        "fetch_active_company_template",
+    with patch(
+        "src.services.inspections.fetch_active_company_template",
         AsyncMock(
             return_value=ActiveCompanyTemplateRecord(
                 current_template_id=uuid4(),
@@ -167,3 +192,62 @@ async def test_create_inspection_raises_for_missing_required_metadata_keys() -> 
             )
 
     assert error.value.keys == ["naam_opdrachtgever"]
+
+
+async def test_get_inspection_photo_returns_blob() -> None:
+    with (
+        patch.object(
+            inspections_service.queries,
+            "inspection_photo_belongs_to_company",
+            AsyncMock(return_value=True),
+        ),
+        patch.object(
+            inspections_service.blob,
+            "download_file_with_content_type",
+            AsyncMock(return_value=(b"photo", "image/jpeg")),
+        ) as download,
+    ):
+        data, content_type = await inspections_service.get_inspection_photo(
+            "company-id",
+            "company-id/inspection-id/photos/photo.jpg",
+        )
+
+    assert data == b"photo"
+    assert content_type == "image/jpeg"
+    download.assert_awaited_once_with(
+        "inspections",
+        "company-id/inspection-id/photos/photo.jpg",
+    )
+
+
+async def test_get_inspection_photo_raises_when_not_in_company() -> None:
+    with patch.object(
+        inspections_service.queries,
+        "inspection_photo_belongs_to_company",
+        AsyncMock(return_value=False),
+    ):
+        with pytest.raises(InspectionPhotoNotFound):
+            await inspections_service.get_inspection_photo(
+                "company-id",
+                "other-company/inspection-id/photos/photo.jpg",
+            )
+
+
+async def test_get_inspection_photo_raises_when_blob_is_missing() -> None:
+    with (
+        patch.object(
+            inspections_service.queries,
+            "inspection_photo_belongs_to_company",
+            AsyncMock(return_value=True),
+        ),
+        patch.object(
+            inspections_service.blob,
+            "download_file_with_content_type",
+            AsyncMock(side_effect=ResourceNotFoundError("missing")),
+        ),
+    ):
+        with pytest.raises(InspectionPhotoNotFound):
+            await inspections_service.get_inspection_photo(
+                "company-id",
+                "company-id/inspection-id/photos/photo.jpg",
+            )

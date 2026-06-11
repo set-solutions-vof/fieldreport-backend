@@ -3,9 +3,9 @@ from uuid import uuid4
 
 import sqlalchemy as sa
 
-from src.db.connection import get_pool
-from src.db.inspection_mapper import map_inspection_media_file
-from src.db.tables import (
+from src.db.connection import DatabaseConnection, get_database
+from src.db.inspection.mapper import map_inspection_media_file
+from src.db.schema.tables import (
     inspection_audio_files,
     inspection_photo_files,
     inspections,
@@ -16,6 +16,7 @@ from src.models.reports.pipeline import InspectionMediaFile
 
 
 async def insert_inspection(
+    connection: DatabaseConnection,
     id: str,
     company_id: str,
     inspector_id: str,
@@ -35,11 +36,11 @@ async def insert_inspection(
         created_at=sa.func.now(),
     )
 
-    async with get_pool().acquire() as connection:
-        await connection.execute(statement)
+    await connection.execute(statement)
 
 
 async def insert_inspection_audio_file(
+    connection: DatabaseConnection,
     inspection_id: str,
     storage_key: str,
     original_file_name: str,
@@ -52,11 +53,11 @@ async def insert_inspection_audio_file(
         created_at=sa.func.now(),
     )
 
-    async with get_pool().acquire() as connection:
-        await connection.execute(statement)
+    await connection.execute(statement)
 
 
 async def insert_inspection_photo_file(
+    connection: DatabaseConnection,
     inspection_id: str,
     storage_key: str,
     original_file_name: str,
@@ -69,8 +70,7 @@ async def insert_inspection_photo_file(
         created_at=sa.func.now(),
     )
 
-    async with get_pool().acquire() as connection:
-        await connection.execute(statement)
+    await connection.execute(statement)
 
 
 async def fetch_inspection_audio_files(inspection_id: str) -> list[InspectionMediaFile]:
@@ -86,11 +86,34 @@ async def fetch_inspection_audio_files(inspection_id: str) -> list[InspectionMed
         .order_by(inspection_audio_files.c.created_at.asc())
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         rows = result.mappings().all()
 
     return [map_inspection_media_file(row) for row in rows]
+
+
+async def inspection_photo_belongs_to_company(company_id: str, storage_key: str) -> bool:
+    statement = (
+        sa.select(sa.literal(1))
+        .select_from(
+            inspection_photo_files.join(
+                inspections,
+                inspections.c.id == inspection_photo_files.c.inspection_id,
+            )
+        )
+        .where(
+            inspections.c.company_id == company_id,
+            inspection_photo_files.c.storage_key == storage_key,
+        )
+        .limit(1)
+    )
+
+    async with get_database().acquire() as connection:
+        result = await connection.execute(statement)
+        row = result.first()
+
+    return row is not None
 
 
 async def fetch_inspection_photo_files(inspection_id: str) -> list[InspectionMediaFile]:
@@ -106,7 +129,7 @@ async def fetch_inspection_photo_files(inspection_id: str) -> list[InspectionMed
         .order_by(inspection_photo_files.c.created_at.asc())
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         rows = result.mappings().all()
 
@@ -114,6 +137,7 @@ async def fetch_inspection_photo_files(inspection_id: str) -> list[InspectionMed
 
 
 async def insert_report(
+    connection: DatabaseConnection,
     id: str,
     inspection_id: str,
     company_id: str,
@@ -129,5 +153,4 @@ async def insert_report(
         updated_at=sa.func.now(),
     )
 
-    async with get_pool().acquire() as connection:
-        await connection.execute(statement)
+    await connection.execute(statement)

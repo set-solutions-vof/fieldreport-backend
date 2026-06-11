@@ -1,25 +1,25 @@
 from unittest.mock import AsyncMock, patch
 
-from src.workers import audio_pipeline_worker
+from src.workers import report_generation_worker
 
 
-async def test_run_audio_pipeline_worker_processes_claimed_report() -> None:
+async def test_run_report_generation_worker_processes_claimed_report() -> None:
     report = {"id": "report-id"}
 
     with (
         patch.object(
-            audio_pipeline_worker.report_queries,
-            "claim_next_audio_pipeline_report",
+            report_generation_worker.queries,
+            "claim_next_report_for_generation",
             AsyncMock(return_value=report),
         ) as claim_report,
         patch.object(
-            audio_pipeline_worker.audio_pipeline,
-            "run_audio_pipeline",
+            report_generation_worker.pipeline,
+            "run_report_generation",
             AsyncMock(side_effect=KeyboardInterrupt),
         ) as run_pipeline,
     ):
         try:
-            await audio_pipeline_worker.run_audio_pipeline_worker()
+            await report_generation_worker.run_report_generation_worker()
         except KeyboardInterrupt:
             pass
 
@@ -27,23 +27,23 @@ async def test_run_audio_pipeline_worker_processes_claimed_report() -> None:
     run_pipeline.assert_awaited_once_with("report-id")
 
 
-async def test_run_audio_pipeline_worker_continues_after_report_failure() -> None:
+async def test_run_report_generation_worker_continues_after_report_failure() -> None:
     report = {"id": "report-id"}
 
     with (
         patch.object(
-            audio_pipeline_worker.report_queries,
-            "claim_next_audio_pipeline_report",
+            report_generation_worker.queries,
+            "claim_next_report_for_generation",
             AsyncMock(side_effect=[report, KeyboardInterrupt()]),
         ),
         patch.object(
-            audio_pipeline_worker.audio_pipeline,
-            "run_audio_pipeline",
+            report_generation_worker.pipeline,
+            "run_report_generation",
             AsyncMock(side_effect=ValueError("failed")),
         ) as run_pipeline,
     ):
         try:
-            await audio_pipeline_worker.run_audio_pipeline_worker()
+            await report_generation_worker.run_report_generation_worker()
         except KeyboardInterrupt:
             raised = True
         else:
@@ -53,17 +53,17 @@ async def test_run_audio_pipeline_worker_continues_after_report_failure() -> Non
     run_pipeline.assert_awaited_once_with("report-id")
 
 
-async def test_run_audio_pipeline_worker_sleeps_when_no_report_is_available() -> None:
+async def test_run_report_generation_worker_sleeps_when_no_report_is_available() -> None:
     with (
         patch.object(
-            audio_pipeline_worker.report_queries,
-            "claim_next_audio_pipeline_report",
+            report_generation_worker.queries,
+            "claim_next_report_for_generation",
             AsyncMock(side_effect=[None, KeyboardInterrupt()]),
         ),
-        patch.object(audio_pipeline_worker.asyncio, "sleep", AsyncMock()) as sleep,
+        patch.object(report_generation_worker.asyncio, "sleep", AsyncMock()) as sleep,
     ):
         try:
-            await audio_pipeline_worker.run_audio_pipeline_worker()
+            await report_generation_worker.run_report_generation_worker()
         except KeyboardInterrupt:
             raised = True
         else:
@@ -71,5 +71,5 @@ async def test_run_audio_pipeline_worker_sleeps_when_no_report_is_available() ->
 
     assert raised is True
     sleep.assert_awaited_once_with(
-        audio_pipeline_worker.settings.audio_pipeline_worker_poll_seconds
+        report_generation_worker.settings.report_generation_worker_poll_seconds
     )

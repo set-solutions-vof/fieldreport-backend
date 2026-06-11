@@ -56,7 +56,7 @@ async def test_get_onboarding_company_returns_company_state(client: AsyncClient)
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -93,7 +93,7 @@ async def test_patch_onboarding_company_updates_company_state(client: AsyncClien
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -132,7 +132,7 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -169,7 +169,7 @@ async def test_create_onboarding_invite_returns_bad_gateway_when_email_delivery_
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -196,7 +196,7 @@ async def test_create_onboarding_invite_rejects_duplicate_pending_invite(
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -231,7 +231,7 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -265,7 +265,7 @@ async def test_delete_onboarding_invite_deletes_pending_invite(client: AsyncClie
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -292,7 +292,7 @@ async def test_delete_onboarding_invite_returns_not_found_for_missing_invite(
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -315,7 +315,7 @@ async def test_onboarding_routes_require_admin(client: AsyncClient) -> None:
     access_token = security.create_access_token(current_user)
 
     with patch.object(
-        auth_service.auth_queries,
+        auth_service.queries,
         "get_user_by_id",
         AsyncMock(return_value=current_user),
     ):

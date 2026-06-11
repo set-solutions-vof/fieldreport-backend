@@ -3,31 +3,6 @@ from src.email.smtp_client import send_email
 from src.models.enums.user_role import UserRole
 
 
-def invite_accept_url(token: str) -> str:
-    return f"{settings.frontend_base_url.rstrip('/')}/invite/{token}"
-
-
-def role_label(role: UserRole) -> str:
-    if role == "admin":
-        return "Beheerder"
-    return "Inspecteur"
-
-
-body_style = "margin:0;padding:32px;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;"
-card_style = "background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:32px;"
-brand_style = (
-    "margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.08em;"
-    "text-transform:uppercase;color:#3b5bdb;"
-)
-heading_style = "margin:0 0 12px;font-size:24px;line-height:1.3;color:#111827;"
-body_text_style = "margin:0 0 20px;font-size:15px;line-height:1.6;color:#4b5563;"
-button_style = (
-    "display:inline-block;padding:12px 20px;background:#3b5bdb;color:#ffffff;"
-    "text-decoration:none;border-radius:8px;font-weight:600;"
-)
-footer_style = "margin:0;font-size:13px;line-height:1.6;color:#6b7280;"
-
-
 async def send_invite_email(
     *,
     to_email: str,
@@ -90,3 +65,28 @@ async def send_invite_email(
         text_body=text_body,
         html_body=html_body,
     )
+
+
+def invite_accept_url(token: str) -> str:
+    return f"{settings.frontend_base_url.rstrip('/')}/invite/{token}"
+
+
+def role_label(role: UserRole) -> str:
+    if role == "admin":
+        return "Beheerder"
+    return "Inspecteur"
+
+
+body_style = "margin:0;padding:32px;background:#f4f6f8;font-family:Arial,sans-serif;color:#1f2937;"
+card_style = "background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:32px;"
+brand_style = (
+    "margin:0 0 8px;font-size:12px;font-weight:700;letter-spacing:0.08em;"
+    "text-transform:uppercase;color:#3b5bdb;"
+)
+heading_style = "margin:0 0 12px;font-size:24px;line-height:1.3;color:#111827;"
+body_text_style = "margin:0 0 20px;font-size:15px;line-height:1.6;color:#4b5563;"
+button_style = (
+    "display:inline-block;padding:12px 20px;background:#3b5bdb;color:#ffffff;"
+    "text-decoration:none;border-radius:8px;font-weight:600;"
+)
+footer_style = "margin:0;font-size:13px;line-height:1.6;color:#6b7280;"

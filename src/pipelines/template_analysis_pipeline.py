@@ -1,6 +1,6 @@
 import asyncio
 
-from src.db import template_queries
+from src.db.template import queries
 from src.llm import deepseek_client, gpt4o_client
 from src.models.templates.pipeline import TemplateAnalysisDocument
 from src.models.templates.records import TemplateAnalysisJobRecord
@@ -9,14 +9,14 @@ from src.utils import pdf_text_extractor
 
 
 async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | None:
-    job = await template_queries.claim_next_template_analysis_job()
+    job = await queries.claim_next_template_analysis_job()
 
     if job is None:
         return None
 
     try:
         job_id = str(job.id)
-        files = await template_queries.get_template_analysis_job_files(job_id)
+        files = await queries.get_template_analysis_job_files(job_id)
         documents = await asyncio.gather(
             *[
                 build_template_analysis_document(
@@ -28,13 +28,13 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | No
         )
         structure = await deepseek_client.synthesize_template_structure(documents)
 
-        await template_queries.update_template_analysis_job(
+        await queries.update_template_analysis_job(
             job_id,
             "pending_review",
             structure,
         )
     except Exception as error:
-        await template_queries.update_template_analysis_job(
+        await queries.update_template_analysis_job(
             job_id,
             "failed",
             None,

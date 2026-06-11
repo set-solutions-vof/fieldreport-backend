@@ -6,6 +6,7 @@ metadata = sa.MetaData()
 user_role = postgresql.ENUM("admin", "inspector", name="user_role", create_type=False)
 report_status = postgresql.ENUM(
     "generating",
+    "processing",
     "draft",
     "approved",
     "failed",
@@ -164,6 +165,7 @@ reports = sa.Table(
     sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
+    sa.Column("claimed_at", sa.DateTime(timezone=True), nullable=True),
 )
 
 report_sections = sa.Table(

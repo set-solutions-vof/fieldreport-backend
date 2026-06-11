@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from src.db.team_mapper import map_team_member
+from src.db.team.mapper import map_team_member
 from src.models.team.member import TeamMember
 
 

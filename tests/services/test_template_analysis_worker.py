@@ -41,3 +41,22 @@ async def test_run_template_analysis_worker_sleeps_when_no_job_is_available() ->
     sleep.assert_awaited_once_with(
         template_analysis_worker.settings.template_analysis_worker_poll_seconds
     )
+
+
+async def test_run_template_analysis_worker_backs_off_after_error() -> None:
+    with (
+        patch.object(
+            template_analysis_worker.template_analysis_pipeline,
+            "process_next_template_analysis_job",
+            AsyncMock(side_effect=[RuntimeError("boom"), KeyboardInterrupt()]),
+        ),
+        patch.object(template_analysis_worker.asyncio, "sleep", AsyncMock()) as sleep,
+    ):
+        try:
+            await template_analysis_worker.run_template_analysis_worker()
+        except KeyboardInterrupt:
+            pass
+        else:
+            raise AssertionError("Expected KeyboardInterrupt")
+
+    sleep.assert_awaited_once_with(5)

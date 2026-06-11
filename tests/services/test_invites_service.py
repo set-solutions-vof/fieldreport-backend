@@ -3,6 +3,9 @@ from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
+from asyncpg import UniqueViolationError
+from fastapi import HTTPException
+from sqlalchemy.exc import IntegrityError
 
 from src.exceptions import InviteInvalid
 from src.models.auth.authentication import CurrentUser
@@ -27,7 +30,7 @@ async def test_get_invite_preview_returns_preview() -> None:
     invite = build_invite_details()
 
     with patch.object(
-        invites_service.onboarding_queries,
+        invites_service.queries,
         "get_invite_by_token_hash",
         AsyncMock(return_value=invite),
     ):
@@ -42,7 +45,7 @@ async def test_get_invite_preview_returns_preview() -> None:
 
 async def test_get_invite_preview_raises_for_invalid_invite() -> None:
     with patch.object(
-        invites_service.onboarding_queries,
+        invites_service.queries,
         "get_invite_by_token_hash",
         AsyncMock(return_value=None),
     ):
@@ -63,23 +66,21 @@ async def test_accept_invite_returns_tokens() -> None:
 
     with (
         patch.object(
-            invites_service.onboarding_queries,
+            invites_service.queries,
             "get_invite_by_token_hash",
             AsyncMock(return_value=invite),
         ),
-        patch.object(
-            invites_service.auth_queries,
-            "get_user_by_email",
+        patch(
+            "src.services.invites.get_user_by_email",
             AsyncMock(return_value=None),
         ),
         patch.object(
-            invites_service.onboarding_queries,
+            invites_service.queries,
             "accept_invite_and_create_user",
             AsyncMock(return_value=str(current_user.id)),
         ),
-        patch.object(
-            invites_service.auth_queries,
-            "get_user_by_id",
+        patch(
+            "src.services.invites.get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
         patch.object(
@@ -108,7 +109,7 @@ async def test_get_invite_preview_raises_for_accepted_invite() -> None:
     invite = build_invite_details(is_accepted=True)
 
     with patch.object(
-        invites_service.onboarding_queries,
+        invites_service.queries,
         "get_invite_by_token_hash",
         AsyncMock(return_value=invite),
     ):
@@ -121,7 +122,7 @@ async def test_get_invite_preview_raises_for_expired_invite() -> None:
     invite = invite.model_copy(update={"expires_at": datetime.now(UTC) - timedelta(seconds=1)})
 
     with patch.object(
-        invites_service.onboarding_queries,
+        invites_service.queries,
         "get_invite_by_token_hash",
         AsyncMock(return_value=invite),
     ):
@@ -142,13 +143,12 @@ async def test_accept_invite_raises_when_user_already_exists() -> None:
 
     with (
         patch.object(
-            invites_service.onboarding_queries,
+            invites_service.queries,
             "get_invite_by_token_hash",
             AsyncMock(return_value=invite),
         ),
-        patch.object(
-            invites_service.auth_queries,
-            "get_user_by_email",
+        patch(
+            "src.services.invites.get_user_by_email",
             AsyncMock(return_value=existing_user),
         ),
     ):
@@ -162,23 +162,21 @@ async def test_accept_invite_raises_when_created_user_cannot_be_loaded() -> None
 
     with (
         patch.object(
-            invites_service.onboarding_queries,
+            invites_service.queries,
             "get_invite_by_token_hash",
             AsyncMock(return_value=invite),
         ),
-        patch.object(
-            invites_service.auth_queries,
-            "get_user_by_email",
+        patch(
+            "src.services.invites.get_user_by_email",
             AsyncMock(return_value=None),
         ),
         patch.object(
-            invites_service.onboarding_queries,
+            invites_service.queries,
             "accept_invite_and_create_user",
             AsyncMock(return_value=str(user_id)),
         ),
-        patch.object(
-            invites_service.auth_queries,
-            "get_user_by_id",
+        patch(
+            "src.services.invites.get_user_by_id",
             AsyncMock(return_value=None),
         ),
     ):
@@ -191,20 +189,71 @@ async def test_accept_invite_raises_when_user_creation_fails() -> None:
 
     with (
         patch.object(
-            invites_service.onboarding_queries,
+            invites_service.queries,
             "get_invite_by_token_hash",
             AsyncMock(return_value=invite),
         ),
-        patch.object(
-            invites_service.auth_queries,
-            "get_user_by_email",
+        patch(
+            "src.services.invites.get_user_by_email",
             AsyncMock(return_value=None),
         ),
         patch.object(
-            invites_service.onboarding_queries,
+            invites_service.queries,
             "accept_invite_and_create_user",
             AsyncMock(return_value=""),
         ),
     ):
         with pytest.raises(InviteInvalid):
             await invites_service.accept_invite("token", "New User", "secret")
+
+
+async def test_accept_invite_returns_conflict_for_asyncpg_unique_violation() -> None:
+    invite = build_invite_details()
+
+    with (
+        patch.object(
+            invites_service.queries,
+            "get_invite_by_token_hash",
+            AsyncMock(return_value=invite),
+        ),
+        patch(
+            "src.services.invites.get_user_by_email",
+            AsyncMock(return_value=None),
+        ),
+        patch.object(
+            invites_service.queries,
+            "accept_invite_and_create_user",
+            AsyncMock(side_effect=UniqueViolationError("duplicate")),
+        ),
+    ):
+        with pytest.raises(HTTPException) as error:
+            await invites_service.accept_invite("token", "New User", "secret")
+
+    assert error.value.status_code == 409
+    assert error.value.detail == "Email already registered"
+
+
+async def test_accept_invite_returns_conflict_for_integrity_error() -> None:
+    invite = build_invite_details()
+
+    with (
+        patch.object(
+            invites_service.queries,
+            "get_invite_by_token_hash",
+            AsyncMock(return_value=invite),
+        ),
+        patch(
+            "src.services.invites.get_user_by_email",
+            AsyncMock(return_value=None),
+        ),
+        patch.object(
+            invites_service.queries,
+            "accept_invite_and_create_user",
+            AsyncMock(side_effect=IntegrityError("insert", {}, Exception("duplicate"))),
+        ),
+    ):
+        with pytest.raises(HTTPException) as error:
+            await invites_service.accept_invite("token", "New User", "secret")
+
+    assert error.value.status_code == 409
+    assert error.value.detail == "Email already registered"

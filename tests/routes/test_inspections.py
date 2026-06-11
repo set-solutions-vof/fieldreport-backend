@@ -5,7 +5,7 @@ from uuid import uuid4
 from fastapi import HTTPException
 from starlette.datastructures import UploadFile
 
-from src.exceptions import MissingMetadataKeys
+from src.exceptions import InspectionPhotoNotFound, InvalidMetadataFormat, MissingMetadataKeys
 from src.http.v1.request.inspection import CreateInspectionRequest
 from src.http.v1.response.inspection import CreateInspectionResponse
 from src.models.auth.authentication import CurrentUser
@@ -89,13 +89,55 @@ async def test_create_inspection_returns_missing_required_metadata_keys() -> Non
     create_inspection.assert_awaited_once()
 
 
-async def test_get_inspection_photo_returns_image_bytes() -> None:
+async def test_create_inspection_returns_invalid_metadata_format() -> None:
+    current_user = build_current_user()
+
     with patch(
-        "src.routes.inspections.blob.download_file",
-        AsyncMock(return_value=b"\xff\xd8\xff"),
-    ) as download:
-        response = await inspections.get_inspection_photo("company/inspection/photo.jpg")
+        "src.routes.inspections.inspections.create_inspection",
+        AsyncMock(side_effect=InvalidMetadataFormat()),
+    ):
+        try:
+            await inspections.create_inspection(
+                CreateInspectionRequest(
+                    metadata="{",
+                    audio_files=[UploadFile(filename="audio.m4a", file=BytesIO(b"audio"))],
+                ),
+                current_user,
+            )
+        except HTTPException as error:
+            assert error.status_code == 422
+            assert error.detail == "Invalid metadata format"
+        else:
+            raise AssertionError("Expected HTTPException")
+
+
+async def test_get_inspection_photo_returns_image_bytes() -> None:
+    current_user = build_current_user()
+    key = f"{current_user.company_id}/inspection/photo.jpg"
+
+    with patch(
+        "src.routes.inspections.inspections.get_inspection_photo",
+        AsyncMock(return_value=(b"\xff\xd8\xff", "image/png")),
+    ) as get_photo:
+        response = await inspections.get_inspection_photo(key, current_user)
 
     assert response.body == b"\xff\xd8\xff"
-    assert response.media_type == "image/jpeg"
-    download.assert_awaited_once_with("inspections", "company/inspection/photo.jpg")
+    assert response.media_type == "image/png"
+    get_photo.assert_awaited_once_with(str(current_user.company_id), key)
+
+
+async def test_get_inspection_photo_returns_not_found_for_missing_photo() -> None:
+    current_user = build_current_user()
+    key = f"{current_user.company_id}/inspection/photo.jpg"
+
+    with patch(
+        "src.routes.inspections.inspections.get_inspection_photo",
+        AsyncMock(side_effect=InspectionPhotoNotFound(key)),
+    ):
+        try:
+            await inspections.get_inspection_photo(key, current_user)
+        except HTTPException as error:
+            assert error.status_code == 404
+            assert error.detail == "Photo not found"
+        else:
+            raise AssertionError("Expected HTTPException")

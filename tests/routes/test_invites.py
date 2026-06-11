@@ -64,7 +64,7 @@ async def test_accept_invite_returns_tokens(client: AsyncClient) -> None:
     ) as accept_invite:
         response = await client.post(
             "/api/v1/invites/raw-token/accept",
-            json={"name": "New User", "password": "secret"},
+            json={"name": "New User", "password": "secret12"},
         )
 
     assert response.status_code == 201
@@ -73,7 +73,7 @@ async def test_accept_invite_returns_tokens(client: AsyncClient) -> None:
         "refresh_token": "refresh-token",
         "token_type": "bearer",
     }
-    accept_invite.assert_awaited_once_with("raw-token", "New User", "secret")
+    accept_invite.assert_awaited_once_with("raw-token", "New User", "secret12")
 
 
 async def test_accept_invite_returns_bad_request_for_invalid_invite(
@@ -85,7 +85,7 @@ async def test_accept_invite_returns_bad_request_for_invalid_invite(
     ):
         response = await client.post(
             f"/api/v1/invites/{uuid4()}/accept",
-            json={"name": "New User", "password": "secret"},
+            json={"name": "New User", "password": "secret12"},
         )
 
     assert response.status_code == 400

@@ -38,14 +38,19 @@ def database_url() -> str:
     return settings.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
 
 
-async def create_pool() -> None:
+async def init_database() -> None:
     global _engine
-    _engine = create_async_engine(database_url())
+    _engine = create_async_engine(
+        database_url(),
+        pool_pre_ping=True,
+        pool_size=10,
+        max_overflow=5,
+    )
 
 
-async def close_pool() -> None:
+async def close_database() -> None:
     await _engine.dispose()
 
 
-def get_pool() -> Database:
+def get_database() -> Database:
     return Database(_engine)

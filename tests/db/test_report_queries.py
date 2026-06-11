@@ -2,8 +2,10 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from src.db import report_queries
-from src.db.report_mapper import map_report_detail_sections
+import pytest
+
+from src.db.report import queries
+from src.db.report.mapper import map_report_detail_sections
 from src.exceptions import ReportNotFound
 from src.models.reports.metadata import ReportMetadata
 from tests.db.sqlalchemy_fakes import FakeResult, build_connection
@@ -35,8 +37,8 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        reports = await report_queries.list_report_summaries_by_company_id(str(company_id))
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        reports = await queries.list_report_summaries_by_company_id(str(company_id))
 
     assert [report.id for report in reports] == [rows[0]["id"], rows[1]["id"]]
     assert all(report.company_id == company_id for report in reports)
@@ -69,8 +71,8 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        report = await report_queries.get_report_by_id(str(report_id), str(company_id))
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        report = await queries.get_report_by_id(str(report_id), str(company_id))
 
     assert report is not None
     assert report.id == report_id
@@ -94,9 +96,9 @@ async def test_get_report_by_id_raises_when_missing() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
+    with patch("src.db.report.queries.get_database", return_value=pool):
         try:
-            await report_queries.get_report_by_id(str(uuid4()), str(uuid4()))
+            await queries.get_report_by_id(str(uuid4()), str(uuid4()))
         except ReportNotFound as error:
             assert str(error) != ""
         else:
@@ -260,8 +262,8 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        rows = await report_queries.fetch_report_section_rows(str(uuid4()), str(uuid4()))
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        rows = await queries.fetch_report_section_rows(str(uuid4()), str(uuid4()))
         sections, evidence_items = map_report_detail_sections(rows)
 
     assert [section.id for section in sections] == [
@@ -305,7 +307,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     connection.execute.assert_awaited_once()
 
 
-async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None:
+async def test_claim_next_report_for_generation_returns_claimed_report() -> None:
     row = {
         "id": uuid4(),
         "inspection_id": uuid4(),
@@ -317,8 +319,8 @@ async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        result = await report_queries.claim_next_audio_pipeline_report()
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result = await queries.claim_next_report_for_generation()
 
     assert result == row
     connection.execute.assert_awaited_once()
@@ -342,11 +344,22 @@ async def test_get_report_for_pipeline_returns_report_context() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        result = await report_queries.get_report_for_pipeline(str(row["id"]))
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result = await queries.get_report_for_pipeline(str(row["id"]))
 
     assert result == ReportPipelineContext(**row)
     connection.execute.assert_awaited_once()
+
+
+async def test_get_report_for_pipeline_raises_when_missing() -> None:
+    connection = build_connection(row=None)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        with pytest.raises(ReportNotFound):
+            await queries.get_report_for_pipeline(str(uuid4()))
 
 
 async def test_set_report_status_executes_update() -> None:
@@ -355,46 +368,26 @@ async def test_set_report_status_executes_update() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        await report_queries.set_report_status("report-id", "draft")
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        await queries.set_report_status("report-id", "draft")
 
     connection.execute.assert_awaited_once()
     statement = connection.execute.await_args.args[0]
     assert statement.table.name == "reports"
 
 
-async def test_fetch_transcription_segments_for_inspection_returns_rows() -> None:
-    from src.models.reports.pipeline import StoredTranscriptionSegment
-
-    segment_id = uuid4()
-    rows = [{"id": segment_id, "text": "Segment"}]
-    connection = build_connection(rows=rows)
+async def test_reset_report_for_retry_executes_update() -> None:
+    connection = build_connection()
 
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        result = await report_queries.fetch_transcription_segments_for_inspection("inspection-id")
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        await queries.reset_report_for_retry("report-id", "company-id")
 
-    assert result == [StoredTranscriptionSegment(id=segment_id, text="Segment")]
     connection.execute.assert_awaited_once()
-
-
-async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
-    from src.models.reports.pipeline import StoredImageAnalysis
-
-    image_id = uuid4()
-    rows = [{"id": image_id, "analysis_text": "Fotoanalyse"}]
-    connection = build_connection(rows=rows)
-
-    pool = MagicMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        result = await report_queries.fetch_image_analyses_for_inspection("inspection-id")
-
-    assert result == [StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]
-    connection.execute.assert_awaited_once()
+    statement = connection.execute.await_args.args[0]
+    assert statement.table.name == "reports"
 
 
 async def test_update_report_section_returns_updated_section_for_company() -> None:
@@ -434,8 +427,8 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        section = await report_queries.update_report_section(
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        section = await queries.update_report_section(
             str(report_id),
             str(section_id),
             str(company_id),
@@ -493,8 +486,8 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
-        section = await report_queries.update_report_section(
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        section = await queries.update_report_section(
             str(report_id),
             str(section_id),
             str(company_id),
@@ -516,9 +509,9 @@ async def test_update_report_section_raises_when_section_is_missing() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.report_queries.get_pool", return_value=pool):
+    with patch("src.db.report.queries.get_database", return_value=pool):
         try:
-            await report_queries.update_report_section(
+            await queries.update_report_section(
                 str(uuid4()),
                 str(uuid4()),
                 str(uuid4()),

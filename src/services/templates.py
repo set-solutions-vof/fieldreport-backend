@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from fastapi import UploadFile
 
-from src.db import template_queries
+from src.db.template import queries
 from src.exceptions import TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.templates import status_resolver
@@ -19,7 +19,7 @@ from src.storage import blob
 
 
 async def load_template_configuration(company_id: str) -> TemplateStatus:
-    active_template, job = await template_queries.fetch_template_configuration_context(company_id)
+    active_template, job = await queries.fetch_template_configuration_context(company_id)
 
     return status_resolver.resolve_template_company_state(active_template, job)
 
@@ -29,7 +29,7 @@ async def get_template_analysis_job(
     job_id: str,
 ) -> TemplateAnalysisJobRecord:
     company_id = str(user.company_id)
-    job_row = await template_queries.get_template_analysis_job(job_id, company_id)
+    job_row = await queries.get_template_analysis_job(job_id, company_id)
 
     if job_row is None:
         raise TemplateAnalysisJobNotFound(job_id, company_id)
@@ -53,7 +53,7 @@ async def start_template_analysis(
             TemplateAnalysisFile(original_file_name=original_file_name, stored_file_path=key)
         )
 
-    await template_queries.replace_template_analysis_job(job_id, company_id, stored_files)
+    await queries.replace_template_analysis_job(job_id, company_id, stored_files)
 
     return TemplateStatusProcessing(
         status="processing",
@@ -67,14 +67,14 @@ async def confirm_template(
     structure: TemplateStructure,
 ) -> TemplateStatusActive:
     company_id = str(user.company_id)
-    job = await template_queries.fetch_optional_latest_template_analysis_job(company_id)
+    job = await queries.fetch_optional_latest_template_analysis_job(company_id)
     template_id = str(uuid4())
 
-    await template_queries.create_template(company_id, template_id, structure)
-    await template_queries.set_active_template(company_id, template_id)
+    await queries.create_template(company_id, template_id, structure)
+    await queries.set_active_template(company_id, template_id)
 
     if job is not None:
-        await template_queries.delete_template_analysis_job(str(job.id), company_id)
+        await queries.delete_template_analysis_job(str(job.id), company_id)
 
     return TemplateStatusActive(
         status="active",

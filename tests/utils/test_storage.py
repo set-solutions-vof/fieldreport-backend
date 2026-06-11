@@ -31,14 +31,14 @@ async def test_upload_images_normalizes_and_uploads_images() -> None:
         patch.object(
             storage,
             "normalize_to_jpeg",
-            return_value=(b"jpeg", ".jpg", "image/jpeg"),
+            return_value=(b"jpeg", "image/jpeg"),
         ) as normalize,
         patch.object(storage.blob, "upload_file", AsyncMock()) as upload_file,
     ):
         keys = await storage.upload_images("inspections", "company/inspection/photos", [file])
 
     assert keys == ["company/inspection/photos/image-id.jpg"]
-    normalize.assert_called_once_with(b"image", "photo.heic", "")
+    normalize.assert_called_once_with(b"image", "")
     upload_file.assert_awaited_once_with(
         "inspections",
         "company/inspection/photos/image-id.jpg",

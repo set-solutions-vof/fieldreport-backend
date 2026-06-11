@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from src.db.onboarding_mapper import (
+from src.db.onboarding.mapper import (
     map_company,
     map_created_invite,
     map_invite,

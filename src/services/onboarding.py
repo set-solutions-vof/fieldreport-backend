@@ -2,7 +2,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from src.config import settings
-from src.db import onboarding_queries
+from src.db.onboarding import queries
 from src.email.invite_email import send_invite_email
 from src.exceptions import InviteAlreadyExists, InviteEmailDeliveryFailed
 from src.models.enums.user_role import UserRole
@@ -12,14 +12,14 @@ from src.security.invite_tokens import hash_invite_token
 
 
 async def get_company(company_id: str) -> CompanyOnboarding:
-    return await onboarding_queries.get_company(company_id)
+    return await queries.get_company(company_id)
 
 
 async def update_company(
     company_id: str,
     update: CompanyOnboardingUpdate,
 ) -> CompanyOnboarding:
-    return await onboarding_queries.update_company(
+    return await queries.update_company(
         company_id,
         update.logo_url,
         update.primary_color,
@@ -35,7 +35,7 @@ async def create_invite(
     email: str,
     role: UserRole,
 ) -> InviteCreated:
-    if await onboarding_queries.has_pending_invite(company_id, email):
+    if await queries.has_pending_invite(company_id, email):
         raise InviteAlreadyExists(email)
 
     if not _smtp_is_configured():
@@ -44,8 +44,8 @@ async def create_invite(
     raw_token = secrets.token_hex(32)
     token_hash = hash_invite_token(raw_token)
     expires_at = datetime.now(UTC) + timedelta(days=7)
-    company = await onboarding_queries.get_company(company_id)
-    invite = await onboarding_queries.create_invite(
+    company = await queries.get_company(company_id)
+    invite = await queries.create_invite(
         company_id,
         email,
         role,
@@ -61,7 +61,7 @@ async def create_invite(
             token=raw_token,
         )
     except Exception as error:
-        await onboarding_queries.delete_pending_invite(company_id, str(invite.id))
+        await queries.delete_pending_invite(company_id, str(invite.id))
         raise InviteEmailDeliveryFailed() from error
 
     return invite
@@ -79,8 +79,8 @@ def _smtp_is_configured() -> bool:
 
 
 async def list_invites(company_id: str) -> list[InviteRecord]:
-    return await onboarding_queries.list_invites(company_id)
+    return await queries.list_invites(company_id)
 
 
 async def delete_pending_invite(company_id: str, invite_id: str) -> bool:
-    return await onboarding_queries.delete_pending_invite(company_id, invite_id)
+    return await queries.delete_pending_invite(company_id, invite_id)

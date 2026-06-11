@@ -20,8 +20,10 @@ async def upload_images(container: str, prefix: str, files: list[UploadFile]) ->
     keys = []
     for file in files:
         data = await file.read()
-        data, suffix, content_type = normalize_to_jpeg(
-            data, file.filename or "", file.content_type or ""
+        content_type = file.content_type or ""
+        data, content_type = normalize_to_jpeg(data, content_type)
+        suffix = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}.get(
+            content_type, Path(file.filename or "").suffix
         )
         key = f"{prefix}/{uuid4()}{suffix}"
         await blob.upload_file(container, key, data, content_type)

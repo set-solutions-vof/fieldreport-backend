@@ -27,8 +27,8 @@ class Settings(BaseSettings):
     template_analysis_worker_poll_seconds: float = Field(
         default=2.0, validation_alias="TEMPLATE_ANALYSIS_WORKER_POLL_SECONDS"
     )
-    audio_pipeline_worker_poll_seconds: float = Field(
-        default=5.0, validation_alias="AUDIO_PIPELINE_WORKER_POLL_SECONDS"
+    report_generation_worker_poll_seconds: float = Field(
+        default=5.0, validation_alias="REPORT_GENERATION_WORKER_POLL_SECONDS"
     )
     azure_storage_connection_string: str = Field(
         default="", validation_alias="AZURE_STORAGE_CONNECTION_STRING"
@@ -49,4 +49,4 @@ class Settings(BaseSettings):
     )
 
 
-settings = Settings()
+settings = Settings.model_validate({})

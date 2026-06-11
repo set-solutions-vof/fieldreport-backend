@@ -4,8 +4,8 @@ import sqlalchemy as sa
 from pydantic import TypeAdapter
 
 from src.db.connection import DatabaseConnection
-from src.db.report_mapper import map_stored_image_analysis, map_stored_transcription_segment
-from src.db.tables import (
+from src.db.report.mapper import map_stored_image_analysis, map_stored_transcription_segment
+from src.db.schema.tables import (
     image_analyses,
     report_section_evidence,
     report_sections,
@@ -185,6 +185,51 @@ class ReportPipelineRepository:
         await self.connection.execute(statement)
 
         return report_section_id
+
+    async def insert_report_sections(
+        self,
+        report_id: str,
+        company_id: str,
+        section_pairs: list[tuple[GeneratedReportSection, TemplateSection]],
+    ) -> list[str]:
+        report_section_ids = [str(uuid4()) for _ in section_pairs]
+
+        if not section_pairs:
+            return report_section_ids
+
+        statement = report_sections.insert().values(
+            [
+                {
+                    "id": report_section_id,
+                    "report_id": report_id,
+                    "company_id": company_id,
+                    "section_id": section.id,
+                    "section_order": template_section.order,
+                    "render_type": template_section.render_type,
+                    "generated_content": [section.generated_content],
+                    "reviewed_content": None,
+                    "edit_distance": None,
+                    "approved": False,
+                    "confidence_level": section.confidence_level,
+                    "confidence_score": section.confidence_score,
+                    "label": template_section.label,
+                    "fields": _fields_adapter.dump_python(template_section.fields, mode="json")
+                    if template_section.fields is not None
+                    else None,
+                    "groups": _groups_adapter.dump_python(template_section.groups, mode="json")
+                    if template_section.groups is not None
+                    else None,
+                    "updated_at": sa.func.now(),
+                }
+                for report_section_id, (section, template_section) in zip(
+                    report_section_ids, section_pairs, strict=True
+                )
+            ]
+        )
+
+        await self.connection.execute(statement)
+
+        return report_section_ids
 
     async def insert_report_section_source_transcription(
         self,

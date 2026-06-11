@@ -40,7 +40,7 @@ async def test_build_template_analysis_document_combines_text_and_visual_outputs
 
 async def test_process_next_template_analysis_job_returns_none_when_queue_is_empty() -> None:
     with patch.object(
-        template_analysis_pipeline.template_queries,
+        template_analysis_pipeline.queries,
         "claim_next_template_analysis_job",
         AsyncMock(return_value=None),
     ):
@@ -70,12 +70,12 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
 
     with (
         patch.object(
-            template_analysis_pipeline.template_queries,
+            template_analysis_pipeline.queries,
             "claim_next_template_analysis_job",
             AsyncMock(return_value=job),
         ),
         patch.object(
-            template_analysis_pipeline.template_queries,
+            template_analysis_pipeline.queries,
             "get_template_analysis_job_files",
             AsyncMock(return_value=files),
         ),
@@ -96,7 +96,7 @@ async def test_process_next_template_analysis_job_updates_pending_review_structu
             AsyncMock(return_value=structure),
         ),
         patch.object(
-            template_analysis_pipeline.template_queries,
+            template_analysis_pipeline.queries,
             "update_template_analysis_job",
             AsyncMock(),
         ) as update_job,
@@ -129,12 +129,12 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
 
     with (
         patch.object(
-            template_analysis_pipeline.template_queries,
+            template_analysis_pipeline.queries,
             "claim_next_template_analysis_job",
             AsyncMock(return_value=job),
         ),
         patch.object(
-            template_analysis_pipeline.template_queries,
+            template_analysis_pipeline.queries,
             "get_template_analysis_job_files",
             AsyncMock(return_value=files),
         ),
@@ -155,7 +155,7 @@ async def test_process_next_template_analysis_job_marks_failed_when_model_call_f
             AsyncMock(side_effect=ValueError("bad json")),
         ),
         patch.object(
-            template_analysis_pipeline.template_queries,
+            template_analysis_pipeline.queries,
             "update_template_analysis_job",
             AsyncMock(),
         ) as update_job,

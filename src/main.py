@@ -19,29 +19,36 @@ from src.routes import (
     uploads,
 )
 from src.storage import blob
-from src.workers import audio_pipeline_worker, template_analysis_worker
+from src.workers import report_generation_worker, template_analysis_worker
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await connection.create_pool()
+    await connection.init_database()
     await blob.ensure_containers()
 
     client_factory.get_gpt4o_client()
     client_factory.get_deepseek_client()
     client_factory.get_gpt4o_transcribe_client()
 
-    audio_task = asyncio.create_task(audio_pipeline_worker.run_audio_pipeline_worker())
+    report_generation_task = asyncio.create_task(
+        report_generation_worker.run_report_generation_worker(),
+        name="report-generation-worker",
+    )
 
-    template_task = asyncio.create_task(template_analysis_worker.run_template_analysis_worker())
+    template_task = asyncio.create_task(
+        template_analysis_worker.run_template_analysis_worker(),
+        name="template-analysis-worker",
+    )
 
     yield
 
-    audio_task.cancel()
+    report_generation_task.cancel()
 
     template_task.cancel()
-    await asyncio.gather(audio_task, template_task, return_exceptions=True)
-    await connection.close_pool()
+    await asyncio.gather(report_generation_task, template_task, return_exceptions=True)
+    await blob.close_service_client()
+    await connection.close_database()
 
 
 app = FastAPI(

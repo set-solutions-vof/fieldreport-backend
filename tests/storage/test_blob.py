@@ -24,13 +24,8 @@ async def test_upload_file_uploads_blob_and_returns_url() -> None:
     blob_client.url = "https://storage.example/logos/key.png"
     service = MagicMock()
     service.get_blob_client.return_value = blob_client
-    service.__aenter__ = AsyncMock(return_value=service)
-    service.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "src.storage.blob.BlobServiceClient.from_connection_string",
-        return_value=service,
-    ):
+    with patch("src.storage.blob._service_client_instance", return_value=service):
         url = await blob.upload_file("logos", "key.png", b"data", "image/png")
 
     assert url == "https://storage.example/logos/key.png"
@@ -49,13 +44,8 @@ async def test_ensure_containers_creates_missing_containers() -> None:
     missing_logos.create_container = AsyncMock()
     service = MagicMock()
     service.get_container_client.side_effect = [existing, missing, missing_logos]
-    service.__aenter__ = AsyncMock(return_value=service)
-    service.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "src.storage.blob.BlobServiceClient.from_connection_string",
-        return_value=service,
-    ):
+    with patch("src.storage.blob._service_client_instance", return_value=service):
         await blob.ensure_containers()
 
     existing.create_container.assert_not_awaited()
@@ -68,15 +58,13 @@ async def test_download_file_returns_bytes() -> None:
     stream = MagicMock()
     stream.readall = AsyncMock(return_value=b"file-content")
     blob_client.download_blob = AsyncMock(return_value=stream)
+    blob_client.get_blob_properties = AsyncMock(
+        return_value=MagicMock(content_settings=MagicMock(content_type="image/png"))
+    )
     service = MagicMock()
     service.get_blob_client.return_value = blob_client
-    service.__aenter__ = AsyncMock(return_value=service)
-    service.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "src.storage.blob.BlobServiceClient.from_connection_string",
-        return_value=service,
-    ):
+    with patch("src.storage.blob._service_client_instance", return_value=service):
         content = await blob.download_file("logos", "key.png")
 
     assert content == b"file-content"
@@ -87,15 +75,13 @@ async def test_download_file_encodes_non_bytes_content() -> None:
     stream = MagicMock()
     stream.readall = AsyncMock(return_value="text-content")
     blob_client.download_blob = AsyncMock(return_value=stream)
+    blob_client.get_blob_properties = AsyncMock(
+        return_value=MagicMock(content_settings=MagicMock(content_type="text/plain"))
+    )
     service = MagicMock()
     service.get_blob_client.return_value = blob_client
-    service.__aenter__ = AsyncMock(return_value=service)
-    service.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "src.storage.blob.BlobServiceClient.from_connection_string",
-        return_value=service,
-    ):
+    with patch("src.storage.blob._service_client_instance", return_value=service):
         content = await blob.download_file("logos", "key.png")
 
     assert content == b"text-content"
@@ -106,13 +92,37 @@ async def test_delete_file_deletes_blob() -> None:
     blob_client.delete_blob = AsyncMock()
     service = MagicMock()
     service.get_blob_client.return_value = blob_client
-    service.__aenter__ = AsyncMock(return_value=service)
-    service.__aexit__ = AsyncMock(return_value=None)
 
-    with patch(
-        "src.storage.blob.BlobServiceClient.from_connection_string",
-        return_value=service,
-    ):
+    with patch("src.storage.blob._service_client_instance", return_value=service):
         await blob.delete_file("logos", "key.png")
 
     blob_client.delete_blob.assert_awaited_once()
+
+
+async def test_close_service_client_closes_existing_client() -> None:
+    service = MagicMock()
+    service.close = AsyncMock()
+
+    with patch.object(blob, "_service_client", service):
+        await blob.close_service_client()
+
+    service.close.assert_awaited_once()
+    assert blob._service_client is None
+
+
+async def test_service_client_instance_creates_and_reuses_client() -> None:
+    service = MagicMock()
+
+    with (
+        patch.object(blob, "_service_client", None),
+        patch(
+            "src.storage.blob.BlobServiceClient.from_connection_string",
+            return_value=service,
+        ) as create_client,
+    ):
+        first_client = blob._service_client_instance()
+        second_client = blob._service_client_instance()
+
+    assert first_client is service
+    assert second_client is service
+    create_client.assert_called_once()

@@ -109,3 +109,52 @@ async def test_report_routes_return_success_payloads() -> None:
 
     assert detail_response.id == report_detail.id
     assert section_response.id == section.id
+
+
+async def test_retry_report_returns_no_content() -> None:
+    current_user = build_current_user()
+    report_id = uuid4()
+
+    with patch.object(
+        reports.reports,
+        "retry_failed_report",
+        AsyncMock(),
+    ) as retry_report:
+        response = await reports.retry_report(report_id, current_user)
+
+    assert response.status_code == 204
+    retry_report.assert_awaited_once_with(str(report_id), current_user)
+
+
+async def test_retry_report_returns_not_found() -> None:
+    current_user = build_current_user()
+
+    with patch.object(
+        reports.reports,
+        "retry_failed_report",
+        AsyncMock(side_effect=ReportNotFound("report-id")),
+    ):
+        try:
+            await reports.retry_report(uuid4(), current_user)
+        except HTTPException as error:
+            assert error.status_code == 404
+            assert error.detail == "Report not found"
+        else:
+            raise AssertionError("Expected HTTPException")
+
+
+async def test_retry_report_returns_conflict_for_non_failed_report() -> None:
+    current_user = build_current_user()
+
+    with patch.object(
+        reports.reports,
+        "retry_failed_report",
+        AsyncMock(side_effect=ValueError("wrong status")),
+    ):
+        try:
+            await reports.retry_report(uuid4(), current_user)
+        except HTTPException as error:
+            assert error.status_code == 409
+            assert error.detail == "Report can only be retried when failed"
+        else:
+            raise AssertionError("Expected HTTPException")

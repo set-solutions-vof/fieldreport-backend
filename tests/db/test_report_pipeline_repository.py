@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from src.db.report_pipeline_repository import ReportPipelineRepository
-from src.db.tables import (
+from src.db.report.pipeline_repository import ReportPipelineRepository
+from src.db.schema.tables import (
     image_analyses,
     report_section_evidence,
     report_sections,
@@ -116,6 +116,50 @@ async def test_insert_report_section_executes_insert_and_returns_id() -> None:
     connection.execute.assert_awaited_once()
     statement = connection.execute.await_args.args[0]
     assert statement.table is report_sections
+
+
+async def test_insert_report_sections_executes_bulk_insert_and_returns_ids() -> None:
+    connection = build_connection()
+    repository = ReportPipelineRepository(connection)
+    section = GeneratedReportSection(
+        id="conclusie",
+        generated_content="Concept",
+        confidence_level="high",
+        confidence_score=0.9,
+    )
+    template_section = TemplateSection(
+        id="conclusie",
+        label="Conclusie",
+        order=1,
+        render_type="text_block",
+        fields=["Issue", "Advice"],
+        groups=[TemplateSectionGroup(id="main", label="Main", fields=["Issue"])],
+    )
+
+    report_section_ids = await repository.insert_report_sections(
+        "report-id",
+        "company-id",
+        [(section, template_section)],
+    )
+
+    assert len(report_section_ids) == 1
+    connection.execute.assert_awaited_once()
+    statement = connection.execute.await_args.args[0]
+    assert statement.table is report_sections
+
+
+async def test_insert_report_sections_returns_empty_without_sections() -> None:
+    connection = build_connection()
+    repository = ReportPipelineRepository(connection)
+
+    report_section_ids = await repository.insert_report_sections(
+        "report-id",
+        "company-id",
+        [],
+    )
+
+    assert report_section_ids == []
+    connection.execute.assert_not_awaited()
 
 
 async def test_insert_report_section_source_transcription_executes_insert() -> None:

@@ -2,13 +2,15 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from src.db import template_queries
-from src.db.tables import (
+import pytest
+
+from src.db.schema.tables import (
     company,
     template_analysis_job_files,
     template_analysis_jobs,
     templates,
 )
+from src.db.template import queries
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import (
@@ -65,11 +67,11 @@ async def test_fetch_template_configuration_context_returns_state_context() -> N
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
+    with patch("src.db.template.queries.get_database", return_value=pool):
         (
             result_active_template,
             result_job_row,
-        ) = await template_queries.fetch_template_configuration_context(str(uuid4()))
+        ) = await queries.fetch_template_configuration_context(str(uuid4()))
 
     assert result_active_template == ActiveCompanyTemplateRecord(
         current_template_id=company_row["current_template_id"],
@@ -97,8 +99,8 @@ async def test_fetch_active_company_template_returns_company_template() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.fetch_active_company_template(str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.fetch_active_company_template(str(uuid4()))
 
     assert result == ActiveCompanyTemplateRecord(
         current_template_id=company_row["current_template_id"],
@@ -119,8 +121,8 @@ async def test_replace_template_analysis_job_replaces_existing_company_jobs_and_
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        await template_queries.replace_template_analysis_job(
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        await queries.replace_template_analysis_job(
             str(uuid4()),
             str(uuid4()),
             stored_files,
@@ -142,8 +144,8 @@ async def test_get_template_analysis_job_files_returns_stored_files() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.get_template_analysis_job_files(str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.get_template_analysis_job_files(str(uuid4()))
 
     assert result == [
         TemplateAnalysisFile(original_file_name="one.pdf", stored_file_path="/tmp/one.pdf"),
@@ -163,8 +165,8 @@ async def test_fetch_template_structure_returns_stored_structure() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        structure = await template_queries.fetch_template_structure("template-id", "company-id")
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        structure = await queries.fetch_template_structure("template-id", "company-id")
 
     assert structure.sections[0].id == "conclusie"
     connection.execute.assert_awaited_once()
@@ -186,8 +188,8 @@ async def test_get_template_analysis_job_returns_company_scoped_job() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.get_template_analysis_job(str(uuid4()), str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.get_template_analysis_job(str(uuid4()), str(uuid4()))
 
     assert result == TemplateAnalysisJobRecord(
         id=job_row["id"],
@@ -206,8 +208,8 @@ async def test_get_template_analysis_job_returns_none_when_missing_job() -> None
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.get_template_analysis_job(str(uuid4()), str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.get_template_analysis_job(str(uuid4()), str(uuid4()))
 
     assert result is None
     connection.execute.assert_awaited_once()
@@ -229,8 +231,8 @@ async def test_fetch_latest_template_analysis_job_returns_latest_company_job() -
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.fetch_latest_template_analysis_job(str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.fetch_latest_template_analysis_job(str(uuid4()))
 
     assert result == TemplateAnalysisJobRecord(
         id=job_row["id"],
@@ -260,11 +262,11 @@ async def test_fetch_template_configuration_context_handles_null_job_structure()
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
+    with patch("src.db.template.queries.get_database", return_value=pool):
         (
             result_active_template,
             result_job_row,
-        ) = await template_queries.fetch_template_configuration_context(str(uuid4()))
+        ) = await queries.fetch_template_configuration_context(str(uuid4()))
 
     assert result_active_template == ActiveCompanyTemplateRecord(
         current_template_id=company_row["current_template_id"],
@@ -287,8 +289,8 @@ async def test_update_template_analysis_job_updates_status_structure_and_failure
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        await template_queries.update_template_analysis_job(
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        await queries.update_template_analysis_job(
             str(uuid4()),
             "failed",
             TemplateStructure(sections=[]),
@@ -307,8 +309,8 @@ async def test_delete_template_analysis_job_deletes_company_scoped_job() -> None
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        await template_queries.delete_template_analysis_job(job_id, company_id)
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        await queries.delete_template_analysis_job(job_id, company_id)
 
     query = connection.execute.await_args.args[0]
     assert query.table is template_analysis_jobs
@@ -320,8 +322,8 @@ async def test_claim_next_template_analysis_job_returns_none_when_no_job_exists(
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.claim_next_template_analysis_job()
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.claim_next_template_analysis_job()
 
     assert result is None
     connection.execute.assert_awaited_once()
@@ -342,8 +344,8 @@ async def test_claim_next_template_analysis_job_returns_processing_job() -> None
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.claim_next_template_analysis_job()
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.claim_next_template_analysis_job()
 
     assert result is not None
     assert result.id == row["id"]
@@ -356,10 +358,8 @@ async def test_create_template_inserts_template_structure() -> None:
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        await template_queries.create_template(
-            str(uuid4()), str(uuid4()), TemplateStructure(sections=[])
-        )
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        await queries.create_template(str(uuid4()), str(uuid4()), TemplateStructure(sections=[]))
 
     statement = connection.execute.await_args.args[0]
     assert statement.table is templates
@@ -371,8 +371,8 @@ async def test_set_active_template_updates_company_current_template_id() -> None
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        await template_queries.set_active_template(str(uuid4()), str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        await queries.set_active_template(str(uuid4()), str(uuid4()))
 
     statement = connection.execute.await_args.args[0]
     assert statement.table is company
@@ -386,8 +386,8 @@ async def test_fetch_optional_active_company_template_returns_none_without_templ
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.fetch_optional_active_company_template(str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.fetch_optional_active_company_template(str(uuid4()))
 
     assert result is None
 
@@ -398,9 +398,9 @@ async def test_fetch_latest_template_analysis_job_raises_when_no_job_exists() ->
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
+    with patch("src.db.template.queries.get_database", return_value=pool):
         try:
-            await template_queries.fetch_latest_template_analysis_job(str(uuid4()))
+            await queries.fetch_latest_template_analysis_job(str(uuid4()))
         except IndexError:
             pass
         else:
@@ -414,26 +414,20 @@ async def test_fetch_optional_latest_template_analysis_job_returns_none_when_mis
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        result = await template_queries.fetch_optional_latest_template_analysis_job(str(uuid4()))
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.fetch_optional_latest_template_analysis_job(str(uuid4()))
 
     assert result is None
     connection.execute.assert_awaited_once()
 
 
-async def test_update_template_structure_updates_template_row() -> None:
-    connection = build_connection()
-    template_id = str(uuid4())
+async def test_fetch_active_company_template_raises_when_missing() -> None:
+    connection = build_fake_connection(row=None)
     company_id = str(uuid4())
-    structure = TemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
-    )
 
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    with patch("src.db.template_queries.get_pool", return_value=pool):
-        await template_queries.update_template_structure(template_id, company_id, structure)
-
-    statement = connection.execute.await_args.args[0]
-    assert statement.table is templates
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        with pytest.raises(RuntimeError):
+            await queries.fetch_active_company_template(company_id)

@@ -1,16 +1,14 @@
 import sqlalchemy as sa
 from sqlalchemy import text
 
-from src.db.connection import get_pool
-from src.db.report_mapper import (
+from src.db.connection import get_database
+from src.db.report.mapper import (
     map_report_detail,
     map_report_pipeline_context,
     map_report_sections,
     map_report_summary,
-    map_stored_image_analysis,
-    map_stored_transcription_segment,
 )
-from src.db.tables import (
+from src.db.schema.tables import (
     image_analyses,
     inspections,
     report_section_evidence,
@@ -20,11 +18,7 @@ from src.db.tables import (
     users,
 )
 from src.exceptions import ReportNotFound
-from src.models.reports.pipeline import (
-    ReportPipelineContext,
-    StoredImageAnalysis,
-    StoredTranscriptionSegment,
-)
+from src.models.reports.pipeline import ReportPipelineContext
 from src.models.reports.report import (
     ReportDetail,
     ReportSection,
@@ -126,7 +120,7 @@ async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSum
         .order_by(reports.c.created_at.desc())
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         rows = result.mappings().all()
 
@@ -154,7 +148,7 @@ async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
         )
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().first()
 
@@ -178,7 +172,7 @@ async def fetch_report_section_rows(report_id: str, company_id: str) -> list:
         )
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         return result.mappings().all()
 
@@ -190,18 +184,19 @@ async def update_report_section(
     reviewed_content: str | None,
     approved: bool | None,
 ) -> ReportSection:
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         values: dict[str, object] = {}
 
         if reviewed_content is not None:
             values["reviewed_content"] = [reviewed_content]
+            values["approved"] = False
 
         if approved is not None:
             values["approved"] = approved
 
         if values:
             values["updated_at"] = sa.func.now()
-            section_statement = (
+            section_result = await connection.execute(
                 report_sections.update()
                 .where(
                     reports.c.id == report_sections.c.report_id,
@@ -213,7 +208,7 @@ async def update_report_section(
                 .returning(report_sections.c.id)
             )
         else:
-            section_statement = (
+            section_result = await connection.execute(
                 sa.select(report_sections.c.id)
                 .select_from(
                     report_sections.join(reports, reports.c.id == report_sections.c.report_id)
@@ -225,7 +220,6 @@ async def update_report_section(
                 )
             )
 
-        section_result = await connection.execute(section_statement)
         section_row = section_result.mappings().first()
 
         if section_row is None:
@@ -243,24 +237,28 @@ async def update_report_section(
     return map_report_sections(rows)[0]
 
 
-async def claim_next_audio_pipeline_report() -> dict | None:
+async def claim_next_report_for_generation() -> dict | None:
     statement = text(
         """
         WITH next_report AS (
             SELECT id
             FROM reports
             WHERE status = 'generating'::report_status
+              AND (claimed_at IS NULL OR claimed_at < NOW() - INTERVAL '15 minutes')
             ORDER BY created_at ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
         )
-        SELECT id, inspection_id, company_id, template_id
-        FROM reports
+        UPDATE reports
+        SET status = 'processing'::report_status,
+            claimed_at = NOW(),
+            updated_at = NOW()
         WHERE id IN (SELECT id FROM next_report)
+        RETURNING id, inspection_id, company_id, template_id
         """
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().first()
 
@@ -282,9 +280,12 @@ async def get_report_for_pipeline(report_id: str) -> ReportPipelineContext:
         .where(reports.c.id == report_id)
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
-        row = result.mappings().one()
+        row = result.mappings().first()
+
+    if row is None:
+        raise ReportNotFound(report_id)
 
     return map_report_pipeline_context(row)
 
@@ -296,55 +297,24 @@ async def set_report_status(report_id: str, status: str) -> None:
         .values(status=status, updated_at=sa.func.now())
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         await connection.execute(statement)
 
 
-async def fetch_transcription_segments_for_inspection(
-    inspection_id: str,
-) -> list[StoredTranscriptionSegment]:
+async def reset_report_for_retry(report_id: str, company_id: str) -> None:
     statement = (
-        sa.select(
-            transcription_segments.c.id,
-            transcription_segments.c.transcription_id,
-            transcription_segments.c.inspection_id,
-            transcription_segments.c.segment_index,
-            transcription_segments.c.start_seconds,
-            transcription_segments.c.end_seconds,
-            transcription_segments.c.text,
-            transcription_segments.c.created_at,
+        reports.update()
+        .where(
+            reports.c.id == report_id,
+            reports.c.company_id == company_id,
+            reports.c.status == "failed",
         )
-        .where(transcription_segments.c.inspection_id == inspection_id)
-        .order_by(
-            transcription_segments.c.transcription_id.asc(),
-            transcription_segments.c.segment_index.asc(),
+        .values(
+            status="generating",
+            claimed_at=None,
+            updated_at=sa.func.now(),
         )
     )
 
-    async with get_pool().acquire() as connection:
-        result = await connection.execute(statement)
-        rows = result.mappings().all()
-
-    return [map_stored_transcription_segment(row) for row in rows]
-
-
-async def fetch_image_analyses_for_inspection(inspection_id: str) -> list[StoredImageAnalysis]:
-    statement = (
-        sa.select(
-            image_analyses.c.id,
-            image_analyses.c.inspection_id,
-            image_analyses.c.company_id,
-            image_analyses.c.storage_key,
-            image_analyses.c.analysis_text,
-            image_analyses.c.captured_at,
-            image_analyses.c.created_at,
-        )
-        .where(image_analyses.c.inspection_id == inspection_id)
-        .order_by(image_analyses.c.created_at.asc())
-    )
-
-    async with get_pool().acquire() as connection:
-        result = await connection.execute(statement)
-        rows = result.mappings().all()
-
-    return [map_stored_image_analysis(row) for row in rows]
+    async with get_database().acquire() as connection:
+        await connection.execute(statement)

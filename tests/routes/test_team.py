@@ -56,7 +56,7 @@ async def test_list_team_members_returns_members(client: AsyncClient) -> None:
 
     with (
         patch.object(
-            auth_service.auth_queries,
+            auth_service.queries,
             "get_user_by_id",
             AsyncMock(return_value=current_user),
         ),
@@ -87,7 +87,7 @@ async def test_list_team_members_requires_admin(client: AsyncClient) -> None:
     access_token = security.create_access_token(current_user)
 
     with patch.object(
-        auth_service.auth_queries,
+        auth_service.queries,
         "get_user_by_id",
         AsyncMock(return_value=current_user),
     ):

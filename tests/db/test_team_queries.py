@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from src.db import team_queries
+from src.db.team import queries
 from src.models.team.member import TeamMember
 from tests.db.sqlalchemy_fakes import build_connection
 
@@ -11,7 +11,7 @@ def mock_pool(connection):
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-    return patch("src.db.team_queries.get_pool", return_value=pool)
+    return patch("src.db.team.queries.get_database", return_value=pool)
 
 
 async def test_list_company_members_returns_members() -> None:
@@ -27,7 +27,7 @@ async def test_list_company_members_returns_members() -> None:
     connection = build_connection(rows=[row])
 
     with mock_pool(connection):
-        members = await team_queries.list_company_members(str(uuid4()))
+        members = await queries.list_company_members(str(uuid4()))
 
     assert members == [
         TeamMember(

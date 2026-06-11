@@ -21,7 +21,7 @@ async def test_get_company_returns_company() -> None:
     )
 
     with patch.object(
-        onboarding_service.onboarding_queries,
+        onboarding_service.queries,
         "get_company",
         AsyncMock(return_value=company),
     ):
@@ -48,7 +48,7 @@ async def test_update_company_returns_updated_company() -> None:
     )
 
     with patch.object(
-        onboarding_service.onboarding_queries,
+        onboarding_service.queries,
         "update_company",
         AsyncMock(return_value=company),
     ) as update_company:
@@ -85,17 +85,17 @@ async def test_create_invite_returns_created_invite() -> None:
 
     with (
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "has_pending_invite",
             AsyncMock(return_value=False),
         ),
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "get_company",
             AsyncMock(return_value=company),
         ),
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "create_invite",
             AsyncMock(return_value=invite),
         ) as create_invite,
@@ -129,7 +129,7 @@ def test_smtp_is_configured_returns_false_when_from_email_is_missing() -> None:
 async def test_create_invite_raises_when_smtp_is_not_configured() -> None:
     with (
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "has_pending_invite",
             AsyncMock(return_value=False),
         ),
@@ -162,17 +162,17 @@ async def test_create_invite_deletes_pending_invite_when_email_send_fails() -> N
 
     with (
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "has_pending_invite",
             AsyncMock(return_value=False),
         ),
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "get_company",
             AsyncMock(return_value=company),
         ),
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "create_invite",
             AsyncMock(return_value=invite),
         ),
@@ -183,7 +183,7 @@ async def test_create_invite_deletes_pending_invite_when_email_send_fails() -> N
             AsyncMock(side_effect=RuntimeError("smtp failed")),
         ),
         patch.object(
-            onboarding_service.onboarding_queries,
+            onboarding_service.queries,
             "delete_pending_invite",
             AsyncMock(),
         ) as delete_pending_invite,
@@ -201,7 +201,7 @@ async def test_create_invite_deletes_pending_invite_when_email_send_fails() -> N
 
 async def test_create_invite_raises_when_pending_invite_exists() -> None:
     with patch.object(
-        onboarding_service.onboarding_queries,
+        onboarding_service.queries,
         "has_pending_invite",
         AsyncMock(return_value=True),
     ):
@@ -224,7 +224,7 @@ async def test_list_invites_returns_invites() -> None:
     )
 
     with patch.object(
-        onboarding_service.onboarding_queries,
+        onboarding_service.queries,
         "list_invites",
         AsyncMock(return_value=[invite]),
     ):
@@ -235,7 +235,7 @@ async def test_list_invites_returns_invites() -> None:
 
 async def test_delete_pending_invite_returns_repository_result() -> None:
     with patch.object(
-        onboarding_service.onboarding_queries,
+        onboarding_service.queries,
         "delete_pending_invite",
         AsyncMock(return_value=True),
     ):

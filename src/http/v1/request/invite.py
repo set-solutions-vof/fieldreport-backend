@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AcceptInviteRequest(BaseModel):
     name: str
-    password: str
+    password: str = Field(min_length=8)

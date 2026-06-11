@@ -3,14 +3,14 @@ from uuid import uuid4
 
 import sqlalchemy as sa
 
-from src.db.connection import get_pool
-from src.db.onboarding_mapper import (
+from src.db.connection import get_database
+from src.db.onboarding.mapper import (
     map_company,
     map_created_invite,
     map_invite,
     map_invite_details,
 )
-from src.db.tables import company, invites, users
+from src.db.schema.tables import company, invites, users
 from src.models.onboarding.company import CompanyOnboarding
 from src.models.onboarding.invite import InviteCreated, InviteRecord
 from src.models.onboarding.invite_details import InviteDetails
@@ -29,7 +29,7 @@ def _company_columns():
 async def get_company(company_id: str) -> CompanyOnboarding:
     statement = sa.select(*_company_columns()).where(company.c.id == company_id)
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().one()
 
@@ -65,7 +65,7 @@ async def update_company(
         .returning(*_company_columns())
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().one()
 
@@ -79,7 +79,7 @@ async def has_pending_invite(company_id: str, email: str) -> bool:
         invites.c.is_accepted.is_(False),
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().first()
 
@@ -113,7 +113,7 @@ async def create_invite(
         )
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().one()
 
@@ -134,7 +134,7 @@ async def list_invites(company_id: str) -> list[InviteRecord]:
         .order_by(invites.c.created_at.desc())
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         rows = result.mappings().all()
 
@@ -156,7 +156,7 @@ async def get_invite_by_token_hash(token_hash: str) -> InviteDetails | None:
         .where(invites.c.token == token_hash)
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().first()
 
@@ -174,7 +174,7 @@ async def accept_invite_and_create_user(
     role: str,
     password_hash: str,
 ) -> str:
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         async with connection.transaction():
             invite_statement = (
                 sa.select(invites.c.id)
@@ -229,7 +229,7 @@ async def delete_pending_invite(company_id: str, invite_id: str) -> bool:
         .returning(invites.c.id)
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().first()
 

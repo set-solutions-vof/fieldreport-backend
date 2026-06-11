@@ -9,9 +9,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml .
-RUN uv sync --no-dev --no-cache
+COPY uv.lock .
+RUN uv sync --frozen --no-dev --no-cache
 
 COPY src/ src/
+COPY alembic/ alembic/
+COPY alembic.ini .
 
 ENV PATH="/app/.venv/bin:$PATH"
 

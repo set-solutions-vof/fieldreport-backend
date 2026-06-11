@@ -3,14 +3,14 @@ from uuid import uuid4
 import sqlalchemy as sa
 from sqlalchemy import text
 
-from src.db.connection import get_pool
-from src.db.tables import (
+from src.db.connection import get_database
+from src.db.schema.tables import (
     company,
     template_analysis_job_files,
     template_analysis_jobs,
     templates,
 )
-from src.db.template_mapper import (
+from src.db.template.mapper import (
     map_active_company_template,
     map_optional_active_company_template,
     map_template_analysis_file,
@@ -40,7 +40,7 @@ def _template_analysis_job_columns():
 async def fetch_template_configuration_context(
     company_id: str,
 ) -> tuple[ActiveCompanyTemplateRecord | None, TemplateAnalysisJobRecord | None]:
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         active_template_row = await _fetch_optional_active_company_template_row(
             connection, company_id
         )
@@ -53,8 +53,11 @@ async def fetch_template_configuration_context(
 
 
 async def fetch_active_company_template(company_id: str) -> ActiveCompanyTemplateRecord:
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         company_row = await _fetch_active_company_template_row(connection, company_id)
+
+    if company_row is None:
+        raise RuntimeError(f"No active template found for company {company_id}")
 
     return map_active_company_template(company_row)
 
@@ -62,7 +65,7 @@ async def fetch_active_company_template(company_id: str) -> ActiveCompanyTemplat
 async def fetch_optional_active_company_template(
     company_id: str,
 ) -> ActiveCompanyTemplateRecord | None:
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         company_row = await _fetch_optional_active_company_template_row(connection, company_id)
 
     return map_optional_active_company_template(company_row)
@@ -71,7 +74,7 @@ async def fetch_optional_active_company_template(
 async def fetch_optional_latest_template_analysis_job(
     company_id: str,
 ) -> TemplateAnalysisJobRecord | None:
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         job_row = await _fetch_latest_template_analysis_job_row(connection, company_id)
 
     if job_row is None:
@@ -99,7 +102,7 @@ async def get_template_analysis_job(
         template_analysis_jobs.c.company_id == company_id,
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         job_row = result.mappings().first()
 
@@ -114,7 +117,7 @@ async def replace_template_analysis_job(
     company_id: str,
     files: list[TemplateAnalysisFile],
 ) -> None:
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         await connection.execute(
             template_analysis_jobs.delete().where(template_analysis_jobs.c.company_id == company_id)
         )
@@ -165,7 +168,7 @@ async def update_template_analysis_job(
         )
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         await connection.execute(statement)
 
 
@@ -175,7 +178,7 @@ async def delete_template_analysis_job(job_id: str, company_id: str) -> None:
         template_analysis_jobs.c.company_id == company_id,
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         await connection.execute(statement)
 
 
@@ -207,7 +210,7 @@ async def claim_next_template_analysis_job() -> TemplateAnalysisJobRecord | None
         """
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().first()
 
@@ -227,7 +230,7 @@ async def get_template_analysis_job_files(job_id: str) -> list[TemplateAnalysisF
         .order_by(template_analysis_job_files.c.created_at.asc())
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         rows = result.mappings().all()
 
@@ -240,29 +243,11 @@ async def fetch_template_structure(template_id: str, company_id: str) -> Templat
         templates.c.company_id == company_id,
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         result = await connection.execute(statement)
         row = result.mappings().one()
 
     return parse_template_structure(row["structure"])
-
-
-async def update_template_structure(
-    template_id: str,
-    company_id: str,
-    structure: TemplateStructure,
-) -> None:
-    statement = (
-        templates.update()
-        .where(
-            templates.c.id == template_id,
-            templates.c.company_id == company_id,
-        )
-        .values(structure=structure.model_dump(mode="json"))
-    )
-
-    async with get_pool().acquire() as connection:
-        await connection.execute(statement)
 
 
 async def create_template(
@@ -279,7 +264,7 @@ async def create_template(
         created_at=sa.func.now(),
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         await connection.execute(statement)
 
 
@@ -288,7 +273,7 @@ async def set_active_template(company_id: str, template_id: str) -> None:
         company.update().where(company.c.id == company_id).values(current_template_id=template_id)
     )
 
-    async with get_pool().acquire() as connection:
+    async with get_database().acquire() as connection:
         await connection.execute(statement)
 
 
@@ -315,7 +300,7 @@ async def _fetch_active_company_template_row(connection, company_id: str):
         .where(company.c.id == company_id)
     )
     result = await connection.execute(statement)
-    return result.mappings().one()
+    return result.mappings().first()
 
 
 async def _fetch_latest_template_analysis_job_row(connection, company_id: str):

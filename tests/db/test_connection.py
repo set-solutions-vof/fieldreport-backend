@@ -30,21 +30,21 @@ class FakeEngine:
         return FakeConnectContext(self.fake_connection)
 
 
-async def test_create_pool_sets_module_pool() -> None:
+async def test_init_database_sets_module_engine() -> None:
     mock_engine = MagicMock()
 
     with patch("src.db.connection.create_async_engine", return_value=mock_engine):
-        await connection.create_pool()
+        await connection.init_database()
 
-    assert connection.get_pool().engine is mock_engine
+    assert connection.get_database().engine is mock_engine
 
 
-async def test_close_pool_closes_pool() -> None:
+async def test_close_database_disposes_engine() -> None:
     mock_engine = MagicMock()
     mock_engine.dispose = AsyncMock()
     connection._engine = mock_engine
 
-    await connection.close_pool()
+    await connection.close_database()
 
     mock_engine.dispose.assert_awaited_once()
 
