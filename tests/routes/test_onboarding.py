@@ -137,7 +137,7 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding.create_invite",
+            "src.routes.onboarding.invites.create_invite",
             AsyncMock(return_value=invite),
         ) as create_invite,
     ):
@@ -174,7 +174,7 @@ async def test_create_onboarding_invite_returns_bad_gateway_when_email_delivery_
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding.create_invite",
+            "src.routes.onboarding.invites.create_invite",
             AsyncMock(side_effect=InviteEmailDeliveryFailed()),
         ),
     ):
@@ -201,7 +201,7 @@ async def test_create_onboarding_invite_rejects_duplicate_pending_invite(
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding.create_invite",
+            "src.routes.onboarding.invites.create_invite",
             AsyncMock(side_effect=InviteAlreadyExists("new.user@example.com")),
         ),
     ):
@@ -236,7 +236,7 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding.list_invites",
+            "src.routes.onboarding.invites.list_invites",
             AsyncMock(return_value=[invite]),
         ),
     ):
@@ -270,7 +270,7 @@ async def test_delete_onboarding_invite_deletes_pending_invite(client: AsyncClie
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding.delete_pending_invite",
+            "src.routes.onboarding.invites.delete_pending_invite",
             AsyncMock(return_value=True),
         ) as delete_invite,
     ):
@@ -297,7 +297,7 @@ async def test_delete_onboarding_invite_returns_not_found_for_missing_invite(
             AsyncMock(return_value=current_user),
         ),
         patch(
-            "src.routes.onboarding.onboarding.delete_pending_invite",
+            "src.routes.onboarding.invites.delete_pending_invite",
             AsyncMock(return_value=False),
         ),
     ):

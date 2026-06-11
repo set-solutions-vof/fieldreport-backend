@@ -12,7 +12,7 @@ from src.http.v1.response.onboarding import (
 from src.models.auth.authentication import CurrentUser
 from src.models.onboarding.company import CompanyOnboardingUpdate
 from src.security.authentication import require_admin
-from src.services import onboarding
+from src.services import invites, onboarding
 
 router = APIRouter(tags=["Onboarding"])
 
@@ -69,7 +69,7 @@ async def create_invite(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> InviteCreatedResponse:
     try:
-        invite = await onboarding.create_invite(
+        invite = await invites.create_invite(
             str(current_user.company_id),
             request_body.email,
             request_body.role,
@@ -91,9 +91,9 @@ async def create_invite(
 async def list_invites(
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> list[InviteResponse]:
-    invites = await onboarding.list_invites(str(current_user.company_id))
+    invite_records = await invites.list_invites(str(current_user.company_id))
 
-    return [InviteResponse.model_validate(invite.model_dump()) for invite in invites]
+    return [InviteResponse.model_validate(invite.model_dump()) for invite in invite_records]
 
 
 @router.delete(
@@ -106,7 +106,7 @@ async def delete_invite(
     invite_id: str,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> Response:
-    was_deleted = await onboarding.delete_pending_invite(
+    was_deleted = await invites.delete_pending_invite(
         str(current_user.company_id),
         invite_id,
     )
