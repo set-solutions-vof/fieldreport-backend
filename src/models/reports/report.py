@@ -78,4 +78,6 @@ class ReportDetail(BaseModel):
     inspector_name: str
     updated_at: datetime | None = None
     sections: list[ReportDetailSection]
-    evidence_items: list[TranscriptionEvidenceItem | ImageEvidenceItem] = Field(default_factory=list)
+    evidence_items: list[TranscriptionEvidenceItem | ImageEvidenceItem] = Field(
+        default_factory=list
+    )

@@ -8,7 +8,8 @@ depends_on = None
 
 def upgrade() -> None:
     op.execute(
-        "ALTER TABLE transcriptions ADD COLUMN IF NOT EXISTS duration_seconds FLOAT NOT NULL DEFAULT 0"
+        "ALTER TABLE transcriptions ADD COLUMN IF NOT EXISTS "
+        "duration_seconds FLOAT NOT NULL DEFAULT 0"
     )
 
 

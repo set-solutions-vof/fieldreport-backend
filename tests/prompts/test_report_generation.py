@@ -8,7 +8,7 @@ def test_report_generation_prompt_contains_template_sources_and_rules() -> None:
 
     prompt = REPORT_GENERATION_PROMPT.format(
         sections_text=sections_text,
-        combined_transcription="Inspecteur noemt vocht bij de waterleiding.",
+        transcription_segments_text="1. Inspecteur noemt vocht bij de waterleiding.",
         image_text=image_text,
         context_text=context_text,
     )

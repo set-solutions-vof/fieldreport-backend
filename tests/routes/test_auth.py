@@ -356,7 +356,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
                 "storage_key": None,
             }
         ],
-        }
+    }
 
 
 async def test_update_report_section_accepts_access_token(client: AsyncClient) -> None:

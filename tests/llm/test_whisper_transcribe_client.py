@@ -131,6 +131,10 @@ async def test_transcribe_audio_offsets_whisper_segments_for_later_chunks() -> N
     assert result.segments[1].end_seconds == 18.0
 
 
+def test_merge_transcription_segments_returns_empty_list_for_no_segments() -> None:
+    assert whisper_transcribe_client.merge_transcription_segments([]) == []
+
+
 def test_merge_transcription_segments_merges_short_segments_until_sentence_end() -> None:
     segments = [
         TranscriptionSegment(
@@ -198,9 +202,7 @@ def test_merge_transcription_segments_respects_maximum_duration() -> None:
     merged_segments = whisper_transcribe_client.merge_transcription_segments(segments)
 
     assert len(merged_segments) < len(segments)
-    assert all(
-        segment.end_seconds - segment.start_seconds <= 45.0 for segment in merged_segments
-    )
+    assert all(segment.end_seconds - segment.start_seconds <= 45.0 for segment in merged_segments)
 
 
 def test_map_response_segments_maps_api_segments() -> None:

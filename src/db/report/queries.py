@@ -33,12 +33,14 @@ def _report_section_content(column):
 
 def _transcription_timeline_offset():
     prior_transcription = transcriptions.alias("prior_transcription")
-    return sa.select(
-        sa.func.coalesce(sa.func.sum(prior_transcription.c.duration_seconds), 0)
-    ).where(
-        prior_transcription.c.inspection_id == transcriptions.c.inspection_id,
-        prior_transcription.c.created_at < transcriptions.c.created_at,
-    ).scalar_subquery()
+    return (
+        sa.select(sa.func.coalesce(sa.func.sum(prior_transcription.c.duration_seconds), 0))
+        .where(
+            prior_transcription.c.inspection_id == transcriptions.c.inspection_id,
+            prior_transcription.c.created_at < transcriptions.c.created_at,
+        )
+        .scalar_subquery()
+    )
 
 
 def _report_section_detail_columns(include_timeline: bool):

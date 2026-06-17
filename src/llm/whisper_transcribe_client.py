@@ -129,10 +129,10 @@ def map_response_segments(
     ]
 
 
-
 def ends_sentence(text: str) -> bool:
     stripped = text.rstrip()
     return bool(stripped) and stripped[-1] in ".!?"
+
 
 def split_audio_sync(file_content: bytes, filename: str) -> list[AudioChunk]:
     file_extension = Path(filename).suffix or ".m4a"

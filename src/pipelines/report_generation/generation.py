@@ -25,7 +25,7 @@ def format_transcription_segments_for_prompt(
 ) -> str:
     return "\n".join(
         (
-            f'{segment_index}. [{format_timestamp(segment.start_seconds)}-'
+            f"{segment_index}. [{format_timestamp(segment.start_seconds)}-"
             f'{format_timestamp(segment.end_seconds)}] "{segment.text}"'
         )
         for segment_index, segment in enumerate(segment_rows, start=1)
@@ -34,7 +34,7 @@ def format_transcription_segments_for_prompt(
 
 def format_images_for_prompt(image_rows: list[StoredImageAnalysis]) -> str:
     return "\n".join(
-        f'{image_index}. {image.analysis_text}'
+        f"{image_index}. {image.analysis_text}"
         for image_index, image in enumerate(image_rows, start=1)
     )
 

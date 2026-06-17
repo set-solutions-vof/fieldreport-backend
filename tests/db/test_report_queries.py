@@ -1,13 +1,13 @@
-import sqlalchemy as sa
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+import sqlalchemy as sa
 
 from src.db.report import queries
 from src.db.report.mapper import map_report_detail_sections
-from src.db.schema.tables import report_sections, reports
+from src.db.schema.tables import report_sections
 from src.exceptions import ReportNotFound
 from src.models.reports.metadata import ReportMetadata
 from tests.db.sqlalchemy_fakes import FakeResult, build_connection
@@ -393,8 +393,7 @@ async def test_fetch_report_section_rows_offsets_timeline_by_prior_transcription
             "image_storage_key": None,
             "captured_at": None,
             "image_analysis_text": None,
-            "timeline_seconds": second_segment_start_seconds
-            + first_transcription_duration_seconds,
+            "timeline_seconds": second_segment_start_seconds + first_transcription_duration_seconds,
         },
     ]
     connection = build_connection(rows=rows)

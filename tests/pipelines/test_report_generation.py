@@ -154,7 +154,11 @@ async def test_persist_pipeline_results_links_evidence() -> None:
         report,
         template_sections,
         generated_sections,
-        [StoredTranscriptionSegment(id=segment_id, text="Segment", start_seconds=0.0, end_seconds=5.0)],
+        [
+            StoredTranscriptionSegment(
+                id=segment_id, text="Segment", start_seconds=0.0, end_seconds=5.0
+            )
+        ],
         [StoredImageAnalysis(id=image_id, analysis_text="Image")],
     )
 

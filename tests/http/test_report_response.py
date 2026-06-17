@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from src.http.v1.response.report import (
+    EvidenceSourceResponse,
     ImageEvidenceItemResponse,
     ReportDetailResponse,
-    EvidenceSourceResponse,
     report_detail_response,
 )
 from src.models.reports.report import ReportDetail, ReportDetailSection
