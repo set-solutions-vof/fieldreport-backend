@@ -25,6 +25,7 @@ def resolve_template_company_state(
         return TemplateStatusActive(
             status="active",
             source_reports_count=0,
+            metadata_fields=active_template.structure.metadata_fields,
             sections=active_template.structure.sections,
         )
 
@@ -44,6 +45,7 @@ def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateStatus
             status="pending_review",
             job_id=str(job.id),
             source_reports_count=job.source_reports_count,
+            metadata_fields=job.structure.metadata_fields,
             sections=job.structure.sections,
         )
 
@@ -57,5 +59,6 @@ def resolve_template_job_state(job: TemplateAnalysisJobRecord) -> TemplateStatus
     return TemplateStatusActive(
         status="active",
         source_reports_count=job.source_reports_count,
+        metadata_fields=job.structure.metadata_fields,
         sections=job.structure.sections,
     )

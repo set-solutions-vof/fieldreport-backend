@@ -1,0 +1,2 @@
+class InviteEmailDeliveryFailed(Exception):
+    pass

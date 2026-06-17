@@ -3,11 +3,7 @@ from pydantic import BaseModel, Field
 
 
 class CreateInspectionRequest(BaseModel):
-    address: str
-    inspection_date: str
-    investigation_type: str
-    client_type: str
-    reference_number: str | None = None
+    metadata: str
     extra_context: str | None = None
-    audio_files: list[UploadFile]
+    audio_files: list[UploadFile] = Field(min_length=1)
     photo_files: list[UploadFile] = Field(default_factory=list)

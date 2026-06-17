@@ -1,23 +1,22 @@
 import asyncio
 
-from src.db import template_queries
+from src.db.template import queries
 from src.llm import deepseek_client, gpt4o_client
-from src.models.templates.domain import TemplateStructure
 from src.models.templates.pipeline import TemplateAnalysisDocument
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.storage import template_file_storage
+from src.storage import blob
 from src.utils import pdf_text_extractor
 
 
 async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | None:
-    job = await template_queries.claim_next_template_analysis_job()
+    job = await queries.claim_next_template_analysis_job()
 
     if job is None:
         return None
 
     try:
         job_id = str(job.id)
-        files = await template_queries.get_template_analysis_job_files(job_id)
+        files = await queries.get_template_analysis_job_files(job_id)
         documents = await asyncio.gather(
             *[
                 build_template_analysis_document(
@@ -27,16 +26,15 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | No
                 for file in files
             ]
         )
-        sections = await deepseek_client.synthesize_template_sections(documents)
-        structure = TemplateStructure(sections=sections)
+        structure = await deepseek_client.synthesize_template_structure(documents)
 
-        await template_queries.update_template_analysis_job(
+        await queries.update_template_analysis_job(
             job_id,
             "pending_review",
             structure,
         )
     except Exception as error:
-        await template_queries.update_template_analysis_job(
+        await queries.update_template_analysis_job(
             job_id,
             "failed",
             None,
@@ -49,11 +47,11 @@ async def process_next_template_analysis_job() -> TemplateAnalysisJobRecord | No
 
 async def build_template_analysis_document(
     original_file_name: str,
-    stored_file_path: str,
+    blob_key: str,
 ) -> TemplateAnalysisDocument:
-    file_content = template_file_storage.load_template_analysis_file(stored_file_path)
+    file_content = (await blob.download_file("templates", blob_key))[0]
     extracted_text, visual_summary = await asyncio.gather(
-        asyncio.to_thread(pdf_text_extractor.extract_text_from_pdf, stored_file_path),
+        asyncio.to_thread(pdf_text_extractor.extract_text_from_pdf, file_content),
         gpt4o_client.analyze_pdf_visuals(original_file_name, file_content),
     )
 

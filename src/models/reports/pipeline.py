@@ -3,6 +3,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 from src.models.enums.report_status import ReportStatus
+from src.models.reports.metadata import ReportMetadata
 
 
 class ReportPipelineContext(BaseModel):
@@ -12,8 +13,7 @@ class ReportPipelineContext(BaseModel):
     template_id: UUID
     status: ReportStatus
     extra_context: str
-    investigation_type: str
-    client_type: str
+    metadata: ReportMetadata
 
 
 class InspectionMediaFile(BaseModel):
@@ -24,6 +24,8 @@ class InspectionMediaFile(BaseModel):
 class StoredTranscriptionSegment(BaseModel):
     id: UUID
     text: str
+    start_seconds: float
+    end_seconds: float
 
 
 class StoredImageAnalysis(BaseModel):

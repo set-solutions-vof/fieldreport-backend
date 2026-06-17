@@ -2,8 +2,8 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from src.http.v1.response.report import (
-    EvidenceItemResponse,
     EvidenceSourceResponse,
+    ImageEvidenceItemResponse,
     ReportDetailResponse,
     report_detail_response,
 )
@@ -23,28 +23,25 @@ def test_evidence_source_response_serializes_missing_captured_at() -> None:
     assert response.model_dump(mode="json")["captured_at"] is None
 
 
-def test_timeline_item_response_serializes_missing_captured_at() -> None:
-    response = EvidenceItemResponse(
+def test_timeline_item_response_serializes_missing_timeline_and_captured_at() -> None:
+    response = ImageEvidenceItemResponse(
         id=uuid4(),
-        evidence_type="transcription_segment",
-        timeline_seconds=1.0,
-        start_seconds=1.0,
-        end_seconds=2.0,
         captured_at=None,
-        content_summary="Audio summary",
+        content_summary="Image summary",
     )
 
-    assert response.model_dump(mode="json")["captured_at"] is None
+    payload = response.model_dump(mode="json")
+    assert payload["captured_at"] is None
+    assert payload["timeline_seconds"] is None
 
 
 def test_report_detail_response_serializes_missing_updated_at() -> None:
     response = ReportDetailResponse(
         id=uuid4(),
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
         updated_at=None,
         sections=[],
         evidence_items=[],
@@ -59,10 +56,9 @@ def test_report_detail_response_serializes_section_template_metadata() -> None:
     report = ReportDetail(
         id=report_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
         sections=[
             ReportDetailSection(
                 id=section_id,

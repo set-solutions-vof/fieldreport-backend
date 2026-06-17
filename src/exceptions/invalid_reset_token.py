@@ -1,0 +1,2 @@
+class InvalidResetToken(Exception):
+    pass

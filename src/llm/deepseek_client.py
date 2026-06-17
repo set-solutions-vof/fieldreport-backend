@@ -2,11 +2,10 @@ from openai.types.shared_params.response_format_json_object import ResponseForma
 
 from src.config import settings
 from src.llm.client_factory import get_deepseek_client
-from src.models.templates.domain import TemplateSection
+from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.pipeline import (
     TemplateAnalysisDocument,
     TemplateAnalysisDocumentList,
-    TemplateSectionList,
 )
 from src.prompts.deepseek_template_extraction import (
     DEEPSEEK_TEMPLATE_EXTRACTION_PROMPT,
@@ -17,6 +16,12 @@ from src.prompts.deepseek_template_extraction import (
 async def synthesize_template_sections(
     documents: list[TemplateAnalysisDocument],
 ) -> list[TemplateSection]:
+    return (await synthesize_template_structure(documents)).sections
+
+
+async def synthesize_template_structure(
+    documents: list[TemplateAnalysisDocument],
+) -> TemplateStructure:
     client = get_deepseek_client()
     documents_json = TemplateAnalysisDocumentList(documents=documents).model_dump_json()
 
@@ -37,6 +42,6 @@ async def synthesize_template_sections(
         response_format=ResponseFormatJSONObject(type="json_object"),
     )
     content = response.choices[0].message.model_dump()["content"]
-    payload = TemplateSectionList.model_validate_json(content)
+    payload = TemplateStructure.model_validate_json(content)
 
-    return payload.sections
+    return payload

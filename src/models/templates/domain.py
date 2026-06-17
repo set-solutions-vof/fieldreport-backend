@@ -1,6 +1,29 @@
-from pydantic import BaseModel
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, Field
 
 from src.models.enums.template_section_render_type import TemplateSectionRenderType
+
+
+class TemplateSelectMetadataField(BaseModel):
+    key: str
+    label: str
+    type: Literal["select"]
+    options: list[str]
+    required: bool = False
+
+
+class TemplateScalarMetadataField(BaseModel):
+    key: str
+    label: str
+    type: Literal["text", "date", "phone", "email", "boolean"]
+    required: bool = False
+
+
+TemplateMetadataField = Annotated[
+    TemplateSelectMetadataField | TemplateScalarMetadataField,
+    Field(discriminator="type"),
+]
 
 
 class TemplateSectionGroup(BaseModel):
@@ -20,4 +43,5 @@ class TemplateSection(BaseModel):
 
 
 class TemplateStructure(BaseModel):
+    metadata_fields: list[TemplateMetadataField] = Field(default_factory=list)
     sections: list[TemplateSection]

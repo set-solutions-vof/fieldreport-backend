@@ -14,6 +14,13 @@ class ActiveCompanyTemplateRecord(BaseModel):
     structure: TemplateStructure
 
 
+class CompanyTemplateRecord(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: UUID
+    structure: TemplateStructure
+
+
 class TemplateAnalysisJobRecord(BaseModel):
     model_config = ConfigDict(frozen=True)
 

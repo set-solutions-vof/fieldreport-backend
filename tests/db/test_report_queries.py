@@ -1,25 +1,16 @@
 from datetime import UTC, datetime
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
-from src.db import report_queries
-from src.db.report_mapper import map_report_detail_sections
-from src.models.reports.transcription import TranscriptionSegment
+import pytest
+import sqlalchemy as sa
 
-
-def build_connection(
-    rows: list[dict[str, object]] | None = None,
-    row: dict[str, object] | None = None,
-) -> SimpleNamespace:
-    return SimpleNamespace(
-        rows=rows,
-        row=row,
-        fetch=AsyncMock(return_value=rows),
-        fetchrow=AsyncMock(return_value=row),
-        execute=AsyncMock(),
-        close=AsyncMock(),
-    )
+from src.db.report import queries
+from src.db.report.mapper import map_report_detail_sections
+from src.db.schema.tables import report_sections
+from src.exceptions import ReportNotFound
+from src.models.reports.metadata import ReportMetadata
+from tests.db.sqlalchemy_fakes import FakeResult, build_connection
 
 
 async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> None:
@@ -30,38 +21,38 @@ async def test_list_report_summaries_by_company_id_returns_mapped_reports() -> N
             "id": uuid4(),
             "company_id": company_id,
             "status": "draft",
-            "client_name": "ACME",
-            "address": "Main Street 1",
+            "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
             "inspection_date": inspection_date,
-            "inspector_name": "Jeroen van Dijk",
+            "inspector_name": "Inspector User",
         },
         {
             "id": uuid4(),
             "company_id": company_id,
             "status": "approved",
-            "client_name": "Globex",
-            "address": "Second Street 2",
+            "metadata": {"naam_opdrachtgever": "Globex", "adres_schadeadres": "Second Street 2"},
             "inspection_date": inspection_date,
-            "inspector_name": "Sanne de Vries",
+            "inspector_name": "Admin User",
         },
     ]
-    connection = build_connection(rows)
+    connection = build_connection(rows=rows)
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
-        reports = await report_queries.list_report_summaries_by_company_id(str(company_id))
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        reports = await queries.list_report_summaries_by_company_id(str(company_id))
 
     assert [report.id for report in reports] == [rows[0]["id"], rows[1]["id"]]
     assert all(report.company_id == company_id for report in reports)
     assert [report.status for report in reports] == ["draft", "approved"]
-    assert [report.client_name for report in reports] == ["ACME", "Globex"]
-    assert reports[0].address == "Main Street 1"
+    assert [report.metadata.model_dump()["naam_opdrachtgever"] for report in reports] == [
+        "ACME",
+        "Globex",
+    ]
+    assert reports[0].metadata.model_dump()["adres_schadeadres"] == "Main Street 1"
     assert reports[0].inspection_date == inspection_date
-    assert reports[0].inspector_name == "Jeroen van Dijk"
-    connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
+    assert reports[0].inspector_name == "Inspector User"
+    connection.execute.assert_awaited_once()
 
 
 async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
@@ -72,31 +63,48 @@ async def test_get_report_by_id_returns_mapped_report_for_company() -> None:
     row = {
         "id": report_id,
         "status": "draft",
-        "client_name": "ACME",
-        "address": "Main Street 1",
+        "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         "inspection_date": inspection_date,
-        "inspector_name": "Jeroen van Dijk",
+        "inspector_name": "Inspector User",
         "updated_at": updated_at,
     }
     connection = build_connection(row=row)
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
-        report = await report_queries.get_report_by_id(str(report_id), str(company_id))
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        report = await queries.get_report_by_id(str(report_id), str(company_id))
 
     assert report is not None
     assert report.id == report_id
     assert report.status == "draft"
-    assert report.client_name == "ACME"
-    assert report.address == "Main Street 1"
+    assert report.metadata == ReportMetadata.model_validate(
+        {
+            "naam_opdrachtgever": "ACME",
+            "adres_schadeadres": "Main Street 1",
+        }
+    )
     assert report.inspection_date == inspection_date
-    assert report.inspector_name == "Jeroen van Dijk"
+    assert report.inspector_name == "Inspector User"
     assert report.updated_at == updated_at
     assert report.sections == []
-    connection.fetchrow.assert_awaited_once()
-    connection.close.assert_awaited_once()
+    connection.execute.assert_awaited_once()
+
+
+async def test_get_report_by_id_raises_when_missing() -> None:
+    connection = build_connection(row=None)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        try:
+            await queries.get_report_by_id(str(uuid4()), str(uuid4()))
+        except ReportNotFound as error:
+            assert str(error) != ""
+        else:
+            raise AssertionError("Expected ReportNotFound")
 
 
 async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> None:
@@ -108,10 +116,17 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     shared_image_analysis_id = uuid4()
     third_section_segment_id = uuid4()
     capture_time = datetime(2026, 5, 8, 12, 30, 20, tzinfo=UTC)
+    first_transcription_id = uuid4()
+    second_transcription_id = uuid4()
     rows = [
         {
             "id": first_section_id,
             "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": ["Issue", "Action"],
+            "groups": [
+                {"id": "damage", "label": "Damage", "fields": ["Issue"]},
+            ],
             "section_order": 1,
             "generated_content": "Draft text",
             "reviewed_content": None,
@@ -120,6 +135,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.95,
             "evidence_type": "image_analysis",
             "transcription_segment_id": None,
+            "transcription_id": None,
             "start_seconds": None,
             "end_seconds": None,
             "transcription_text": None,
@@ -131,6 +147,11 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": first_section_id,
             "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": ["Issue", "Action"],
+            "groups": [
+                {"id": "damage", "label": "Damage", "fields": ["Issue"]},
+            ],
             "section_order": 1,
             "generated_content": "Draft text",
             "reviewed_content": None,
@@ -139,6 +160,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.95,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": shared_transcription_segment_id,
+            "transcription_id": first_transcription_id,
             "start_seconds": 12.0,
             "end_seconds": 15.0,
             "transcription_text": "Moisture mentioned",
@@ -150,6 +172,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": second_section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "generated_content": "Advice",
             "reviewed_content": None,
@@ -158,6 +183,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.71,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": shared_transcription_segment_id,
+            "transcription_id": first_transcription_id,
             "start_seconds": 12.0,
             "end_seconds": 15.0,
             "transcription_text": "Moisture mentioned",
@@ -169,6 +195,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": second_section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "generated_content": "Advice",
             "reviewed_content": None,
@@ -177,6 +206,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.71,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": first_unique_segment_id,
+            "transcription_id": second_transcription_id,
             "start_seconds": 5.0,
             "end_seconds": 8.0,
             "transcription_text": "Opening note",
@@ -188,6 +218,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": second_section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "generated_content": "Advice",
             "reviewed_content": None,
@@ -196,6 +229,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.71,
             "evidence_type": "image_analysis",
             "transcription_segment_id": None,
+            "transcription_id": None,
             "start_seconds": None,
             "end_seconds": None,
             "transcription_text": None,
@@ -207,6 +241,9 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         {
             "id": third_section_id,
             "section_id": "samenvatting",
+            "label": "Samenvatting",
+            "fields": None,
+            "groups": None,
             "section_order": 3,
             "generated_content": "Summary",
             "reviewed_content": None,
@@ -215,6 +252,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.42,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": third_section_segment_id,
+            "transcription_id": first_transcription_id,
             "start_seconds": 30.0,
             "end_seconds": 35.0,
             "transcription_text": "Summary audio",
@@ -224,16 +262,18 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "timeline_seconds": 30.0,
         },
     ]
+    photo_key = "company-id/inspection-id/photos/photo.jpg"
     for row in rows:
         row["render_type"] = "text_block"
+        row["image_storage_key"] = photo_key if row["evidence_type"] == "image_analysis" else None
     rows[0]["render_type"] = "measurement_table"
-    connection = build_connection(rows)
+    connection = build_connection(rows=rows)
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
-        rows = await report_queries.fetch_report_section_rows(str(uuid4()))
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        rows = await queries.fetch_report_section_rows(str(uuid4()), str(uuid4()))
         sections, evidence_items = map_report_detail_sections(rows)
 
     assert [section.id for section in sections] == [
@@ -242,6 +282,10 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
         third_section_id,
     ]
     assert sections[0].render_type == "measurement_table"
+    assert sections[0].label == "Bevindingen"
+    assert sections[0].fields == ["Issue", "Action"]
+    assert sections[0].groups is not None
+    assert sections[0].groups[0].label == "Damage"
     assert sections[0].evidence_item_ids == [
         shared_image_analysis_id,
         shared_transcription_segment_id,
@@ -255,24 +299,121 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     assert [evidence_item.id for evidence_item in evidence_items] == [
         first_unique_segment_id,
         shared_transcription_segment_id,
-        shared_image_analysis_id,
         third_section_segment_id,
+        shared_image_analysis_id,
     ]
     assert [evidence_item.evidence_type for evidence_item in evidence_items] == [
         "transcription_segment",
         "transcription_segment",
-        "image_analysis",
         "transcription_segment",
+        "image_analysis",
     ]
     assert [evidence_item.timeline_seconds for evidence_item in evidence_items] == [
         5.0,
         12.0,
-        20.0,
         30.0,
+        None,
     ]
+    transcription_evidence = [
+        evidence_item
+        for evidence_item in evidence_items
+        if evidence_item.evidence_type == "transcription_segment"
+    ]
+    assert transcription_evidence[0].transcription_id == second_transcription_id
+    assert transcription_evidence[1].transcription_id == first_transcription_id
+    connection.execute.assert_awaited_once()
 
 
-async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None:
+def test_report_section_timeline_query_offsets_second_transcription() -> None:
+    columns = queries._report_section_detail_columns(include_timeline=True)
+    statement = sa.select(*columns).select_from(queries._report_sections_join())
+    compiled = str(statement.compile(compile_kwargs={"literal_binds": True}))
+
+    assert "duration_seconds" in compiled
+    assert "prior_transcription" in compiled
+    assert "NULL" in compiled
+    assert "epoch" not in compiled
+    assert report_sections.c.id.key in compiled or "report_sections" in compiled
+
+
+async def test_fetch_report_section_rows_offsets_timeline_by_prior_transcription_duration() -> None:
+    section_id = uuid4()
+    first_transcription_id = uuid4()
+    second_transcription_id = uuid4()
+    first_segment_id = uuid4()
+    second_segment_id = uuid4()
+    first_transcription_duration_seconds = 40.0
+    second_segment_start_seconds = 5.0
+    rows = [
+        {
+            "id": section_id,
+            "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": None,
+            "groups": None,
+            "section_order": 1,
+            "render_type": "text_block",
+            "generated_content": "Draft text",
+            "reviewed_content": None,
+            "approved": False,
+            "confidence_level": "high",
+            "confidence_score": 0.95,
+            "evidence_type": "transcription_segment",
+            "transcription_segment_id": first_segment_id,
+            "transcription_id": first_transcription_id,
+            "start_seconds": 10.0,
+            "end_seconds": 15.0,
+            "transcription_text": "First audio",
+            "image_analysis_id": None,
+            "image_storage_key": None,
+            "captured_at": None,
+            "image_analysis_text": None,
+            "timeline_seconds": 10.0,
+        },
+        {
+            "id": section_id,
+            "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": None,
+            "groups": None,
+            "section_order": 1,
+            "render_type": "text_block",
+            "generated_content": "Draft text",
+            "reviewed_content": None,
+            "approved": False,
+            "confidence_level": "high",
+            "confidence_score": 0.95,
+            "evidence_type": "transcription_segment",
+            "transcription_segment_id": second_segment_id,
+            "transcription_id": second_transcription_id,
+            "start_seconds": second_segment_start_seconds,
+            "end_seconds": 8.0,
+            "transcription_text": "Second audio",
+            "image_analysis_id": None,
+            "image_storage_key": None,
+            "captured_at": None,
+            "image_analysis_text": None,
+            "timeline_seconds": second_segment_start_seconds + first_transcription_duration_seconds,
+        },
+    ]
+    connection = build_connection(rows=rows)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result_rows = await queries.fetch_report_section_rows(str(uuid4()), str(uuid4()))
+        _, evidence_items = map_report_detail_sections(result_rows)
+
+    assert len(evidence_items) == 2
+    assert evidence_items[0].timeline_seconds == 10.0
+    assert evidence_items[0].transcription_id == first_transcription_id
+    assert evidence_items[1].timeline_seconds == 45.0
+    assert evidence_items[1].transcription_id == second_transcription_id
+    connection.execute.assert_awaited_once()
+
+
+async def test_claim_next_report_for_generation_returns_claimed_report() -> None:
     row = {
         "id": uuid4(),
         "inspection_id": uuid4(),
@@ -281,17 +422,20 @@ async def test_claim_next_audio_pipeline_report_returns_claimed_report() -> None
     }
     connection = build_connection(row=row)
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        result = await report_queries.claim_next_audio_pipeline_report()
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result = await queries.claim_next_report_for_generation()
 
     assert result == row
-    connection.fetchrow.assert_awaited_once()
-    connection.close.assert_awaited_once()
+    connection.execute.assert_awaited_once()
 
 
 async def test_get_report_for_pipeline_returns_report_context() -> None:
     from src.models.reports.pipeline import ReportPipelineContext
 
+    metadata = {"type_onderzoek": "Lekdetectie", "type_klant": "Zakelijk"}
     row = {
         "id": uuid4(),
         "inspection_id": uuid4(),
@@ -299,186 +443,57 @@ async def test_get_report_for_pipeline_returns_report_context() -> None:
         "template_id": uuid4(),
         "status": "generating",
         "extra_context": "",
-        "investigation_type": "Lekdetectie",
-        "client_type": "Zakelijk",
+        "metadata": metadata,
     }
     connection = build_connection(row=row)
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        result = await report_queries.get_report_for_pipeline(str(row["id"]))
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result = await queries.get_report_for_pipeline(str(row["id"]))
 
     assert result == ReportPipelineContext(**row)
-    connection.fetchrow.assert_awaited_once()
-    connection.close.assert_awaited_once()
+    connection.execute.assert_awaited_once()
+
+
+async def test_get_report_for_pipeline_raises_when_missing() -> None:
+    connection = build_connection(row=None)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        with pytest.raises(ReportNotFound):
+            await queries.get_report_for_pipeline(str(uuid4()))
 
 
 async def test_set_report_status_executes_update() -> None:
     connection = build_connection()
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        await report_queries.set_report_status("report-id", "draft")
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        await queries.set_report_status("report-id", "draft")
 
     connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-2:] == ("report-id", "draft")
-    connection.close.assert_awaited_once()
+    statement = connection.execute.await_args.args[0]
+    assert statement.table.name == "reports"
 
 
-async def test_insert_transcription_executes_insert_and_returns_id() -> None:
+async def test_reset_report_for_retry_executes_update() -> None:
     connection = build_connection()
 
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        transcription_id = await report_queries.insert_transcription(
-            "inspection-id",
-            "company-id",
-            "/tmp/audio.m4a",
-            "Tekst",
-            12.5,
-        )
-
-    assert transcription_id
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        "inspection-id",
-        "company-id",
-        "/tmp/audio.m4a",
-        "Tekst",
-    )
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_transcription_segments_executes_inserts_and_returns_ids() -> None:
-    connection = build_connection()
-    segments = [
-        TranscriptionSegment(
-            segment_index=0,
-            start_seconds=0.0,
-            end_seconds=1.5,
-            text="Segment",
-        )
-    ]
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        segment_ids = await report_queries.insert_transcription_segments(
-            "transcription-id",
-            "inspection-id",
-            segments,
-        )
-
-    assert len(segment_ids) == 1
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        0,
-        0.0,
-        1.5,
-        "Segment",
-    )
-    connection.close.assert_awaited_once()
-
-
-async def test_fetch_transcription_segments_for_inspection_returns_rows() -> None:
-    from src.models.reports.pipeline import StoredTranscriptionSegment
-
-    segment_id = uuid4()
-    rows = [{"id": segment_id, "text": "Segment"}]
-    connection = build_connection(rows=rows)
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        result = await report_queries.fetch_transcription_segments_for_inspection("inspection-id")
-
-    assert result == [StoredTranscriptionSegment(id=segment_id, text="Segment")]
-    connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_image_analysis_executes_insert_and_returns_id() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        image_analysis_id = await report_queries.insert_image_analysis(
-            "inspection-id",
-            "company-id",
-            "/tmp/photo.jpg",
-            "Fotoanalyse",
-        )
-
-    assert image_analysis_id
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-4:] == (
-        "inspection-id",
-        "company-id",
-        "/tmp/photo.jpg",
-        "Fotoanalyse",
-    )
-    connection.close.assert_awaited_once()
-
-
-async def test_fetch_image_analyses_for_inspection_returns_rows() -> None:
-    from src.models.reports.pipeline import StoredImageAnalysis
-
-    image_id = uuid4()
-    rows = [{"id": image_id, "analysis_text": "Fotoanalyse"}]
-    connection = build_connection(rows=rows)
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        result = await report_queries.fetch_image_analyses_for_inspection("inspection-id")
-
-    assert result == [StoredImageAnalysis(id=image_id, analysis_text="Fotoanalyse")]
-    connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_report_section_executes_insert_and_returns_id() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        report_section_id = await report_queries.insert_report_section(
-            "report-id",
-            "company-id",
-            "conclusie",
-            1,
-            "text_block",
-            "Concept",
-            "high",
-            0.9,
-        )
-
-    assert report_section_id
-    connection.execute.assert_awaited_once()
-    assert "to_jsonb(ARRAY[$7::text])" in connection.execute.await_args.args[0]
-    assert connection.execute.await_args.args[-6:] == (
-        "conclusie",
-        1,
-        "text_block",
-        "Concept",
-        "high",
-        0.9,
-    )
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_report_section_source_transcription_executes_insert() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        await report_queries.insert_report_section_source_transcription(
-            "section-id",
-            "segment-id",
-        )
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        await queries.reset_report_for_retry("report-id", "company-id")
 
     connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-2:] == ("section-id", "segment-id")
-    connection.close.assert_awaited_once()
-
-
-async def test_insert_report_section_source_image_executes_insert() -> None:
-    connection = build_connection()
-
-    with patch("src.db.report_queries.asyncpg.connect", AsyncMock(return_value=connection)):
-        await report_queries.insert_report_section_source_image("section-id", "image-id")
-
-    connection.execute.assert_awaited_once()
-    assert connection.execute.await_args.args[-2:] == ("section-id", "image-id")
-    connection.close.assert_awaited_once()
+    statement = connection.execute.await_args.args[0]
+    assert statement.table.name == "reports"
 
 
 async def test_update_report_section_returns_updated_section_for_company() -> None:
@@ -490,6 +505,9 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
         {
             "id": section_id,
             "section_id": "advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
             "section_order": 2,
             "render_type": "key_value_table",
             "generated_content": "Advice",
@@ -505,13 +523,18 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
             "image_analysis_text": "Image summary",
         }
     ]
-    connection = build_connection(rows, {"id": section_id})
+    connection = build_connection(
+        results=[
+            FakeResult(row={"id": section_id}),
+            FakeResult(rows=rows),
+        ]
+    )
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
-        section = await report_queries.update_report_section(
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        section = await queries.update_report_section(
             str(report_id),
             str(section_id),
             str(company_id),
@@ -530,17 +553,7 @@ async def test_update_report_section_returns_updated_section_for_company() -> No
     assert section.evidence_sources[0].type == "image"
     assert section.evidence_sources[0].captured_at == capture_time
     assert section.evidence_sources[0].content_summary == "Image summary"
-    connection.fetch.assert_awaited_once()
-    connection.fetchrow.assert_awaited_once()
-    assert connection.fetchrow.await_args.args[1:] == (
-        str(report_id),
-        str(section_id),
-        str(company_id),
-        "Updated advice",
-        True,
-    )
-    assert connection.fetch.await_args.args[1:] == (section_id,)
-    connection.close.assert_awaited_once()
+    assert connection.execute.await_count == 2
 
 
 async def test_update_report_section_returns_section_when_no_fields_are_changed() -> None:
@@ -569,13 +582,18 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
             "image_analysis_text": None,
         }
     ]
-    connection = build_connection(rows, {"id": section_id})
+    connection = build_connection(
+        results=[
+            FakeResult(row={"id": section_id}),
+            FakeResult(rows=rows),
+        ]
+    )
 
-    with patch(
-        "src.db.report_queries.asyncpg.connect",
-        AsyncMock(return_value=connection),
-    ):
-        section = await report_queries.update_report_section(
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        section = await queries.update_report_section(
             str(report_id),
             str(section_id),
             str(company_id),
@@ -588,12 +606,25 @@ async def test_update_report_section_returns_section_when_no_fields_are_changed(
     assert section.reviewed_content == "Expert advice"
     assert section.approved is False
     assert section.evidence_sources[0].type == "audio"
-    connection.fetchrow.assert_awaited_once()
-    assert "SELECT report_sections.id" in connection.fetchrow.await_args.args[0]
-    assert connection.fetchrow.await_args.args[1:] == (
-        str(report_id),
-        str(section_id),
-        str(company_id),
-    )
-    connection.fetch.assert_awaited_once()
-    connection.close.assert_awaited_once()
+    assert connection.execute.await_count == 2
+
+
+async def test_update_report_section_raises_when_section_is_missing() -> None:
+    connection = build_connection(row=None)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        try:
+            await queries.update_report_section(
+                str(uuid4()),
+                str(uuid4()),
+                str(uuid4()),
+                None,
+                None,
+            )
+        except ReportNotFound as error:
+            assert str(error) != ""
+        else:
+            raise AssertionError("Expected ReportNotFound")

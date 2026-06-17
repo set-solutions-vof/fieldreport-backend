@@ -41,24 +41,24 @@ def test_get_deepseek_client_returns_configured_client() -> None:
     )
 
 
-def test_get_gpt4o_transcribe_client_returns_configured_client() -> None:
+def test_get_whisper_transcribe_client_returns_configured_client() -> None:
     client = object()
 
     with (
         patch.object(
             client_factory.settings,
-            "azure_openai_resource_endpoint",
+            "whisper_resource_endpoint",
             "https://ai.example",
         ),
-        patch.object(client_factory.settings, "azure_openai_api_key", "shared-key"),
-        patch.object(client_factory.settings, "gpt4o_transcribe_api_version", "2024-10-21"),
+        patch.object(client_factory.settings, "whisper_api_key", "whisper-key"),
+        patch.object(client_factory.settings, "whisper_api_version", "2024-06-01"),
         patch.object(client_factory, "AsyncAzureOpenAI", return_value=client) as factory,
     ):
-        result = client_factory.get_gpt4o_transcribe_client()
+        result = client_factory.get_whisper_transcribe_client()
 
     assert result is client
     factory.assert_called_once_with(
         azure_endpoint="https://ai.example",
-        api_key="shared-key",
-        api_version="2024-10-21",
+        api_key="whisper-key",
+        api_version="2024-06-01",
     )

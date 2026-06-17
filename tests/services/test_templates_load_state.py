@@ -12,7 +12,7 @@ async def test_load_template_configuration_fetches_and_resolves() -> None:
 
     with (
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "fetch_template_configuration_context",
             AsyncMock(return_value=(None, None)),
         ) as fetch_context,

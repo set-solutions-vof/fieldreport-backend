@@ -1,32 +1,19 @@
-from src.db import report_queries, template_queries
-from src.db.report_mapper import map_report_detail_sections
+from src.db.report import queries
+from src.db.report.mapper import map_report_detail_sections
 from src.models.auth.authentication import CurrentUser
-from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
+from src.models.reports.report import (
+    ReportDetail,
+    ReportSection,
+    ReportSummary,
+)
 
 
 async def get_report_detail(report_id: str, user: CurrentUser) -> ReportDetail:
     company_id = str(user.company_id)
-    report = await report_queries.get_report_by_id(report_id, company_id)
+    report = await queries.get_report_by_id(report_id, company_id)
     sections, evidence_items = map_report_detail_sections(
-        await report_queries.fetch_report_section_rows(report_id)
+        await queries.fetch_report_section_rows(report_id, company_id)
     )
-    template_sections_by_id = {
-        template_section.id: template_section
-        for template_section in (
-            await template_queries.fetch_active_company_template(company_id)
-        ).structure.sections
-    }
-    sections = [
-        section.model_copy(
-            update={
-                "label": template_sections_by_id[section.section_id].label,
-                "fields": template_sections_by_id[section.section_id].fields,
-                "groups": template_sections_by_id[section.section_id].groups,
-            }
-        )
-        for section in sections
-    ]
-
     return report.model_copy(update={"sections": sections, "evidence_items": evidence_items})
 
 
@@ -38,29 +25,24 @@ async def update_report_section(
     approved: bool | None,
 ) -> ReportSection:
     company_id = str(user.company_id)
-    section = await report_queries.update_report_section(
+    return await queries.update_report_section(
         report_id,
         section_id,
         company_id,
         reviewed_content,
         approved,
     )
-    template_sections_by_id = {
-        template_section.id: template_section
-        for template_section in (
-            await template_queries.fetch_active_company_template(company_id)
-        ).structure.sections
-    }
-    template_section = template_sections_by_id[section.section_id]
-
-    return section.model_copy(
-        update={
-            "label": template_section.label,
-            "fields": template_section.fields,
-            "groups": template_section.groups,
-        }
-    )
 
 
 async def list_reports_for_user(user: CurrentUser) -> list[ReportSummary]:
-    return await report_queries.list_report_summaries_by_company_id(str(user.company_id))
+    return await queries.list_report_summaries_by_company_id(str(user.company_id))
+
+
+async def retry_failed_report(report_id: str, user: CurrentUser) -> None:
+    company_id = str(user.company_id)
+    report = await queries.get_report_by_id(report_id, company_id)
+
+    if report.status != "failed":
+        raise ValueError("Report retry is only allowed for failed reports")
+
+    await queries.reset_report_for_retry(report_id, company_id)

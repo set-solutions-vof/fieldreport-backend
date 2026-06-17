@@ -7,12 +7,13 @@ import bcrypt
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from src.exceptions import InvalidResetToken, InviteEmailDeliveryFailed
 from src.main import app
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 from src.models.reports.report import (
+    ImageEvidenceItem,
     ReportDetail,
     ReportDetailSection,
-    ReportEvidenceItem,
     ReportEvidenceSource,
     ReportSection,
     ReportSummary,
@@ -28,15 +29,15 @@ async def client() -> AsyncIterator[AsyncClient]:
 
 
 def build_authenticated_user() -> AuthenticatedUser:
-    password_hash = bcrypt.hashpw(b"LekkDemo2026!", bcrypt.gensalt()).decode()
+    password_hash = bcrypt.hashpw(b"TestPassword2026!", bcrypt.gensalt()).decode()
 
     return AuthenticatedUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="sanne.devries@lekk.nl",
+        company_name="Demo Company",
+        email="admin.user@example.com",
         password_hash=password_hash,
-        name="Sanne de Vries",
+        name="Admin User",
         role="admin",
     )
 
@@ -45,9 +46,9 @@ def build_current_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
-        email="jeroen.vandijk@lekk.nl",
-        name="Jeroen van Dijk",
+        company_name="Demo Company",
+        email="inspector.user@example.com",
+        name="Inspector User",
         role="inspector",
     )
 
@@ -57,10 +58,9 @@ def build_report_summary(company_id: UUID) -> ReportSummary:
         id=uuid4(),
         company_id=company_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
     )
 
 
@@ -68,11 +68,11 @@ async def test_login_json_returns_tokens_for_valid_credentials(client: AsyncClie
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login/json",
-            json={"email": authenticated_user.email, "password": "LekkDemo2026!"},
+            json={"email": authenticated_user.email, "password": "TestPassword2026!"},
         )
 
     assert response.status_code == 200
@@ -85,11 +85,11 @@ async def test_login_form_returns_tokens_for_valid_credentials(client: AsyncClie
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login",
-            data={"username": authenticated_user.email, "password": "LekkDemo2026!"},
+            data={"username": authenticated_user.email, "password": "TestPassword2026!"},
         )
 
     assert response.status_code == 200
@@ -100,7 +100,7 @@ async def test_login_returns_unauthorized_for_wrong_password(client: AsyncClient
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login/json",
@@ -115,7 +115,7 @@ async def test_login_form_returns_unauthorized_for_wrong_password(client: AsyncC
     authenticated_user = build_authenticated_user()
 
     with patch.object(
-        service.auth_queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
+        service.queries, "get_user_by_email", AsyncMock(return_value=authenticated_user)
     ):
         response = await client.post(
             "/api/v1/auth/login",
@@ -130,7 +130,7 @@ async def test_refresh_returns_new_access_token(client: AsyncClient) -> None:
     current_user = build_current_user()
     refresh_token = security.create_refresh_token(current_user)
 
-    with patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)):
+    with patch.object(service.queries, "get_user_by_id", AsyncMock(return_value=current_user)):
         response = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh_token})
 
     assert response.status_code == 200
@@ -145,6 +145,69 @@ async def test_refresh_rejects_invalid_token(client: AsyncClient) -> None:
     assert response.json() == {"detail": "Invalid credentials"}
 
 
+async def test_password_reset_request_returns_no_content(client: AsyncClient) -> None:
+    with patch("src.routes.auth.password_reset.request_reset", AsyncMock()) as request_reset:
+        response = await client.post(
+            "/api/v1/auth/password-reset/request",
+            json={"email": "user@example.com"},
+        )
+
+    assert response.status_code == 204
+    request_reset.assert_awaited_once_with("user@example.com")
+
+
+async def test_password_reset_request_swallows_email_delivery_failure(
+    client: AsyncClient,
+) -> None:
+    with patch(
+        "src.routes.auth.password_reset.request_reset",
+        AsyncMock(side_effect=InviteEmailDeliveryFailed()),
+    ):
+        response = await client.post(
+            "/api/v1/auth/password-reset/request",
+            json={"email": "user@example.com"},
+        )
+
+    assert response.status_code == 204
+
+
+async def test_password_reset_confirm_returns_no_content(client: AsyncClient) -> None:
+    with patch("src.routes.auth.password_reset.confirm_reset", AsyncMock()) as confirm_reset:
+        response = await client.post(
+            "/api/v1/auth/password-reset/confirm",
+            json={"token": "raw-token", "new_password": "NewPassword2026!"},
+        )
+
+    assert response.status_code == 204
+    confirm_reset.assert_awaited_once_with("raw-token", "NewPassword2026!")
+
+
+async def test_password_reset_confirm_rejects_short_password(client: AsyncClient) -> None:
+    with patch("src.routes.auth.password_reset.confirm_reset", AsyncMock()) as confirm_reset:
+        response = await client.post(
+            "/api/v1/auth/password-reset/confirm",
+            json={"token": "raw-token", "new_password": "short"},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "password_too_short"}
+    confirm_reset.assert_not_awaited()
+
+
+async def test_password_reset_confirm_rejects_invalid_token(client: AsyncClient) -> None:
+    with patch(
+        "src.routes.auth.password_reset.confirm_reset",
+        AsyncMock(side_effect=InvalidResetToken()),
+    ):
+        response = await client.post(
+            "/api/v1/auth/password-reset/confirm",
+            json={"token": "raw-token", "new_password": "NewPassword2026!"},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "invalid_or_expired_token"}
+
+
 async def test_me_requires_access_token(client: AsyncClient) -> None:
     response = await client.get("/api/v1/auth/me")
 
@@ -156,7 +219,7 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    with patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)):
+    with patch.object(service.queries, "get_user_by_id", AsyncMock(return_value=current_user)):
         response = await client.get(
             "/api/v1/auth/me",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -187,7 +250,7 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
     fake_report = build_report_summary(current_user.company_id)
 
     with (
-        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch.object(service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.list_reports_for_user",
             AsyncMock(return_value=[fake_report]),
@@ -204,10 +267,9 @@ async def test_reports_accept_access_token(client: AsyncClient) -> None:
             "id": str(fake_report.id),
             "company_id": str(current_user.company_id),
             "status": "draft",
-            "client_name": "ACME",
-            "address": "Main Street 1",
+            "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
             "inspection_date": "2026-05-08T12:30:00Z",
-            "inspector_name": "Jeroen van Dijk",
+            "inspector_name": "Inspector User",
         }
     ]
 
@@ -222,10 +284,9 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     fake_report = ReportDetail(
         id=report_id,
         status="draft",
-        client_name="ACME",
-        address="Main Street 1",
+        metadata={"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         inspection_date=datetime(2026, 5, 8, 12, 30, tzinfo=UTC),
-        inspector_name="Jeroen van Dijk",
+        inspector_name="Inspector User",
         updated_at=updated_at,
         sections=[
             ReportDetailSection(
@@ -241,12 +302,8 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
             )
         ],
         evidence_items=[
-            ReportEvidenceItem(
+            ImageEvidenceItem(
                 id=image_analysis_id,
-                evidence_type="image_analysis",
-                timeline_seconds=15.0,
-                start_seconds=None,
-                end_seconds=None,
                 captured_at=capture_time,
                 content_summary="Image summary",
             )
@@ -254,7 +311,7 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     )
 
     with (
-        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch.object(service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.get_report_detail",
             AsyncMock(return_value=fake_report),
@@ -269,10 +326,9 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
     assert response.json() == {
         "id": str(report_id),
         "status": "draft",
-        "client_name": "ACME",
-        "address": "Main Street 1",
+        "metadata": {"naam_opdrachtgever": "ACME", "adres_schadeadres": "Main Street 1"},
         "inspection_date": "2026-05-08T12:30:00Z",
-        "inspector_name": "Jeroen van Dijk",
+        "inspector_name": "Inspector User",
         "updated_at": "2026-05-09T08:15:00Z",
         "sections": [
             {
@@ -294,11 +350,10 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
             {
                 "id": str(image_analysis_id),
                 "evidence_type": "image_analysis",
-                "timeline_seconds": 15.0,
-                "start_seconds": None,
-                "end_seconds": None,
+                "timeline_seconds": None,
                 "captured_at": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
+                "storage_key": None,
             }
         ],
     }
@@ -331,7 +386,7 @@ async def test_update_report_section_accepts_access_token(client: AsyncClient) -
     )
 
     with (
-        patch.object(service.auth_queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch.object(service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
         patch(
             "src.routes.reports.reports.update_report_section",
             AsyncMock(return_value=fake_section),

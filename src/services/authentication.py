@@ -1,4 +1,9 @@
-from src.db import auth_queries
+import os
+
+import bcrypt
+
+from src.db.auth import queries
+from src.exceptions import AuthenticationFailed
 from src.models.auth.authentication import (
     CurrentUser,
     LoginCredentials,
@@ -9,10 +14,17 @@ from src.security import authentication
 
 
 async def login(credentials: LoginCredentials) -> TokenPair:
-    user = await auth_queries.get_user_by_email(credentials.email)
+    user = await queries.get_user_by_email(credentials.email)
 
-    if user is None or not authentication.verify_password(credentials.password, user.password_hash):
-        raise PermissionError
+    if user is None:
+        bcrypt.checkpw(
+            credentials.password.encode(),
+            bcrypt.hashpw(os.urandom(16), bcrypt.gensalt()),
+        )
+        raise AuthenticationFailed()
+
+    if not authentication.verify_password(credentials.password, user.password_hash):
+        raise AuthenticationFailed()
 
     current_user = CurrentUser(
         id=user.id,
@@ -34,12 +46,12 @@ async def refresh(refresh_token: str) -> RefreshedAccessToken:
     claims = authentication.decode_token(refresh_token)
 
     if claims.type != "refresh":
-        raise PermissionError
+        raise AuthenticationFailed()
 
-    current_user = await auth_queries.get_user_by_id(str(claims.sub))
+    current_user = await queries.get_user_by_id(str(claims.sub))
 
     if current_user is None:
-        raise PermissionError
+        raise AuthenticationFailed()
 
     return RefreshedAccessToken(
         access_token=authentication.create_access_token(current_user),

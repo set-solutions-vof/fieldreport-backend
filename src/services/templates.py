@@ -1,8 +1,10 @@
+from pathlib import Path
 from uuid import uuid4
 
 from fastapi import UploadFile
 
-from src.db import template_queries
+from src.db.template import queries
+from src.exceptions import TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.templates import status_resolver
 from src.models.templates.configuration import (
@@ -10,13 +12,14 @@ from src.models.templates.configuration import (
     TemplateStatusActive,
     TemplateStatusProcessing,
 )
-from src.models.templates.domain import TemplateSection, TemplateStructure
+from src.models.templates.domain import TemplateStructure
+from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import TemplateAnalysisJobRecord
-from src.storage import template_file_storage
+from src.storage import blob
 
 
 async def load_template_configuration(company_id: str) -> TemplateStatus:
-    active_template, job = await template_queries.fetch_template_configuration_context(company_id)
+    active_template, job = await queries.fetch_template_configuration_context(company_id)
 
     return status_resolver.resolve_template_company_state(active_template, job)
 
@@ -25,10 +28,11 @@ async def get_template_analysis_job(
     user: CurrentUser,
     job_id: str,
 ) -> TemplateAnalysisJobRecord:
-    job_row = await template_queries.get_template_analysis_job(job_id, str(user.company_id))
+    company_id = str(user.company_id)
+    job_row = await queries.get_template_analysis_job(job_id, company_id)
 
     if job_row is None:
-        raise LookupError
+        raise TemplateAnalysisJobNotFound(job_id, company_id)
 
     return job_row
 
@@ -39,13 +43,23 @@ async def start_template_analysis(
 ) -> TemplateStatusProcessing:
     company_id = str(user.company_id)
     job_id = str(uuid4())
-    stored_files = await template_file_storage.store_template_analysis_files(
-        company_id,
-        job_id,
-        files,
-    )
 
-    await template_queries.replace_template_analysis_job(job_id, company_id, stored_files)
+    stored_files: list[TemplateAnalysisFile] = []
+    for file in files:
+        original_file_name = file.filename or f"{uuid4()}.pdf"
+        key = f"{company_id}/{job_id}/{uuid4()}{Path(original_file_name).suffix}"
+        data = await file.read()
+        await blob.upload_file(
+            "templates",
+            key,
+            data,
+            file.content_type or "application/octet-stream",
+        )
+        stored_files.append(
+            TemplateAnalysisFile(original_file_name=original_file_name, stored_file_path=key)
+        )
+
+    await queries.replace_template_analysis_job(job_id, company_id, stored_files)
 
     return TemplateStatusProcessing(
         status="processing",
@@ -56,19 +70,21 @@ async def start_template_analysis(
 
 async def confirm_template(
     user: CurrentUser,
-    sections: list[TemplateSection],
+    structure: TemplateStructure,
 ) -> TemplateStatusActive:
     company_id = str(user.company_id)
-    job = await template_queries.fetch_latest_template_analysis_job(company_id)
-    structure = TemplateStructure(sections=sections)
+    job = await queries.fetch_optional_latest_template_analysis_job(company_id)
     template_id = str(uuid4())
 
-    await template_queries.create_template(company_id, template_id, structure)
-    await template_queries.set_active_template(company_id, template_id)
-    await template_queries.delete_template_analysis_job(str(job.id), company_id)
+    await queries.create_template(company_id, template_id, structure)
+    await queries.set_active_template(company_id, template_id)
+
+    if job is not None:
+        await queries.delete_template_analysis_job(str(job.id), company_id)
 
     return TemplateStatusActive(
         status="active",
-        source_reports_count=job.source_reports_count,
-        sections=sections,
+        source_reports_count=job.source_reports_count if job is not None else 0,
+        metadata_fields=structure.metadata_fields,
+        sections=structure.sections,
     )

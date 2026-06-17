@@ -33,13 +33,13 @@ db-downgrade:
 all: format lint stan test
 
 run:
-	@if ! nc -z localhost 5432 2>/dev/null; then \
+	@if ! nc -z localhost 5432 2>/dev/null || ! nc -z localhost 10000 2>/dev/null; then \
 		if ! docker info >/dev/null 2>&1; then \
 			echo "Error: Docker is not running. Start Docker Desktop and try again."; \
 			exit 1; \
 		fi; \
-		echo "PostgreSQL not detected — starting via Docker Compose..."; \
-		docker compose up db -d --wait; \
+		echo "PostgreSQL or Azurite not detected — starting via Docker Compose..."; \
+		docker compose up db azurite -d --wait; \
 	fi
 	@cp -n .env.example .env 2>/dev/null || true
 	uv run alembic upgrade head
@@ -48,7 +48,7 @@ run:
 	trap 'if [ -n "$$template_worker_pid" ]; then kill "$$template_worker_pid" 2>/dev/null || true; fi; if [ -n "$$audio_worker_pid" ]; then kill "$$audio_worker_pid" 2>/dev/null || true; fi' EXIT INT TERM; \
 	uv run python -m src.workers.template_analysis_worker & \
 	template_worker_pid=$$!; \
-	uv run python -m src.workers.audio_pipeline_worker & \
+	uv run python -m src.workers.report_generation_worker & \
 	audio_worker_pid=$$!; \
 	uv run uvicorn src.main:app --reload
 
@@ -60,5 +60,5 @@ worker:
 stop:
 	-pkill -f "$(CURDIR)/.venv/bin/uvicorn src.main:app --reload"
 	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.template_analysis_worker"
-	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.audio_pipeline_worker"
+	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.report_generation_worker"
 	docker compose down

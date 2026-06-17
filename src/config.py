@@ -18,24 +18,33 @@ class Settings(BaseSettings):
     azure_openai_api_key: str = Field(default="", validation_alias="AZURE_OPENAI_API_KEY")
     deepseek_deployment: str = Field(default="", validation_alias="DEEPSEEK_DEPLOYMENT")
     gpt4o_deployment: str = Field(default="", validation_alias="GPT4O_DEPLOYMENT")
-    gpt4o_transcribe_deployment: str = Field(
-        default="gpt-4o-transcribe", validation_alias="GPT4O_TRANSCRIBE_DEPLOYMENT"
-    )
-    gpt4o_transcribe_api_version: str = Field(
-        default="2024-10-21", validation_alias="GPT4O_TRANSCRIBE_API_VERSION"
-    )
-    template_analysis_stored_file_path: str = Field(
-        default=".data/template-analysis", validation_alias="TEMPLATE_ANALYSIS_STORAGE_PATH"
-    )
+    whisper_resource_endpoint: str = Field(default="", validation_alias="WHISPER_RESOURCE_ENDPOINT")
+    whisper_deployment: str = Field(default="whisper", validation_alias="WHISPER_DEPLOYMENT")
+    whisper_api_version: str = Field(default="2024-06-01", validation_alias="WHISPER_API_VERSION")
+    whisper_api_key: str = Field(default="", validation_alias="WHISPER_API_KEY")
     template_analysis_worker_poll_seconds: float = Field(
         default=2.0, validation_alias="TEMPLATE_ANALYSIS_WORKER_POLL_SECONDS"
     )
-    inspection_stored_file_path: str = Field(
-        default=".data/inspections", validation_alias="INSPECTION_STORAGE_PATH"
+    report_generation_worker_poll_seconds: float = Field(
+        default=5.0, validation_alias="REPORT_GENERATION_WORKER_POLL_SECONDS"
     )
-    audio_pipeline_worker_poll_seconds: float = Field(
-        default=5.0, validation_alias="AUDIO_PIPELINE_WORKER_POLL_SECONDS"
+    azure_storage_connection_string: str = Field(
+        default="", validation_alias="AZURE_STORAGE_CONNECTION_STRING"
+    )
+    smtp_host: str = Field(default="", validation_alias="SMTP_HOST")
+    smtp_port: int = Field(default=587, validation_alias="SMTP_PORT")
+    smtp_use_starttls: bool = Field(default=True, validation_alias="SMTP_USE_STARTTLS")
+    smtp_username: str = Field(default="", validation_alias="SMTP_USERNAME")
+    smtp_password: str = Field(default="", validation_alias="SMTP_PASSWORD")
+    smtp_from_email: str = Field(default="", validation_alias="SMTP_FROM_EMAIL")
+    smtp_from_name: str = Field(default="FieldReport", validation_alias="SMTP_FROM_NAME")
+    frontend_base_url: str = Field(
+        default="http://localhost:5173", validation_alias="FRONTEND_BASE_URL"
+    )
+    cors_origins: list[str] = Field(
+        default=["http://localhost:5173"],
+        validation_alias="CORS_ORIGINS",
     )
 
 
-settings = Settings()
+settings = Settings.model_validate({})

@@ -1,7 +1,9 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from src.exceptions import ReportNotFound
 from src.http.v1.request.report import ReportSectionUpdateRequest
 from src.http.v1.response.report import (
     ReportDetailResponse,
@@ -39,10 +41,13 @@ async def get_reports(
     description="Returns a single report with sections and evidence sources.",
 )
 async def get_report(
-    report_id: str,
+    report_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> ReportDetailResponse:
-    report_detail = await reports.get_report_detail(report_id, current_user)
+    try:
+        report_detail = await reports.get_report_detail(str(report_id), current_user)
+    except ReportNotFound:
+        raise HTTPException(status_code=404, detail="Report not found")
 
     return report_detail_response(report_detail)
 
@@ -54,17 +59,40 @@ async def get_report(
     description="Updates reviewed content and approval status for a report section.",
 )
 async def update_report_section(
-    report_id: str,
+    report_id: UUID,
     section_id: str,
     request_body: ReportSectionUpdateRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> ReportSectionResponse:
-    section = await reports.update_report_section(
-        report_id,
-        section_id,
-        current_user,
-        request_body.reviewed_content,
-        request_body.approved,
-    )
+    try:
+        section = await reports.update_report_section(
+            str(report_id),
+            section_id,
+            current_user,
+            request_body.reviewed_content,
+            request_body.approved,
+        )
+    except ReportNotFound:
+        raise HTTPException(status_code=404, detail="Report or section not found")
 
     return report_section_response(section)
+
+
+@router.post(
+    "/api/v1/reports/{report_id}/retry",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Retry report",
+    description="Retries a failed report generation.",
+)
+async def retry_report(
+    report_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> Response:
+    try:
+        await reports.retry_failed_report(str(report_id), current_user)
+    except ReportNotFound:
+        raise HTTPException(status_code=404, detail="Report not found")
+    except ValueError:
+        raise HTTPException(status_code=409, detail="Report can only be retried when failed")
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -1,3 +1,3 @@
 from typing import Literal
 
-ReportStatus = Literal["generating", "draft", "approved", "failed"]
+ReportStatus = Literal["generating", "processing", "draft", "approved", "failed"]

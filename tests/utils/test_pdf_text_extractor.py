@@ -17,6 +17,6 @@ def test_extract_text_from_pdf_returns_joined_page_text(tmp_path: Path) -> None:
     document.save(pdf_path)
     document.close()
 
-    result = pdf_text_extractor.extract_text_from_pdf(str(pdf_path))
+    result = pdf_text_extractor.extract_text_from_pdf(pdf_path.read_bytes())
 
     assert result == "Summary page\n\nFindings page"

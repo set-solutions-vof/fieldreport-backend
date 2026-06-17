@@ -1,8 +1,8 @@
 import fitz
 
 
-def extract_text_from_pdf(stored_file_path: str) -> str:
-    document = fitz.open(stored_file_path)
+def extract_text_from_pdf(data: bytes) -> str:
+    document = fitz.open(stream=data, filetype="pdf")
 
     try:
         page_texts = [page.get_text("text").strip() for page in document]

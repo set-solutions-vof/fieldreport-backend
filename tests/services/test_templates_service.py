@@ -3,12 +3,13 @@ from io import BytesIO
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
+import pytest
 from starlette.datastructures import UploadFile
 
+from src.exceptions import TemplateAnalysisJobNotFound
 from src.models.auth.authentication import CurrentUser
 from src.models.enums.template_analysis_job_status import TemplateAnalysisJobStatus
 from src.models.templates.domain import TemplateSection, TemplateStructure
-from src.models.templates.pipeline import TemplateAnalysisFile
 from src.models.templates.records import TemplateAnalysisJobRecord
 from src.services import templates as templates_service
 
@@ -42,7 +43,7 @@ def build_current_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
-        company_name="LEKK BV",
+        company_name="Demo Company",
         email="demo@fieldreport.local",
         name="Demo User",
         role="admin",
@@ -60,7 +61,7 @@ async def test_get_template_analysis_job_returns_active_job() -> None:
     )
 
     with patch.object(
-        templates_service.template_queries,
+        templates_service.queries,
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
@@ -81,19 +82,14 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
         build_upload_file("one.pdf"),
         build_upload_file("two.pdf"),
     ]
-    stored_files = [
-        TemplateAnalysisFile(original_file_name="one.pdf", stored_file_path="/tmp/one.pdf"),
-        TemplateAnalysisFile(original_file_name="two.pdf", stored_file_path="/tmp/two.pdf"),
-    ]
-
     with (
         patch.object(
-            templates_service.template_file_storage,
-            "store_template_analysis_files",
-            AsyncMock(return_value=stored_files),
-        ) as store_files,
+            templates_service.blob,
+            "upload_file",
+            AsyncMock(return_value="https://storage.example/blob"),
+        ) as upload_file,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "replace_template_analysis_job",
             AsyncMock(),
         ) as replace_job,
@@ -102,8 +98,10 @@ async def test_start_template_analysis_stores_files_and_creates_job() -> None:
 
     assert result.status == "processing"
     assert result.source_reports_count == 2
-    store_files.assert_awaited_once_with(str(current_user.company_id), result.job_id, files)
-    replace_job.assert_awaited_once_with(result.job_id, str(current_user.company_id), stored_files)
+    assert upload_file.await_count == 2
+    replace_job.assert_awaited_once()
+    stored_files = replace_job.await_args.args[2]
+    assert [file.original_file_name for file in stored_files] == ["one.pdf", "two.pdf"]
 
 
 async def test_get_template_analysis_job_returns_pending_review_job() -> None:
@@ -113,7 +111,7 @@ async def test_get_template_analysis_job_returns_pending_review_job() -> None:
     )
 
     with patch.object(
-        templates_service.template_queries,
+        templates_service.queries,
         "get_template_analysis_job",
         AsyncMock(
             return_value=build_analysis_job_record(
@@ -132,16 +130,12 @@ async def test_get_template_analysis_job_raises_for_missing_job() -> None:
     current_user = build_current_user()
 
     with patch.object(
-        templates_service.template_queries,
+        templates_service.queries,
         "get_template_analysis_job",
         AsyncMock(return_value=None),
     ):
-        try:
+        with pytest.raises(TemplateAnalysisJobNotFound):
             await templates_service.get_template_analysis_job(current_user, str(uuid4()))
-        except LookupError:
-            pass
-        else:
-            raise AssertionError("Expected LookupError")
 
 
 async def test_confirm_template_creates_and_activates_template_from_reviewed_sections() -> None:
@@ -162,31 +156,34 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
-            templates_service.template_queries,
-            "fetch_latest_template_analysis_job",
+            templates_service.queries,
+            "fetch_optional_latest_template_analysis_job",
             AsyncMock(return_value=job),
         ),
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "create_template",
             AsyncMock(),
         ) as create_template,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "set_active_template",
             AsyncMock(),
         ) as set_active_template,
         patch.object(
-            templates_service.template_queries,
+            templates_service.queries,
             "delete_template_analysis_job",
             AsyncMock(),
         ) as delete_job,
     ):
-        result = await templates_service.confirm_template(current_user, sections)
+        result = await templates_service.confirm_template(
+            current_user, TemplateStructure(sections=sections)
+        )
 
     assert result.model_dump(exclude_none=True) == {
         "status": "active",
         "source_reports_count": 3,
+        "metadata_fields": [],
         "sections": [
             {
                 "id": "summary",
@@ -208,3 +205,81 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
     create_template.assert_awaited_once()
     set_active_template.assert_awaited_once_with(str(current_user.company_id), str(template_id))
     delete_job.assert_awaited_once_with(str(job_id), str(current_user.company_id))
+
+
+async def test_confirm_template_creates_active_template_when_no_analysis_job_exists() -> None:
+    current_user = build_current_user()
+    template_id = uuid4()
+    sections = [
+        TemplateSection(id="summary", label="Updated Summary", render_type="text_block"),
+    ]
+
+    with (
+        patch.object(templates_service, "uuid4", side_effect=[template_id]),
+        patch.object(
+            templates_service.queries,
+            "fetch_optional_latest_template_analysis_job",
+            AsyncMock(return_value=None),
+        ),
+        patch.object(
+            templates_service.queries,
+            "create_template",
+            AsyncMock(),
+        ) as create_template,
+        patch.object(
+            templates_service.queries,
+            "set_active_template",
+            AsyncMock(),
+        ) as set_active_template,
+        patch.object(
+            templates_service.queries,
+            "delete_template_analysis_job",
+            AsyncMock(),
+        ) as delete_job,
+    ):
+        result = await templates_service.confirm_template(
+            current_user, TemplateStructure(sections=sections)
+        )
+
+    assert result.status == "active"
+    assert result.source_reports_count == 0
+    assert result.sections == sections
+    create_template.assert_awaited_once_with(
+        str(current_user.company_id),
+        str(template_id),
+        TemplateStructure(sections=sections),
+    )
+    set_active_template.assert_awaited_once_with(str(current_user.company_id), str(template_id))
+    delete_job.assert_not_awaited()
+
+
+async def test_confirm_template_does_not_fetch_active_template_without_analysis_job() -> None:
+    current_user = build_current_user()
+    template_id = uuid4()
+
+    with (
+        patch.object(templates_service, "uuid4", side_effect=[template_id]),
+        patch.object(
+            templates_service.queries,
+            "fetch_optional_latest_template_analysis_job",
+            AsyncMock(return_value=None),
+        ),
+        patch.object(
+            templates_service.queries,
+            "fetch_optional_active_company_template",
+            AsyncMock(return_value=None),
+        ) as fetch_active_template,
+        patch.object(
+            templates_service.queries,
+            "create_template",
+            AsyncMock(),
+        ),
+        patch.object(
+            templates_service.queries,
+            "set_active_template",
+            AsyncMock(),
+        ),
+    ):
+        await templates_service.confirm_template(current_user, TemplateStructure(sections=[]))
+
+    fetch_active_template.assert_not_awaited()

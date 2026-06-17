@@ -8,7 +8,7 @@ from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
 
 from src.config import settings
-from src.db import auth_queries
+from src.db.auth import queries
 from src.models.auth.authentication import CurrentUser, TokenClaims
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
@@ -16,6 +16,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(password.encode(), password_hash.encode())
+
+
+def hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def create_access_token(user: CurrentUser) -> str:
@@ -73,7 +77,7 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Cur
     except (InvalidTokenError, ValueError):
         raise credentials_exception
 
-    user = await auth_queries.get_user_by_id(str(claims.sub))
+    user = await queries.get_user_by_id(str(claims.sub))
 
     if user is None:
         raise credentials_exception
