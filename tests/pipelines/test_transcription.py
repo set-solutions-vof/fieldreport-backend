@@ -44,7 +44,7 @@ async def test_transcribe_inspection_audio_files_persists_transcription() -> Non
             return_value=(b"audio", "audio/mpeg"),
         ),
         patch.object(
-            transcription.gpt4o_transcribe_client,
+            transcription.whisper_transcribe_client,
             "transcribe_audio",
             AsyncMock(return_value=transcription_result),
         ),

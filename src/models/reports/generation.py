@@ -8,6 +8,8 @@ class GeneratedReportSection(BaseModel):
     generated_content: str
     confidence_level: ConfidenceLevel
     confidence_score: float
+    transcription_refs: list[int] = []
+    image_refs: list[int] = []
 
 
 class GeneratedReportSectionList(BaseModel):

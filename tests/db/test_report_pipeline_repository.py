@@ -30,6 +30,7 @@ async def test_insert_transcription_executes_insert_and_returns_id() -> None:
     connection.execute.assert_awaited_once()
     statement = connection.execute.await_args.args[0]
     assert statement.table is transcriptions
+    assert statement.compile().params["duration_seconds"] == 12.5
 
 
 async def test_insert_transcription_segments_executes_inserts_and_returns_ids() -> None:

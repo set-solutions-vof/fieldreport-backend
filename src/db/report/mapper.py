@@ -10,12 +10,13 @@ from src.models.reports.pipeline import (
     StoredTranscriptionSegment,
 )
 from src.models.reports.report import (
+    ImageEvidenceItem,
     ReportDetail,
     ReportDetailSection,
-    ReportEvidenceItem,
     ReportEvidenceSource,
     ReportSection,
     ReportSummary,
+    TranscriptionEvidenceItem,
 )
 from src.models.templates.domain import TemplateSectionGroup
 
@@ -66,27 +67,25 @@ def map_report_section_source(row: Mapping[str, object]) -> ReportEvidenceSource
     )
 
 
-def map_report_evidence_item(row: Mapping[str, object]) -> ReportEvidenceItem:
+def map_report_evidence_item(
+    row: Mapping[str, object],
+) -> TranscriptionEvidenceItem | ImageEvidenceItem:
     if row["evidence_type"] == "transcription_segment":
-        return ReportEvidenceItem.model_validate(
+        return TranscriptionEvidenceItem.model_validate(
             {
                 "id": row["transcription_segment_id"],
-                "evidence_type": "transcription_segment",
                 "timeline_seconds": numeric_to_float(row["timeline_seconds"]),
                 "start_seconds": row["start_seconds"],
                 "end_seconds": row["end_seconds"],
-                "captured_at": None,
                 "content_summary": row["transcription_text"],
+                "transcription_id": row["transcription_id"],
             }
         )
 
-    return ReportEvidenceItem.model_validate(
+    return ImageEvidenceItem.model_validate(
         {
             "id": row["image_analysis_id"],
-            "evidence_type": "image_analysis",
-            "timeline_seconds": numeric_to_float(row["timeline_seconds"]),
-            "start_seconds": None,
-            "end_seconds": None,
+            "timeline_seconds": None,
             "captured_at": row["captured_at"],
             "content_summary": row["image_analysis_text"],
             "storage_key": row["image_storage_key"],
@@ -134,9 +133,9 @@ def map_report_sections(rows: list[Mapping[str, object]]) -> list[ReportSection]
 
 def map_report_detail_sections(
     rows: list[Mapping[str, object]],
-) -> tuple[list[ReportDetailSection], list[ReportEvidenceItem]]:
+) -> tuple[list[ReportDetailSection], list[TranscriptionEvidenceItem | ImageEvidenceItem]]:
     sections_by_id: dict[object, ReportDetailSection] = {}
-    evidence_items_by_id: dict[object, ReportEvidenceItem] = {}
+    evidence_items_by_id: dict[object, TranscriptionEvidenceItem | ImageEvidenceItem] = {}
     sections: list[ReportDetailSection] = []
 
     for row in rows:
@@ -169,7 +168,8 @@ def map_report_detail_sections(
     evidence_items = sorted(
         evidence_items_by_id.values(),
         key=lambda item: (
-            item.timeline_seconds,
+            item.timeline_seconds is None,
+            item.timeline_seconds or 0.0,
             item.evidence_type,
             str(item.id),
         ),

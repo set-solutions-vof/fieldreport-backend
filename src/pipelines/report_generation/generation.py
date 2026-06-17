@@ -13,6 +13,32 @@ from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.prompts.report_generation import REPORT_GENERATION_PROMPT
 
 
+def format_timestamp(seconds: float) -> str:
+    total_seconds = int(seconds)
+    minutes = total_seconds // 60
+    remaining_seconds = total_seconds % 60
+    return f"{minutes}:{remaining_seconds:02d}"
+
+
+def format_transcription_segments_for_prompt(
+    segment_rows: list[StoredTranscriptionSegment],
+) -> str:
+    return "\n".join(
+        (
+            f'{segment_index}. [{format_timestamp(segment.start_seconds)}-'
+            f'{format_timestamp(segment.end_seconds)}] "{segment.text}"'
+        )
+        for segment_index, segment in enumerate(segment_rows, start=1)
+    )
+
+
+def format_images_for_prompt(image_rows: list[StoredImageAnalysis]) -> str:
+    return "\n".join(
+        f'{image_index}. {image.analysis_text}'
+        for image_index, image in enumerate(image_rows, start=1)
+    )
+
+
 def build_report_generation_prompt(
     template_structure: TemplateStructure,
     template_sections: list[TemplateSection],
@@ -23,11 +49,8 @@ def build_report_generation_prompt(
     sections_text = "\n".join(
         f"- id: {section.id}, label: {section.label}" for section in template_sections
     )
-    combined_transcription = "\n".join(segment.text for segment in segment_rows)
-    image_text = "\n".join(
-        f"{image_index}. {image.analysis_text}"
-        for image_index, image in enumerate(image_rows, start=1)
-    )
+    transcription_segments_text = format_transcription_segments_for_prompt(segment_rows)
+    image_text = format_images_for_prompt(image_rows)
     metadata_values = report.metadata.model_dump()
     metadata_context = [
         f"{metadata_field.label}: {metadata_values[metadata_field.key]}"
@@ -44,7 +67,7 @@ def build_report_generation_prompt(
 
     return REPORT_GENERATION_PROMPT.format(
         sections_text=sections_text,
-        combined_transcription=combined_transcription,
+        transcription_segments_text=transcription_segments_text,
         image_text=image_text,
         context_text=context_text,
     )
@@ -84,8 +107,6 @@ async def persist_pipeline_results(
     image_rows: list[StoredImageAnalysis],
 ) -> None:
     template_sections_by_id = {section.id: section for section in template_sections}
-    transcription_segment_ids = [str(segment.id) for segment in segment_rows]
-    image_analysis_ids = [str(image.id) for image in image_rows]
     section_pairs: list[tuple[GeneratedReportSection, TemplateSection]] = []
 
     for section_data in generated_sections:
@@ -103,14 +124,20 @@ async def persist_pipeline_results(
         section_pairs,
     )
 
-    for report_section_id in report_section_ids:
-        for transcription_segment_id in transcription_segment_ids:
+    for report_section_id, (section_data, _) in zip(
+        report_section_ids,
+        section_pairs,
+        strict=True,
+    ):
+        for transcription_ref in section_data.transcription_refs:
+            transcription_segment_id = str(segment_rows[transcription_ref - 1].id)
             await repository.insert_report_section_source_transcription(
                 report_section_id,
                 transcription_segment_id,
             )
 
-        for image_analysis_id in image_analysis_ids:
+        for image_ref in section_data.image_refs:
+            image_analysis_id = str(image_rows[image_ref - 1].id)
             await repository.insert_report_section_source_image(
                 report_section_id,
                 image_analysis_id,

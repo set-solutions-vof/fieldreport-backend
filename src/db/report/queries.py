@@ -15,6 +15,7 @@ from src.db.schema.tables import (
     report_sections,
     reports,
     transcription_segments,
+    transcriptions,
     users,
 )
 from src.exceptions import ReportNotFound
@@ -28,6 +29,16 @@ from src.models.reports.report import (
 
 def _report_section_content(column):
     return column[0].astext
+
+
+def _transcription_timeline_offset():
+    prior_transcription = transcriptions.alias("prior_transcription")
+    return sa.select(
+        sa.func.coalesce(sa.func.sum(prior_transcription.c.duration_seconds), 0)
+    ).where(
+        prior_transcription.c.inspection_id == transcriptions.c.inspection_id,
+        prior_transcription.c.created_at < transcriptions.c.created_at,
+    ).scalar_subquery()
 
 
 def _report_section_detail_columns(include_timeline: bool):
@@ -46,6 +57,7 @@ def _report_section_detail_columns(include_timeline: bool):
         report_sections.c.confidence_score,
         report_section_evidence.c.evidence_type.label("evidence_type"),
         transcription_segments.c.id.label("transcription_segment_id"),
+        transcription_segments.c.transcription_id.label("transcription_id"),
         transcription_segments.c.start_seconds.label("start_seconds"),
         transcription_segments.c.end_seconds.label("end_seconds"),
         transcription_segments.c.text.label("transcription_text"),
@@ -60,22 +72,9 @@ def _report_section_detail_columns(include_timeline: bool):
             sa.case(
                 (
                     report_section_evidence.c.evidence_type == "transcription_segment",
-                    transcription_segments.c.start_seconds,
+                    transcription_segments.c.start_seconds + _transcription_timeline_offset(),
                 ),
-                (
-                    report_section_evidence.c.evidence_type == "image_analysis",
-                    sa.cast(
-                        sa.extract(
-                            "epoch",
-                            sa.func.coalesce(
-                                image_analyses.c.captured_at,
-                                image_analyses.c.created_at,
-                            )
-                            - inspections.c.created_at,
-                        ),
-                        sa.Float,
-                    ),
-                ),
+                else_=sa.null(),
             ).label("timeline_seconds")
         )
 
@@ -93,6 +92,10 @@ def _report_sections_join():
         .outerjoin(
             transcription_segments,
             transcription_segments.c.id == report_section_evidence.c.transcription_segment_id,
+        )
+        .outerjoin(
+            transcriptions,
+            transcriptions.c.id == transcription_segments.c.transcription_id,
         )
         .outerjoin(
             image_analyses,

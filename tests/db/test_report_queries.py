@@ -1,3 +1,4 @@
+import sqlalchemy as sa
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -6,6 +7,7 @@ import pytest
 
 from src.db.report import queries
 from src.db.report.mapper import map_report_detail_sections
+from src.db.schema.tables import report_sections, reports
 from src.exceptions import ReportNotFound
 from src.models.reports.metadata import ReportMetadata
 from tests.db.sqlalchemy_fakes import FakeResult, build_connection
@@ -114,6 +116,8 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     shared_image_analysis_id = uuid4()
     third_section_segment_id = uuid4()
     capture_time = datetime(2026, 5, 8, 12, 30, 20, tzinfo=UTC)
+    first_transcription_id = uuid4()
+    second_transcription_id = uuid4()
     rows = [
         {
             "id": first_section_id,
@@ -131,6 +135,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.95,
             "evidence_type": "image_analysis",
             "transcription_segment_id": None,
+            "transcription_id": None,
             "start_seconds": None,
             "end_seconds": None,
             "transcription_text": None,
@@ -155,6 +160,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.95,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": shared_transcription_segment_id,
+            "transcription_id": first_transcription_id,
             "start_seconds": 12.0,
             "end_seconds": 15.0,
             "transcription_text": "Moisture mentioned",
@@ -177,6 +183,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.71,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": shared_transcription_segment_id,
+            "transcription_id": first_transcription_id,
             "start_seconds": 12.0,
             "end_seconds": 15.0,
             "transcription_text": "Moisture mentioned",
@@ -199,6 +206,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.71,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": first_unique_segment_id,
+            "transcription_id": second_transcription_id,
             "start_seconds": 5.0,
             "end_seconds": 8.0,
             "transcription_text": "Opening note",
@@ -221,6 +229,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.71,
             "evidence_type": "image_analysis",
             "transcription_segment_id": None,
+            "transcription_id": None,
             "start_seconds": None,
             "end_seconds": None,
             "transcription_text": None,
@@ -243,6 +252,7 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
             "confidence_score": 0.42,
             "evidence_type": "transcription_segment",
             "transcription_segment_id": third_section_segment_id,
+            "transcription_id": first_transcription_id,
             "start_seconds": 30.0,
             "end_seconds": 35.0,
             "transcription_text": "Summary audio",
@@ -289,21 +299,118 @@ async def test_fetch_report_section_rows_maps_detail_sections_and_timeline() -> 
     assert [evidence_item.id for evidence_item in evidence_items] == [
         first_unique_segment_id,
         shared_transcription_segment_id,
-        shared_image_analysis_id,
         third_section_segment_id,
+        shared_image_analysis_id,
     ]
     assert [evidence_item.evidence_type for evidence_item in evidence_items] == [
         "transcription_segment",
         "transcription_segment",
-        "image_analysis",
         "transcription_segment",
+        "image_analysis",
     ]
     assert [evidence_item.timeline_seconds for evidence_item in evidence_items] == [
         5.0,
         12.0,
-        20.0,
         30.0,
+        None,
     ]
+    transcription_evidence = [
+        evidence_item
+        for evidence_item in evidence_items
+        if evidence_item.evidence_type == "transcription_segment"
+    ]
+    assert transcription_evidence[0].transcription_id == second_transcription_id
+    assert transcription_evidence[1].transcription_id == first_transcription_id
+    connection.execute.assert_awaited_once()
+
+
+def test_report_section_timeline_query_offsets_second_transcription() -> None:
+    columns = queries._report_section_detail_columns(include_timeline=True)
+    statement = sa.select(*columns).select_from(queries._report_sections_join())
+    compiled = str(statement.compile(compile_kwargs={"literal_binds": True}))
+
+    assert "duration_seconds" in compiled
+    assert "prior_transcription" in compiled
+    assert "NULL" in compiled
+    assert "epoch" not in compiled
+    assert report_sections.c.id.key in compiled or "report_sections" in compiled
+
+
+async def test_fetch_report_section_rows_offsets_timeline_by_prior_transcription_duration() -> None:
+    section_id = uuid4()
+    first_transcription_id = uuid4()
+    second_transcription_id = uuid4()
+    first_segment_id = uuid4()
+    second_segment_id = uuid4()
+    first_transcription_duration_seconds = 40.0
+    second_segment_start_seconds = 5.0
+    rows = [
+        {
+            "id": section_id,
+            "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": None,
+            "groups": None,
+            "section_order": 1,
+            "render_type": "text_block",
+            "generated_content": "Draft text",
+            "reviewed_content": None,
+            "approved": False,
+            "confidence_level": "high",
+            "confidence_score": 0.95,
+            "evidence_type": "transcription_segment",
+            "transcription_segment_id": first_segment_id,
+            "transcription_id": first_transcription_id,
+            "start_seconds": 10.0,
+            "end_seconds": 15.0,
+            "transcription_text": "First audio",
+            "image_analysis_id": None,
+            "image_storage_key": None,
+            "captured_at": None,
+            "image_analysis_text": None,
+            "timeline_seconds": 10.0,
+        },
+        {
+            "id": section_id,
+            "section_id": "bevindingen",
+            "label": "Bevindingen",
+            "fields": None,
+            "groups": None,
+            "section_order": 1,
+            "render_type": "text_block",
+            "generated_content": "Draft text",
+            "reviewed_content": None,
+            "approved": False,
+            "confidence_level": "high",
+            "confidence_score": 0.95,
+            "evidence_type": "transcription_segment",
+            "transcription_segment_id": second_segment_id,
+            "transcription_id": second_transcription_id,
+            "start_seconds": second_segment_start_seconds,
+            "end_seconds": 8.0,
+            "transcription_text": "Second audio",
+            "image_analysis_id": None,
+            "image_storage_key": None,
+            "captured_at": None,
+            "image_analysis_text": None,
+            "timeline_seconds": second_segment_start_seconds
+            + first_transcription_duration_seconds,
+        },
+    ]
+    connection = build_connection(rows=rows)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result_rows = await queries.fetch_report_section_rows(str(uuid4()), str(uuid4()))
+        _, evidence_items = map_report_detail_sections(result_rows)
+
+    assert len(evidence_items) == 2
+    assert evidence_items[0].timeline_seconds == 10.0
+    assert evidence_items[0].transcription_id == first_transcription_id
+    assert evidence_items[1].timeline_seconds == 45.0
+    assert evidence_items[1].transcription_id == second_transcription_id
     connection.execute.assert_awaited_once()
 
 

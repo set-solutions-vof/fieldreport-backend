@@ -18,12 +18,10 @@ class Settings(BaseSettings):
     azure_openai_api_key: str = Field(default="", validation_alias="AZURE_OPENAI_API_KEY")
     deepseek_deployment: str = Field(default="", validation_alias="DEEPSEEK_DEPLOYMENT")
     gpt4o_deployment: str = Field(default="", validation_alias="GPT4O_DEPLOYMENT")
-    gpt4o_transcribe_deployment: str = Field(
-        default="gpt-4o-transcribe", validation_alias="GPT4O_TRANSCRIBE_DEPLOYMENT"
-    )
-    gpt4o_transcribe_api_version: str = Field(
-        default="2024-10-21", validation_alias="GPT4O_TRANSCRIBE_API_VERSION"
-    )
+    whisper_resource_endpoint: str = Field(default="", validation_alias="WHISPER_RESOURCE_ENDPOINT")
+    whisper_deployment: str = Field(default="whisper", validation_alias="WHISPER_DEPLOYMENT")
+    whisper_api_version: str = Field(default="2024-06-01", validation_alias="WHISPER_API_VERSION")
+    whisper_api_key: str = Field(default="", validation_alias="WHISPER_API_KEY")
     template_analysis_worker_poll_seconds: float = Field(
         default=2.0, validation_alias="TEMPLATE_ANALYSIS_WORKER_POLL_SECONDS"
     )

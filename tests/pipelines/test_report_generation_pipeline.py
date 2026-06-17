@@ -84,6 +84,8 @@ async def test_run_report_generation_processes_media_and_persists_sections() -> 
                     StoredTranscriptionSegment(
                         id=segment_id,
                         text="Inspecteur noemt vocht.",
+                        start_seconds=0.0,
+                        end_seconds=5.0,
                     )
                 ]
             ),

@@ -122,6 +122,7 @@ transcriptions = sa.Table(
     sa.Column("company_id", postgresql.UUID(as_uuid=False), nullable=False),
     sa.Column("storage_key", sa.String(), nullable=True),
     sa.Column("raw_text", sa.Text(), nullable=False),
+    sa.Column("duration_seconds", sa.Float(), nullable=False, server_default="0"),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )
 

@@ -22,9 +22,9 @@ def get_deepseek_client() -> AsyncOpenAI:
 
 
 @cache
-def get_gpt4o_transcribe_client() -> AsyncAzureOpenAI:
+def get_whisper_transcribe_client() -> AsyncAzureOpenAI:
     return AsyncAzureOpenAI(
-        azure_endpoint=settings.azure_openai_resource_endpoint,
-        api_key=settings.azure_openai_api_key,
-        api_version=settings.gpt4o_transcribe_api_version,
+        azure_endpoint=settings.whisper_resource_endpoint,
+        api_key=settings.whisper_api_key,
+        api_version=settings.whisper_api_version,
     )

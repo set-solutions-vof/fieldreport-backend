@@ -11,9 +11,9 @@ from src.exceptions import InvalidResetToken, InviteEmailDeliveryFailed
 from src.main import app
 from src.models.auth.authentication import AuthenticatedUser, CurrentUser
 from src.models.reports.report import (
+    ImageEvidenceItem,
     ReportDetail,
     ReportDetailSection,
-    ReportEvidenceItem,
     ReportEvidenceSource,
     ReportSection,
     ReportSummary,
@@ -302,12 +302,8 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
             )
         ],
         evidence_items=[
-            ReportEvidenceItem(
+            ImageEvidenceItem(
                 id=image_analysis_id,
-                evidence_type="image_analysis",
-                timeline_seconds=15.0,
-                start_seconds=None,
-                end_seconds=None,
                 captured_at=capture_time,
                 content_summary="Image summary",
             )
@@ -354,15 +350,13 @@ async def test_report_detail_accepts_access_token(client: AsyncClient) -> None:
             {
                 "id": str(image_analysis_id),
                 "evidence_type": "image_analysis",
-                "timeline_seconds": 15.0,
-                "start_seconds": None,
-                "end_seconds": None,
+                "timeline_seconds": None,
                 "captured_at": "2026-05-08T12:45:00Z",
                 "content_summary": "Image summary",
                 "storage_key": None,
             }
         ],
-    }
+        }
 
 
 async def test_update_report_section_accepts_access_token(client: AsyncClient) -> None:

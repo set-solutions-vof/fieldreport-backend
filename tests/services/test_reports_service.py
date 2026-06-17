@@ -6,12 +6,13 @@ import pytest
 
 from src.models.auth.authentication import CurrentUser
 from src.models.reports.report import (
+    ImageEvidenceItem,
     ReportDetail,
     ReportDetailSection,
-    ReportEvidenceItem,
     ReportEvidenceSource,
     ReportSection,
     ReportSummary,
+    TranscriptionEvidenceItem,
 )
 from src.services import reports as reports_service
 
@@ -114,30 +115,24 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
         ),
     ]
     evidence_items = [
-        ReportEvidenceItem(
+        TranscriptionEvidenceItem(
             id=first_unique_segment_id,
-            evidence_type="transcription_segment",
             timeline_seconds=5.0,
             start_seconds=5.0,
             end_seconds=8.0,
-            captured_at=None,
             content_summary="Opening note",
+            transcription_id=uuid4(),
         ),
-        ReportEvidenceItem(
+        TranscriptionEvidenceItem(
             id=shared_transcription_segment_id,
-            evidence_type="transcription_segment",
             timeline_seconds=12.0,
             start_seconds=12.0,
             end_seconds=15.0,
-            captured_at=None,
             content_summary="Moisture mentioned",
+            transcription_id=uuid4(),
         ),
-        ReportEvidenceItem(
+        ImageEvidenceItem(
             id=shared_image_analysis_id,
-            evidence_type="image_analysis",
-            timeline_seconds=20.0,
-            start_seconds=None,
-            end_seconds=None,
             captured_at=first_capture_time,
             content_summary="Thermal image",
         ),

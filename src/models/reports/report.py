@@ -1,11 +1,11 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
 from src.models.enums.confidence_level import ConfidenceLevel
 from src.models.enums.evidence_source_type import EvidenceSourceType
-from src.models.enums.report_evidence_item_type import ReportEvidenceItemType
 from src.models.enums.report_status import ReportStatus
 from src.models.enums.template_section_render_type import TemplateSectionRenderType
 from src.models.reports.metadata import ReportMetadata
@@ -29,12 +29,20 @@ class ReportEvidenceSource(BaseModel):
     content_summary: str
 
 
-class ReportEvidenceItem(BaseModel):
+class TranscriptionEvidenceItem(BaseModel):
     id: UUID
-    evidence_type: ReportEvidenceItemType
+    evidence_type: Literal["transcription_segment"] = "transcription_segment"
     timeline_seconds: float
-    start_seconds: float | None
-    end_seconds: float | None
+    start_seconds: float
+    end_seconds: float
+    content_summary: str
+    transcription_id: UUID
+
+
+class ImageEvidenceItem(BaseModel):
+    id: UUID
+    evidence_type: Literal["image_analysis"] = "image_analysis"
+    timeline_seconds: float | None = None
     captured_at: datetime | None
     content_summary: str
     storage_key: str | None = None
@@ -70,4 +78,4 @@ class ReportDetail(BaseModel):
     inspector_name: str
     updated_at: datetime | None = None
     sections: list[ReportDetailSection]
-    evidence_items: list[ReportEvidenceItem] = Field(default_factory=list)
+    evidence_items: list[TranscriptionEvidenceItem | ImageEvidenceItem] = Field(default_factory=list)

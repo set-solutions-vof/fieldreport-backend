@@ -2,7 +2,7 @@ from loguru import logger
 
 from src.db.inspection.queries import fetch_inspection_audio_files
 from src.db.report.pipeline_repository import ReportPipelineRepository
-from src.llm import gpt4o_transcribe_client
+from src.llm import whisper_transcribe_client
 from src.models.reports.pipeline import ReportPipelineContext
 from src.storage import blob
 
@@ -17,7 +17,7 @@ async def transcribe_inspection_audio_files(
         audio_key = audio_file.storage_key
         try:
             file_content = (await blob.download_file("inspections", audio_key))[0]
-            result = await gpt4o_transcribe_client.transcribe_audio(
+            result = await whisper_transcribe_client.transcribe_audio(
                 file_content,
                 audio_file.original_file_name,
             )

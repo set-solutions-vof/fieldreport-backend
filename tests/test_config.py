@@ -20,7 +20,10 @@ def test_settings_loads_values_from_environment() -> None:
             "AZURE_OPENAI_API_KEY": "shared-key",
             "DEEPSEEK_DEPLOYMENT": "DeepSeek-V3.2-Speciale",
             "GPT4O_DEPLOYMENT": "gpt-4o",
-            "GPT4O_TRANSCRIBE_DEPLOYMENT": "gpt-4o-transcribe",
+            "WHISPER_RESOURCE_ENDPOINT": "https://ai.example",
+            "WHISPER_DEPLOYMENT": "whisper",
+            "WHISPER_API_VERSION": "2024-06-01",
+            "WHISPER_API_KEY": "whisper-key",
             "SMTP_HOST": "smtp.office365.com",
             "SMTP_PORT": "587",
             "SMTP_USE_STARTTLS": "true",
@@ -44,7 +47,10 @@ def test_settings_loads_values_from_environment() -> None:
     assert settings.azure_openai_api_key == "shared-key"
     assert settings.deepseek_deployment == "DeepSeek-V3.2-Speciale"
     assert settings.gpt4o_deployment == "gpt-4o"
-    assert settings.gpt4o_transcribe_deployment == "gpt-4o-transcribe"
+    assert settings.whisper_resource_endpoint == "https://ai.example"
+    assert settings.whisper_deployment == "whisper"
+    assert settings.whisper_api_version == "2024-06-01"
+    assert settings.whisper_api_key == "whisper-key"
     assert settings.smtp_host == "smtp.office365.com"
     assert settings.smtp_port == 587
     assert settings.smtp_use_starttls is True

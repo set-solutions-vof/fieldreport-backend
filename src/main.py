@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
 
     client_factory.get_gpt4o_client()
     client_factory.get_deepseek_client()
-    client_factory.get_gpt4o_transcribe_client()
+    client_factory.get_whisper_transcribe_client()
 
     report_generation_task = asyncio.create_task(
         report_generation_worker.run_report_generation_worker(),

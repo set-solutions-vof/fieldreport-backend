@@ -24,6 +24,8 @@ class InspectionMediaFile(BaseModel):
 class StoredTranscriptionSegment(BaseModel):
     id: UUID
     text: str
+    start_seconds: float
+    end_seconds: float
 
 
 class StoredImageAnalysis(BaseModel):

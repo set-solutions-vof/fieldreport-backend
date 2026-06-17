@@ -14,6 +14,37 @@ from src.pipelines.report_generation import generation
 from tests.pipelines.helpers import build_report
 
 
+def test_build_report_generation_prompt_includes_numbered_transcription_segments() -> None:
+    report = build_report()
+    template_structure = TemplateStructure(
+        metadata_fields=[
+            TemplateScalarMetadataField(key="type_klant", label="Type klant", type="text")
+        ],
+        sections=[TemplateSection(id="conclusie", label="Conclusie", render_type="text_block")],
+    )
+
+    prompt = generation.build_report_generation_prompt(
+        template_structure,
+        template_structure.sections,
+        [
+            StoredTranscriptionSegment(
+                id=uuid4(),
+                text="Transcript",
+                start_seconds=0.0,
+                end_seconds=18.0,
+            )
+        ],
+        [StoredImageAnalysis(id=uuid4(), analysis_text="Image")],
+        report,
+    )
+
+    assert '1. [0:00-0:18] "Transcript"' in prompt
+    assert "transcription_refs" in prompt
+    assert "Type klant: Zakelijk" in prompt
+    assert "Extra opmerkingen: Extra" in prompt
+    assert "1. Image" in prompt
+
+
 def test_build_report_generation_prompt_includes_metadata_and_extra_context() -> None:
     report = build_report()
     template_structure = TemplateStructure(
@@ -26,7 +57,14 @@ def test_build_report_generation_prompt_includes_metadata_and_extra_context() ->
     prompt = generation.build_report_generation_prompt(
         template_structure,
         template_structure.sections,
-        [StoredTranscriptionSegment(id=uuid4(), text="Transcript")],
+        [
+            StoredTranscriptionSegment(
+                id=uuid4(),
+                text="Transcript",
+                start_seconds=0.0,
+                end_seconds=5.0,
+            )
+        ],
         [StoredImageAnalysis(id=uuid4(), analysis_text="Image")],
         report,
     )
@@ -106,6 +144,8 @@ async def test_persist_pipeline_results_links_evidence() -> None:
             generated_content="Concept",
             confidence_level="high",
             confidence_score=0.9,
+            transcription_refs=[1],
+            image_refs=[1],
         )
     ]
 
@@ -114,7 +154,7 @@ async def test_persist_pipeline_results_links_evidence() -> None:
         report,
         template_sections,
         generated_sections,
-        [StoredTranscriptionSegment(id=segment_id, text="Segment")],
+        [StoredTranscriptionSegment(id=segment_id, text="Segment", start_seconds=0.0, end_seconds=5.0)],
         [StoredImageAnalysis(id=image_id, analysis_text="Image")],
     )
 

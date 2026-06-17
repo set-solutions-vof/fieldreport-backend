@@ -1,11 +1,11 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
 from src.models.enums.confidence_level import ConfidenceLevel
 from src.models.enums.evidence_source_type import EvidenceSourceType
-from src.models.enums.report_evidence_item_type import ReportEvidenceItemType
 from src.models.enums.template_section_render_type import TemplateSectionRenderType
 from src.models.reports.metadata import ReportMetadata
 from src.models.reports.report import ReportDetail, ReportSection, ReportSummary
@@ -53,14 +53,24 @@ class ReportSectionResponse(ReportSectionContentResponse):
     evidence_sources: list[EvidenceSourceResponse]
 
 
-class EvidenceItemResponse(BaseModel):
+class TranscriptionEvidenceItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    evidence_type: ReportEvidenceItemType
+    evidence_type: Literal["transcription_segment"] = "transcription_segment"
     timeline_seconds: float
-    start_seconds: float | None
-    end_seconds: float | None
+    start_seconds: float
+    end_seconds: float
+    content_summary: str
+    transcription_id: UUID
+
+
+class ImageEvidenceItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    evidence_type: Literal["image_analysis"] = "image_analysis"
+    timeline_seconds: float | None = None
     captured_at: datetime | None
     content_summary: str
     storage_key: str | None = None
@@ -80,7 +90,7 @@ class ReportDetailResponse(BaseModel):
     inspector_name: str
     updated_at: datetime | None = None
     sections: list[ReportDetailSectionResponse]
-    evidence_items: list[EvidenceItemResponse]
+    evidence_items: list[TranscriptionEvidenceItemResponse | ImageEvidenceItemResponse]
 
 
 def report_summary_response(report_summary: ReportSummary) -> ReportSummaryResponse:

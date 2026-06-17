@@ -7,11 +7,6 @@ class AudioChunk(BaseModel):
     duration_seconds: float
 
 
-class ChunkTranscription(BaseModel):
-    text: str
-    duration_seconds: float
-
-
 class TranscriptionSegment(BaseModel):
     segment_index: int
     start_seconds: float

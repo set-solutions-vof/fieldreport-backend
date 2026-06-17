@@ -40,6 +40,7 @@ class ReportPipelineRepository:
             company_id=company_id,
             storage_key=storage_key,
             raw_text=raw_text,
+            duration_seconds=duration_seconds,
             created_at=sa.func.now(),
         )
 

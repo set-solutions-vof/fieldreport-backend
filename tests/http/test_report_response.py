@@ -2,9 +2,9 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from src.http.v1.response.report import (
-    EvidenceItemResponse,
-    EvidenceSourceResponse,
+    ImageEvidenceItemResponse,
     ReportDetailResponse,
+    EvidenceSourceResponse,
     report_detail_response,
 )
 from src.models.reports.report import ReportDetail, ReportDetailSection
@@ -23,18 +23,16 @@ def test_evidence_source_response_serializes_missing_captured_at() -> None:
     assert response.model_dump(mode="json")["captured_at"] is None
 
 
-def test_timeline_item_response_serializes_missing_captured_at() -> None:
-    response = EvidenceItemResponse(
+def test_timeline_item_response_serializes_missing_timeline_and_captured_at() -> None:
+    response = ImageEvidenceItemResponse(
         id=uuid4(),
-        evidence_type="transcription_segment",
-        timeline_seconds=1.0,
-        start_seconds=1.0,
-        end_seconds=2.0,
         captured_at=None,
-        content_summary="Audio summary",
+        content_summary="Image summary",
     )
 
-    assert response.model_dump(mode="json")["captured_at"] is None
+    payload = response.model_dump(mode="json")
+    assert payload["captured_at"] is None
+    assert payload["timeline_seconds"] is None
 
 
 def test_report_detail_response_serializes_missing_updated_at() -> None:
