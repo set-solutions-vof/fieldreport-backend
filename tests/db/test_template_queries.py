@@ -49,8 +49,14 @@ def build_connection(
 
 
 async def test_fetch_template_configuration_context_returns_state_context() -> None:
-    company_row = {"current_template_id": uuid4(), "structure": '{"sections": []}'}
     created_at = datetime.now(UTC)
+    company_row = {
+        "current_template_id": uuid4(),
+        "structure": '{"sections": []}',
+        "created_at": created_at,
+        "version": 2,
+        "source_reports_count": 0,
+    }
     job_row = {
         "id": uuid4(),
         "company_id": uuid4(),
@@ -76,6 +82,9 @@ async def test_fetch_template_configuration_context_returns_state_context() -> N
     assert result_active_template == ActiveCompanyTemplateRecord(
         current_template_id=company_row["current_template_id"],
         structure=TemplateStructure(sections=[]),
+        created_at=created_at,
+        version=2,
+        source_reports_count=0,
     )
     assert result_job_row == TemplateAnalysisJobRecord(
         id=job_row["id"],
@@ -93,7 +102,14 @@ async def test_fetch_template_configuration_context_returns_state_context() -> N
 
 
 async def test_fetch_active_company_template_returns_company_template() -> None:
-    company_row = {"current_template_id": uuid4(), "structure": '{"sections": []}'}
+    created_at = datetime.now(UTC)
+    company_row = {
+        "current_template_id": uuid4(),
+        "structure": '{"sections": []}',
+        "created_at": created_at,
+        "version": 1,
+        "source_reports_count": 0,
+    }
     connection = build_fake_connection(row=company_row)
 
     pool = MagicMock()
@@ -105,6 +121,9 @@ async def test_fetch_active_company_template_returns_company_template() -> None:
     assert result == ActiveCompanyTemplateRecord(
         current_template_id=company_row["current_template_id"],
         structure=TemplateStructure(sections=[]),
+        created_at=created_at,
+        version=1,
+        source_reports_count=0,
     )
     connection.execute.assert_awaited_once()
 
@@ -246,8 +265,14 @@ async def test_fetch_latest_template_analysis_job_returns_latest_company_job() -
 
 
 async def test_fetch_template_configuration_context_handles_null_job_structure() -> None:
-    company_row = {"current_template_id": uuid4(), "structure": '{"sections": []}'}
     created_at = datetime.now(UTC)
+    company_row = {
+        "current_template_id": uuid4(),
+        "structure": '{"sections": []}',
+        "created_at": created_at,
+        "version": 1,
+        "source_reports_count": 0,
+    }
     job_row = {
         "id": uuid4(),
         "company_id": uuid4(),
@@ -271,6 +296,9 @@ async def test_fetch_template_configuration_context_handles_null_job_structure()
     assert result_active_template == ActiveCompanyTemplateRecord(
         current_template_id=company_row["current_template_id"],
         structure=TemplateStructure(sections=[]),
+        created_at=created_at,
+        version=1,
+        source_reports_count=0,
     )
     assert result_job_row == TemplateAnalysisJobRecord(
         id=job_row["id"],
@@ -299,6 +327,58 @@ async def test_update_template_analysis_job_updates_status_structure_and_failure
 
     statement = connection.execute.await_args.args[0]
     assert statement.table is template_analysis_jobs
+
+
+async def test_archive_template_analysis_job_marks_job_completed() -> None:
+    connection = build_connection()
+    job_id = str(uuid4())
+    company_id = str(uuid4())
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        await queries.archive_template_analysis_job(job_id, company_id)
+
+    query = connection.execute.await_args.args[0]
+    assert query.table is template_analysis_jobs
+
+
+async def test_fetch_pending_review_job_returns_pending_job() -> None:
+    created_at = datetime.now(UTC)
+    job_row = {
+        "id": uuid4(),
+        "company_id": uuid4(),
+        "status": "pending_review",
+        "source_reports_count": 2,
+        "structure": '{"sections": []}',
+        "failure_message": None,
+        "created_at": created_at,
+    }
+    connection = build_fake_connection(row=job_row)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.fetch_pending_review_job(str(uuid4()))
+
+    assert result is not None
+    assert result.status == "pending_review"
+    connection.execute.assert_awaited_once()
+
+
+async def test_fetch_pending_review_job_returns_none_when_missing() -> None:
+    connection = build_fake_connection(row=None)
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.template.queries.get_database", return_value=pool):
+        result = await queries.fetch_pending_review_job(str(uuid4()))
+
+    assert result is None
+    connection.execute.assert_awaited_once()
 
 
 async def test_delete_template_analysis_job_deletes_company_scoped_job() -> None:
@@ -359,7 +439,7 @@ async def test_create_template_inserts_template_structure() -> None:
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
     with patch("src.db.template.queries.get_database", return_value=pool):
-        await queries.create_template(str(uuid4()), str(uuid4()), TemplateStructure(sections=[]))
+        await queries.create_template(str(uuid4()), str(uuid4()), TemplateStructure(sections=[]), 4)
 
     statement = connection.execute.await_args.args[0]
     assert statement.table is templates

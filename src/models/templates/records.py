@@ -12,6 +12,9 @@ class ActiveCompanyTemplateRecord(BaseModel):
 
     current_template_id: UUID
     structure: TemplateStructure
+    created_at: datetime
+    version: int
+    source_reports_count: int
 
 
 class CompanyTemplateRecord(BaseModel):

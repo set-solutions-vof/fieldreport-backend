@@ -1,0 +1,2 @@
+class TemplateConfirmationNotAllowed(Exception):
+    pass

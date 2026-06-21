@@ -10,6 +10,8 @@ class InviteDetails(BaseModel):
     id: UUID
     company_id: UUID
     company_name: str
+    first_name: str
+    last_name: str
     email: str
     role: UserRole
     is_accepted: bool

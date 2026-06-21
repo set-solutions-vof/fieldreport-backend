@@ -18,7 +18,8 @@ def build_current_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="FieldReport",
         email="inspector@example.com",
-        name="Inspector",
+        first_name="Inspector",
+        last_name="",
         role="inspector",
     )
 

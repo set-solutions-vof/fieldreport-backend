@@ -22,6 +22,8 @@ def build_invite_details(*, is_accepted: bool = False) -> InviteDetails:
         id=uuid4(),
         company_id=uuid4(),
         company_name="Demo Company",
+        first_name="New",
+        last_name="User",
         email="new.user@example.com",
         role="inspector",
         is_accepted=is_accepted,
@@ -29,9 +31,10 @@ def build_invite_details(*, is_accepted: bool = False) -> InviteDetails:
     )
 
 
-async def test_create_invite_returns_created_invite() -> None:
+async def test_create_invite_returns_created_invite_and_delivery() -> None:
     company_id = str(uuid4())
     created_at = datetime.now(UTC)
+    expires_at = created_at + timedelta(days=7)
     company = CompanyOnboarding(
         id=uuid4(),
         name="Demo Company",
@@ -41,9 +44,12 @@ async def test_create_invite_returns_created_invite() -> None:
     )
     invite = InviteCreated(
         id=uuid4(),
+        first_name="New",
+        last_name="User",
         email="new.user@example.com",
         role="admin",
         created_at=created_at,
+        expires_at=expires_at,
     )
 
     with (
@@ -66,17 +72,25 @@ async def test_create_invite_returns_created_invite() -> None:
         patch.object(invites_service, "send_invite_email", AsyncMock()) as send_email,
         patch.object(invites_service.secrets, "token_hex", return_value="raw-token"),
     ):
-        result = await invites_service.create_invite(
+        created_invite, delivery = await invites_service.create_invite(
             company_id,
             "new.user@example.com",
             "admin",
         )
 
-    assert result == invite
+    assert created_invite == invite
+    assert delivery == invites_service.InviteEmailDelivery(
+        company_id=company_id,
+        invite_id=str(invite.id),
+        to_email="new.user@example.com",
+        company_name="Demo Company",
+        role="admin",
+        token="raw-token",
+    )
     assert create_invite.await_args.args[0] == company_id
     assert create_invite.await_args.args[1:3] == ("new.user@example.com", "admin")
     assert create_invite.await_args.args[3] == hash_invite_token("raw-token")
-    send_email.assert_awaited_once()
+    send_email.assert_not_awaited()
 
 
 def test_smtp_is_configured_returns_false_when_from_email_is_missing() -> None:
@@ -106,40 +120,44 @@ async def test_create_invite_raises_when_smtp_is_not_configured() -> None:
             )
 
 
-async def test_create_invite_deletes_pending_invite_when_email_send_fails() -> None:
-    company_id = str(uuid4())
-    created_at = datetime.now(UTC)
-    company = CompanyOnboarding(
-        id=uuid4(),
-        name="Demo Company",
-        logo_url=None,
-        primary_color=None,
-        onboarding_completed=True,
-    )
-    invite = InviteCreated(
-        id=uuid4(),
-        email="new.user@example.com",
+async def test_deliver_invite_email_sends_message() -> None:
+    delivery = invites_service.InviteEmailDelivery(
+        company_id=str(uuid4()),
+        invite_id=str(uuid4()),
+        to_email="new.user@example.com",
+        company_name="Demo Company",
         role="admin",
-        created_at=created_at,
+        token="raw-token",
+    )
+
+    with patch.object(
+        invites_service,
+        "send_invite_email",
+        AsyncMock(),
+    ) as send_email:
+        await invites_service.deliver_invite_email(delivery)
+
+    send_email.assert_awaited_once_with(
+        to_email="new.user@example.com",
+        company_name="Demo Company",
+        role="admin",
+        token="raw-token",
+    )
+
+
+async def test_deliver_invite_email_deletes_pending_invite_when_send_fails() -> None:
+    company_id = str(uuid4())
+    invite_id = str(uuid4())
+    delivery = invites_service.InviteEmailDelivery(
+        company_id=company_id,
+        invite_id=invite_id,
+        to_email="new.user@example.com",
+        company_name="Demo Company",
+        role="admin",
+        token="raw-token",
     )
 
     with (
-        patch.object(
-            invites_service.queries,
-            "has_pending_invite",
-            AsyncMock(return_value=False),
-        ),
-        patch.object(
-            invites_service.queries,
-            "get_company",
-            AsyncMock(return_value=company),
-        ),
-        patch.object(
-            invites_service.queries,
-            "create_invite",
-            AsyncMock(return_value=invite),
-        ),
-        patch.object(invites_service, "_smtp_is_configured", return_value=True),
         patch.object(
             invites_service,
             "send_invite_email",
@@ -150,16 +168,10 @@ async def test_create_invite_deletes_pending_invite_when_email_send_fails() -> N
             "delete_pending_invite",
             AsyncMock(),
         ) as delete_pending_invite,
-        patch.object(invites_service.secrets, "token_hex", return_value="raw-token"),
     ):
-        with pytest.raises(InviteEmailDeliveryFailed):
-            await invites_service.create_invite(
-                company_id,
-                "new.user@example.com",
-                "admin",
-            )
+        await invites_service.deliver_invite_email(delivery)
 
-    delete_pending_invite.assert_awaited_once_with(company_id, str(invite.id))
+    delete_pending_invite.assert_awaited_once_with(company_id, invite_id)
 
 
 async def test_create_invite_raises_when_pending_invite_exists() -> None:
@@ -179,6 +191,8 @@ async def test_create_invite_raises_when_pending_invite_exists() -> None:
 async def test_list_invites_returns_invites() -> None:
     invite = InviteRecord(
         id=uuid4(),
+        first_name="New",
+        last_name="User",
         email="new.user@example.com",
         role="inspector",
         created_at=datetime.now(UTC),
@@ -218,6 +232,8 @@ async def test_get_invite_preview_returns_preview() -> None:
         result = await invites_service.get_invite_preview("token")
 
     assert result == InvitePreview(
+        first_name="New",
+        last_name="User",
         email="new.user@example.com",
         role="inspector",
         company_name="Demo Company",
@@ -241,7 +257,8 @@ async def test_accept_invite_returns_tokens() -> None:
         company_id=invite.company_id,
         company_name="Demo Company",
         email=invite.email,
-        name="New User",
+        first_name="New",
+        last_name="User",
         role="inspector",
     )
 
@@ -280,7 +297,7 @@ async def test_accept_invite_returns_tokens() -> None:
             return_value="refresh-token",
         ),
     ):
-        result = await invites_service.accept_invite("token", "New User", "secret")
+        result = await invites_service.accept_invite("token", "secret")
 
     assert result.access_token == "access-token"
     assert result.refresh_token == "refresh-token"
@@ -318,7 +335,8 @@ async def test_accept_invite_raises_when_user_already_exists() -> None:
         company_id=invite.company_id,
         company_name="Demo Company",
         email=invite.email,
-        name="Existing User",
+        first_name="Existing",
+        last_name="User",
         role="inspector",
     )
 
@@ -334,7 +352,7 @@ async def test_accept_invite_raises_when_user_already_exists() -> None:
         ),
     ):
         with pytest.raises(InviteInvalid):
-            await invites_service.accept_invite("token", "New User", "secret")
+            await invites_service.accept_invite("token", "secret")
 
 
 async def test_accept_invite_raises_when_created_user_cannot_be_loaded() -> None:
@@ -362,7 +380,7 @@ async def test_accept_invite_raises_when_created_user_cannot_be_loaded() -> None
         ),
     ):
         with pytest.raises(InviteInvalid):
-            await invites_service.accept_invite("token", "New User", "secret")
+            await invites_service.accept_invite("token", "secret")
 
 
 async def test_accept_invite_raises_when_user_creation_fails() -> None:
@@ -385,7 +403,7 @@ async def test_accept_invite_raises_when_user_creation_fails() -> None:
         ),
     ):
         with pytest.raises(InviteInvalid):
-            await invites_service.accept_invite("token", "New User", "secret")
+            await invites_service.accept_invite("token", "secret")
 
 
 async def test_accept_invite_returns_conflict_for_asyncpg_unique_violation() -> None:
@@ -408,7 +426,7 @@ async def test_accept_invite_returns_conflict_for_asyncpg_unique_violation() -> 
         ),
     ):
         with pytest.raises(HTTPException) as error:
-            await invites_service.accept_invite("token", "New User", "secret")
+            await invites_service.accept_invite("token", "secret")
 
     assert error.value.status_code == 409
     assert error.value.detail == "Email already registered"
@@ -434,7 +452,7 @@ async def test_accept_invite_returns_conflict_for_integrity_error() -> None:
         ),
     ):
         with pytest.raises(HTTPException) as error:
-            await invites_service.accept_invite("token", "New User", "secret")
+            await invites_service.accept_invite("token", "secret")
 
     assert error.value.status_code == 409
     assert error.value.detail == "Email already registered"

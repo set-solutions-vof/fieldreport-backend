@@ -35,7 +35,6 @@ async def accept_invite(token: str, request_body: AcceptInviteRequest) -> TokenR
     try:
         token_pair = await invites.accept_invite(
             token,
-            request_body.name,
             request_body.password,
         )
     except InviteInvalid:

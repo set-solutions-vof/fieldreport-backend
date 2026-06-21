@@ -2,7 +2,8 @@ from pydantic import BaseModel
 
 
 class UpdateProfileRequest(BaseModel):
-    name: str
+    first_name: str
+    last_name: str
 
 
 class ChangePasswordRequest(BaseModel):

@@ -12,7 +12,8 @@ def test_map_team_member_parses_record() -> None:
     member = map_team_member(
         {
             "id": member_id,
-            "name": "Admin",
+            "first_name": "Admin",
+            "last_name": "",
             "email": "admin@example.com",
             "role": "admin",
             "created_at": created_at,
@@ -21,7 +22,8 @@ def test_map_team_member_parses_record() -> None:
 
     assert member == TeamMember(
         id=member_id,
-        name="Admin",
+        first_name="Admin",
+        last_name="",
         email="admin@example.com",
         role="admin",
         created_at=created_at,

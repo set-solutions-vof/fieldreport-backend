@@ -14,23 +14,26 @@ def build_current_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="inspector@example.com",
-        name="Inspector",
+        first_name="Inspector",
+        last_name="",
         role="inspector",
     )
 
 
-async def test_update_profile_updates_name_and_returns_current_user() -> None:
+async def test_update_profile_updates_names_and_returns_current_user() -> None:
     current_user = build_current_user()
 
     with patch.object(
         users_service.db_queries,
-        "update_user_name",
+        "update_user_names",
         AsyncMock(),
-    ) as update_name:
-        result = await users_service.update_profile(current_user, "Updated Inspector")
+    ) as update_names:
+        result = await users_service.update_profile(current_user, "Updated", "Inspector")
 
-    assert result == current_user.model_copy(update={"name": "Updated Inspector"})
-    update_name.assert_awaited_once_with(str(current_user.id), "Updated Inspector")
+    assert result == current_user.model_copy(
+        update={"first_name": "Updated", "last_name": "Inspector"}
+    )
+    update_names.assert_awaited_once_with(str(current_user.id), "Updated", "Inspector")
 
 
 async def test_change_password_updates_hash_when_current_password_matches() -> None:

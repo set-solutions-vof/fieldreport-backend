@@ -12,3 +12,5 @@ class UpdateCompanyOnboardingRequest(BaseModel):
 class CreateInviteRequest(BaseModel):
     email: EmailStr
     role: UserRole
+    first_name: str = ""
+    last_name: str = ""

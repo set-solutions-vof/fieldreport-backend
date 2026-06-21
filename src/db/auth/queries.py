@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import sqlalchemy as sa
 
 from src.db.auth.mapper import map_authenticated_user, map_current_user
@@ -12,7 +14,8 @@ def _user_company_select():
         users.c.company_id,
         company.c.name.label("company_name"),
         users.c.email,
-        users.c.name,
+        users.c.first_name,
+        users.c.last_name,
         users.c.role,
     ).select_from(users.join(company, company.c.id == users.c.company_id))
 
@@ -43,3 +46,10 @@ async def get_user_by_id(user_id: str) -> CurrentUser | None:
         return None
 
     return map_current_user(row)
+
+
+async def update_last_sign_in_at(user_id: str, signed_in_at: datetime) -> None:
+    statement = users.update().where(users.c.id == user_id).values(last_sign_in_at=signed_in_at)
+
+    async with get_database().acquire() as connection:
+        await connection.execute(statement)

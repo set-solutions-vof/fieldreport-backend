@@ -85,9 +85,12 @@ async def test_create_invite_returns_created_invite_response() -> None:
     expires_at = datetime.now(UTC)
     row = {
         "id": invite_id,
+        "first_name": "New",
+        "last_name": "User",
         "email": "new.user@example.com",
         "role": "admin",
         "created_at": created_at,
+        "expires_at": expires_at,
     }
     connection = build_connection(row)
 
@@ -98,13 +101,18 @@ async def test_create_invite_returns_created_invite_response() -> None:
             "admin",
             "token",
             expires_at,
+            "New",
+            "User",
         )
 
     assert invite == InviteCreated(
         id=invite_id,
+        first_name="New",
+        last_name="User",
         email="new.user@example.com",
         role="admin",
         created_at=created_at,
+        expires_at=expires_at,
     )
     connection.execute.assert_awaited_once()
 
@@ -115,6 +123,8 @@ async def test_list_invites_returns_company_invites() -> None:
     invite_id = uuid4()
     row = {
         "id": invite_id,
+        "first_name": "New",
+        "last_name": "User",
         "email": "new.user@example.com",
         "role": "inspector",
         "is_accepted": False,
@@ -129,6 +139,8 @@ async def test_list_invites_returns_company_invites() -> None:
     assert invites == [
         InviteRecord(
             id=invite_id,
+            first_name="New",
+            last_name="User",
             email="new.user@example.com",
             role="inspector",
             is_accepted=False,
@@ -157,6 +169,8 @@ async def test_get_invite_by_token_hash_returns_invite_details() -> None:
         "id": invite_id,
         "company_id": company_id,
         "company_name": "Demo Company",
+        "first_name": "New",
+        "last_name": "User",
         "email": "new.user@example.com",
         "role": "admin",
         "is_accepted": False,
@@ -169,6 +183,8 @@ async def test_get_invite_by_token_hash_returns_invite_details() -> None:
 
     assert invite == InviteDetails(
         id=invite_id,
+        first_name="New",
+        last_name="User",
         company_id=company_id,
         company_name="Demo Company",
         email="new.user@example.com",
@@ -209,7 +225,8 @@ async def test_accept_invite_and_create_user_returns_user_id() -> None:
             str(invite_id),
             str(uuid4()),
             "new.user@example.com",
-            "New User",
+            "New",
+            "User",
             "inspector",
             "hashed-password",
         )
@@ -230,10 +247,91 @@ async def test_accept_invite_and_create_user_returns_empty_string_when_invite_mi
             str(uuid4()),
             str(uuid4()),
             "new.user@example.com",
-            "New User",
+            "New",
+            "User",
             "inspector",
             "hashed-password",
         )
 
     assert result == ""
+    connection.execute.assert_awaited_once()
+
+
+async def test_get_pending_invite_returns_invite() -> None:
+    invite_id = uuid4()
+    created_at = datetime.now(UTC)
+    expires_at = datetime.now(UTC)
+    row = {
+        "id": invite_id,
+        "first_name": "New",
+        "last_name": "User",
+        "email": "new.user@example.com",
+        "role": "inspector",
+        "is_accepted": False,
+        "created_at": created_at,
+        "expires_at": expires_at,
+    }
+    connection = build_connection(row)
+
+    with mock_pool(connection):
+        invite = await queries.get_pending_invite(str(uuid4()), str(invite_id))
+
+    assert invite is not None
+    assert invite.email == "new.user@example.com"
+    connection.execute.assert_awaited_once()
+
+
+async def test_get_pending_invite_returns_none_when_missing() -> None:
+    connection = build_connection(None)
+
+    with mock_pool(connection):
+        invite = await queries.get_pending_invite(str(uuid4()), str(uuid4()))
+
+    assert invite is None
+    connection.execute.assert_awaited_once()
+
+
+async def test_update_pending_invite_returns_updated_invite() -> None:
+    invite_id = uuid4()
+    created_at = datetime.now(UTC)
+    expires_at = datetime.now(UTC)
+    row = {
+        "id": invite_id,
+        "first_name": "Updated",
+        "last_name": "User",
+        "email": "new.user@example.com",
+        "role": "admin",
+        "is_accepted": False,
+        "created_at": created_at,
+        "expires_at": expires_at,
+    }
+    connection = build_connection(row)
+
+    with mock_pool(connection):
+        invite = await queries.update_pending_invite(
+            str(uuid4()),
+            str(invite_id),
+            "Updated",
+            "User",
+            "admin",
+        )
+
+    assert invite is not None
+    assert invite.role == "admin"
+    connection.execute.assert_awaited_once()
+
+
+async def test_update_pending_invite_returns_none_when_missing() -> None:
+    connection = build_connection(None)
+
+    with mock_pool(connection):
+        invite = await queries.update_pending_invite(
+            str(uuid4()),
+            str(uuid4()),
+            "Updated",
+            "User",
+            "admin",
+        )
+
+    assert invite is None
     connection.execute.assert_awaited_once()

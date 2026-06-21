@@ -114,7 +114,9 @@ async def list_report_summaries_by_company_id(company_id: str) -> list[ReportSum
             reports.c.status,
             inspections.c["metadata"],
             sa.cast(inspections.c.inspection_date, sa.DateTime()).label("inspection_date"),
-            users.c.name.label("inspector_name"),
+            sa.func.trim(
+                sa.func.concat(users.c.first_name, sa.literal(" "), users.c.last_name)
+            ).label("inspector_name"),
         )
         .select_from(
             reports.join(inspections, inspections.c.id == reports.c.inspection_id).join(
@@ -140,7 +142,9 @@ async def get_report_by_id(report_id: str, company_id: str) -> ReportDetail:
             reports.c.updated_at,
             inspections.c["metadata"],
             sa.cast(inspections.c.inspection_date, sa.DateTime()).label("inspection_date"),
-            users.c.name.label("inspector_name"),
+            sa.func.trim(
+                sa.func.concat(users.c.first_name, sa.literal(" "), users.c.last_name)
+            ).label("inspector_name"),
         )
         .select_from(
             reports.join(inspections, inspections.c.id == reports.c.inspection_id).join(

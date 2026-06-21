@@ -37,7 +37,8 @@ def build_authenticated_user() -> AuthenticatedUser:
         company_name="Demo Company",
         email="admin.user@example.com",
         password_hash=password_hash,
-        name="Admin User",
+        first_name="Admin",
+        last_name="User",
         role="admin",
     )
 
@@ -48,7 +49,8 @@ def build_current_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="inspector.user@example.com",
-        name="Inspector User",
+        first_name="Inspector",
+        last_name="User",
         role="inspector",
     )
 
@@ -228,7 +230,8 @@ async def test_me_returns_authenticated_user(client: AsyncClient) -> None:
     assert response.status_code == 200
     assert response.json() == {
         "id": str(current_user.id),
-        "name": current_user.name,
+        "first_name": "Inspector",
+        "last_name": "User",
         "email": current_user.email,
         "role": current_user.role,
         "company_id": str(current_user.company_id),

@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from io import BytesIO
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -66,6 +67,9 @@ async def test_create_inspection_stores_files_and_creates_report() -> None:
                         ],
                         sections=[],
                     ),
+                    created_at=datetime.now(UTC),
+                    version=1,
+                    source_reports_count=0,
                 )
             ),
         ),
@@ -147,6 +151,9 @@ async def test_create_inspection_raises_for_invalid_metadata_format() -> None:
             return_value=ActiveCompanyTemplateRecord(
                 current_template_id=uuid4(),
                 structure=TemplateStructure(metadata_fields=[], sections=[]),
+                created_at=datetime.now(UTC),
+                version=1,
+                source_reports_count=0,
             )
         ),
     ):
@@ -178,6 +185,9 @@ async def test_create_inspection_raises_for_missing_required_metadata_keys() -> 
                     ],
                     sections=[],
                 ),
+                created_at=datetime.now(UTC),
+                version=1,
+                source_reports_count=0,
             )
         ),
     ):

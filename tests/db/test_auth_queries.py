@@ -19,7 +19,8 @@ async def test_get_user_by_email_returns_authenticated_user() -> None:
         "company_name": "Demo Company",
         "email": "admin.user@example.com",
         "password_hash": "hash",
-        "name": "Admin User",
+        "first_name": "Admin",
+        "last_name": "User",
         "role": "admin",
     }
     connection = build_connection(row)
@@ -49,7 +50,8 @@ async def test_get_user_by_id_returns_current_user() -> None:
         "company_id": uuid4(),
         "company_name": "Demo Company",
         "email": "inspector.user@example.com",
-        "name": "Inspector User",
+        "first_name": "Inspector",
+        "last_name": "User",
         "role": "inspector",
     }
     connection = build_connection(row)

@@ -92,6 +92,8 @@ async def create_invite(
     role: str,
     token: str,
     expires_at: datetime,
+    first_name: str,
+    last_name: str,
 ) -> InviteCreated:
     statement = (
         invites.insert()
@@ -99,6 +101,8 @@ async def create_invite(
             id=str(uuid4()),
             company_id=company_id,
             email=email,
+            first_name=first_name,
+            last_name=last_name,
             role=role,
             token=token,
             is_accepted=False,
@@ -107,9 +111,12 @@ async def create_invite(
         )
         .returning(
             invites.c.id,
+            invites.c.first_name,
+            invites.c.last_name,
             invites.c.email,
             invites.c.role,
             invites.c.created_at,
+            invites.c.expires_at,
         )
     )
 
@@ -124,6 +131,8 @@ async def list_invites(company_id: str) -> list[InviteRecord]:
     statement = (
         sa.select(
             invites.c.id,
+            invites.c.first_name,
+            invites.c.last_name,
             invites.c.email,
             invites.c.role,
             invites.c.is_accepted,
@@ -147,6 +156,8 @@ async def get_invite_by_token_hash(token_hash: str) -> InviteDetails | None:
             invites.c.id,
             invites.c.company_id,
             company.c.name.label("company_name"),
+            invites.c.first_name,
+            invites.c.last_name,
             invites.c.email,
             invites.c.role,
             invites.c.is_accepted,
@@ -170,7 +181,8 @@ async def accept_invite_and_create_user(
     invite_id: str,
     company_id: str,
     email: str,
-    name: str,
+    first_name: str,
+    last_name: str,
     role: str,
     password_hash: str,
 ) -> str:
@@ -200,7 +212,8 @@ async def accept_invite_and_create_user(
                     company_id=company_id,
                     email=email,
                     password_hash=password_hash,
-                    name=name,
+                    first_name=first_name,
+                    last_name=last_name,
                     phone_number="",
                     role=role,
                     created_at=sa.func.now(),
@@ -234,3 +247,70 @@ async def delete_pending_invite(company_id: str, invite_id: str) -> bool:
         row = result.mappings().first()
 
     return row is not None
+
+
+async def get_pending_invite(company_id: str, invite_id: str) -> InviteRecord | None:
+    statement = sa.select(
+        invites.c.id,
+        invites.c.first_name,
+        invites.c.last_name,
+        invites.c.email,
+        invites.c.role,
+        invites.c.is_accepted,
+        invites.c.created_at,
+        invites.c.expires_at,
+    ).where(
+        invites.c.id == invite_id,
+        invites.c.company_id == company_id,
+        invites.c.is_accepted.is_(False),
+    )
+
+    async with get_database().acquire() as connection:
+        result = await connection.execute(statement)
+        row = result.mappings().first()
+
+    if row is None:
+        return None
+
+    return map_invite(row)
+
+
+async def update_pending_invite(
+    company_id: str,
+    invite_id: str,
+    first_name: str,
+    last_name: str,
+    role: str,
+) -> InviteRecord | None:
+    statement = (
+        invites.update()
+        .where(
+            invites.c.id == invite_id,
+            invites.c.company_id == company_id,
+            invites.c.is_accepted.is_(False),
+        )
+        .values(
+            first_name=first_name,
+            last_name=last_name,
+            role=role,
+        )
+        .returning(
+            invites.c.id,
+            invites.c.first_name,
+            invites.c.last_name,
+            invites.c.email,
+            invites.c.role,
+            invites.c.is_accepted,
+            invites.c.created_at,
+            invites.c.expires_at,
+        )
+    )
+
+    async with get_database().acquire() as connection:
+        result = await connection.execute(statement)
+        row = result.mappings().first()
+
+    if row is None:
+        return None
+
+    return map_invite(row)

@@ -1,4 +1,5 @@
 import secrets
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
 from asyncpg.exceptions import UniqueViolationError
@@ -19,11 +20,23 @@ from src.security import authentication
 from src.security.invite_tokens import hash_invite_token
 
 
+@dataclass(frozen=True, slots=True)
+class InviteEmailDelivery:
+    company_id: str
+    invite_id: str
+    to_email: str
+    company_name: str
+    role: UserRole
+    token: str
+
+
 async def create_invite(
     company_id: str,
     email: str,
     role: UserRole,
-) -> InviteCreated:
+    first_name: str = "",
+    last_name: str = "",
+) -> tuple[InviteCreated, InviteEmailDelivery]:
     if await queries.has_pending_invite(company_id, email):
         raise InviteAlreadyExists(email)
 
@@ -40,20 +53,30 @@ async def create_invite(
         role,
         token_hash,
         expires_at,
+        first_name.strip(),
+        last_name.strip(),
     )
 
+    return invite, InviteEmailDelivery(
+        company_id=company_id,
+        invite_id=str(invite.id),
+        to_email=email,
+        company_name=company.name,
+        role=role,
+        token=raw_token,
+    )
+
+
+async def deliver_invite_email(delivery: InviteEmailDelivery) -> None:
     try:
         await send_invite_email(
-            to_email=email,
-            company_name=company.name,
-            role=role,
-            token=raw_token,
+            to_email=delivery.to_email,
+            company_name=delivery.company_name,
+            role=delivery.role,
+            token=delivery.token,
         )
-    except Exception as error:
-        await queries.delete_pending_invite(company_id, str(invite.id))
-        raise InviteEmailDeliveryFailed() from error
-
-    return invite
+    except Exception:
+        await queries.delete_pending_invite(delivery.company_id, delivery.invite_id)
 
 
 async def list_invites(company_id: str) -> list[InviteRecord]:
@@ -68,13 +91,15 @@ async def get_invite_preview(token: str) -> InvitePreview:
     invite = await _get_valid_invite(token)
 
     return InvitePreview(
+        first_name=invite.first_name,
+        last_name=invite.last_name,
         email=invite.email,
         role=invite.role,
         company_name=invite.company_name,
     )
 
 
-async def accept_invite(token: str, name: str, password: str) -> TokenPair:
+async def accept_invite(token: str, password: str) -> TokenPair:
     invite = await _get_valid_invite(token)
 
     existing_user = await get_user_by_email(invite.email)
@@ -87,7 +112,8 @@ async def accept_invite(token: str, name: str, password: str) -> TokenPair:
             str(invite.id),
             str(invite.company_id),
             invite.email,
-            name,
+            invite.first_name,
+            invite.last_name,
             invite.role,
             authentication.hash_password(password),
         )

@@ -8,6 +8,8 @@ from src.models.enums.user_role import UserRole
 
 class InviteRecord(BaseModel):
     id: UUID
+    first_name: str
+    last_name: str
     email: str
     role: UserRole
     created_at: datetime
@@ -17,6 +19,9 @@ class InviteRecord(BaseModel):
 
 class InviteCreated(BaseModel):
     id: UUID
+    first_name: str
+    last_name: str
     email: str
     role: UserRole
     created_at: datetime
+    expires_at: datetime

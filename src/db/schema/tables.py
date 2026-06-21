@@ -64,10 +64,12 @@ users = sa.Table(
     sa.Column("company_id", postgresql.UUID(as_uuid=False), nullable=False),
     sa.Column("email", sa.String(), nullable=False),
     sa.Column("password_hash", sa.String(), nullable=False),
-    sa.Column("name", sa.String(), nullable=False),
+    sa.Column("first_name", sa.String(), nullable=False),
+    sa.Column("last_name", sa.String(), nullable=False),
     sa.Column("phone_number", sa.String(), nullable=False),
     sa.Column("role", user_role, nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("last_sign_in_at", sa.DateTime(timezone=True), nullable=True),
 )
 
 templates = sa.Table(
@@ -76,6 +78,7 @@ templates = sa.Table(
     sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True),
     sa.Column("company_id", postgresql.UUID(as_uuid=False), nullable=False),
     sa.Column("structure", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
+    sa.Column("source_reports_count", sa.Integer(), nullable=False),
     sa.Column("logo_url", sa.String(), nullable=False),
     sa.Column("primary_color", sa.String(), nullable=False),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
@@ -231,6 +234,8 @@ invites = sa.Table(
     sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True),
     sa.Column("company_id", postgresql.UUID(as_uuid=False), nullable=False),
     sa.Column("email", sa.String(), nullable=False),
+    sa.Column("first_name", sa.String(), nullable=False),
+    sa.Column("last_name", sa.String(), nullable=False),
     sa.Column("role", user_role, nullable=False),
     sa.Column("token", sa.String(), nullable=False),
     sa.Column("is_accepted", sa.Boolean(), nullable=False),

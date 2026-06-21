@@ -5,11 +5,21 @@ from src.models.templates import status_resolver
 from src.models.templates.domain import TemplateSection, TemplateStructure
 from src.models.templates.records import ActiveCompanyTemplateRecord, TemplateAnalysisJobRecord
 
+FIXED_TEMPLATE_CREATED_AT = datetime(2026, 1, 15, 10, 0, tzinfo=UTC)
+
 
 def build_active_template(
     structure: TemplateStructure = TemplateStructure(sections=[]),
+    version: int = 1,
+    source_reports_count: int = 0,
 ) -> ActiveCompanyTemplateRecord:
-    return ActiveCompanyTemplateRecord(current_template_id=uuid4(), structure=structure)
+    return ActiveCompanyTemplateRecord(
+        current_template_id=uuid4(),
+        structure=structure,
+        created_at=FIXED_TEMPLATE_CREATED_AT,
+        version=version,
+        source_reports_count=source_reports_count,
+    )
 
 
 def build_job(

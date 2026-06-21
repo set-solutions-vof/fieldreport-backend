@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
 
 from src.exceptions import InviteAlreadyExists, InviteEmailDeliveryFailed
 from src.http.v1.request.onboarding import CreateInviteRequest, UpdateCompanyOnboardingRequest
@@ -66,20 +66,30 @@ async def update_company(
 )
 async def create_invite(
     request_body: CreateInviteRequest,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[CurrentUser, Depends(require_admin)],
 ) -> InviteCreatedResponse:
     try:
-        invite = await invites.create_invite(
+        invite, email_delivery = await invites.create_invite(
             str(current_user.company_id),
             request_body.email,
             request_body.role,
+            request_body.first_name,
+            request_body.last_name,
         )
     except InviteAlreadyExists:
         raise HTTPException(status_code=409, detail="Invite already exists")
     except InviteEmailDeliveryFailed:
         raise HTTPException(status_code=502, detail="Invite email could not be sent")
 
-    return InviteCreatedResponse.model_validate(invite.model_dump())
+    background_tasks.add_task(invites.deliver_invite_email, email_delivery)
+
+    return InviteCreatedResponse.model_validate(
+        {
+            **invite.model_dump(),
+            "is_accepted": False,
+        }
+    )
 
 
 @router.get(

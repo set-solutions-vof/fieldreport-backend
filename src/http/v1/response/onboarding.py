@@ -20,15 +20,21 @@ class InviteCreatedResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    first_name: str
+    last_name: str
     email: str
     role: UserRole
+    is_accepted: bool
     created_at: datetime
+    expires_at: datetime
 
 
 class InviteResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    first_name: str
+    last_name: str
     email: str
     role: UserRole
     is_accepted: bool

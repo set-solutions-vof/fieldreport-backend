@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
@@ -28,6 +29,9 @@ class TemplateStatusActive(BaseModel):
     source_reports_count: int
     metadata_fields: list[TemplateMetadataField] = Field(default_factory=list)
     sections: list[TemplateSection]
+    template_id: str
+    version: int
+    updated_at: datetime
 
 
 class TemplateStatusFailed(BaseModel):

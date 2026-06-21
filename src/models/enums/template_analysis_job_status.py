@@ -6,4 +6,5 @@ TemplateAnalysisJobStatus = Literal[
     "pending_review",
     "active",
     "failed",
+    "completed",
 ]

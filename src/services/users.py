@@ -5,10 +5,14 @@ from src.exceptions import PasswordIncorrect
 from src.models.auth.authentication import CurrentUser
 
 
-async def update_profile(current_user: CurrentUser, name: str) -> CurrentUser:
-    await db_queries.update_user_name(str(current_user.id), name)
+async def update_profile(
+    current_user: CurrentUser,
+    first_name: str,
+    last_name: str,
+) -> CurrentUser:
+    await db_queries.update_user_names(str(current_user.id), first_name, last_name)
 
-    return current_user.model_copy(update={"name": name})
+    return current_user.model_copy(update={"first_name": first_name, "last_name": last_name})
 
 
 async def change_password(user_id: str, current_password: str, new_password: str) -> None:

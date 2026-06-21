@@ -4,7 +4,7 @@ from uuid import uuid4
 from fastapi import UploadFile
 
 from src.db.template import queries
-from src.exceptions import TemplateAnalysisJobNotFound
+from src.exceptions import TemplateAnalysisJobNotFound, TemplateConfirmationNotAllowed
 from src.models.auth.authentication import CurrentUser
 from src.models.templates import status_resolver
 from src.models.templates.configuration import (
@@ -73,18 +73,20 @@ async def confirm_template(
     structure: TemplateStructure,
 ) -> TemplateStatusActive:
     company_id = str(user.company_id)
-    job = await queries.fetch_optional_latest_template_analysis_job(company_id)
-    template_id = str(uuid4())
+    pending_job = await queries.fetch_pending_review_job(company_id)
+    active_template = await queries.fetch_optional_active_company_template(company_id)
 
-    await queries.create_template(company_id, template_id, structure)
+    source = pending_job or active_template
+    if source is None:
+        raise TemplateConfirmationNotAllowed()
+
+    template_id = str(uuid4())
+    await queries.create_template(company_id, template_id, structure, source.source_reports_count)
     await queries.set_active_template(company_id, template_id)
 
-    if job is not None:
-        await queries.delete_template_analysis_job(str(job.id), company_id)
+    if pending_job is not None:
+        await queries.archive_template_analysis_job(str(pending_job.id), company_id)
 
-    return TemplateStatusActive(
-        status="active",
-        source_reports_count=job.source_reports_count if job is not None else 0,
-        metadata_fields=structure.metadata_fields,
-        sections=structure.sections,
-    )
+    active_template = await queries.fetch_active_company_template(company_id)
+
+    return status_resolver.build_template_status_active(active_template)

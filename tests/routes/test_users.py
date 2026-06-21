@@ -18,20 +18,23 @@ async def client() -> AsyncIterator[AsyncClient]:
         yield test_client
 
 
-def build_current_user(name: str = "Inspector") -> CurrentUser:
+def build_current_user(first_name: str = "Inspector", last_name: str = "") -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
         company_id=uuid4(),
         company_name="Demo Company",
         email="inspector@example.com",
-        name=name,
+        first_name=first_name,
+        last_name=last_name,
         role="inspector",
     )
 
 
 async def test_update_me_returns_updated_user(client: AsyncClient) -> None:
     current_user = build_current_user()
-    updated_user = current_user.model_copy(update={"name": "Updated Inspector"})
+    updated_user = current_user.model_copy(
+        update={"first_name": "Updated", "last_name": "Inspector"}
+    )
     access_token = security.create_access_token(current_user)
 
     with (
@@ -48,12 +51,13 @@ async def test_update_me_returns_updated_user(client: AsyncClient) -> None:
         response = await client.patch(
             "/api/v1/users/me",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={"name": "  Updated Inspector  "},
+            json={"first_name": "Updated", "last_name": "Inspector"},
         )
 
     assert response.status_code == 200
-    assert response.json()["name"] == "Updated Inspector"
-    update_profile.assert_awaited_once_with(current_user, "Updated Inspector")
+    assert response.json()["first_name"] == "Updated"
+    assert response.json()["last_name"] == "Inspector"
+    update_profile.assert_awaited_once_with(current_user, "Updated", "Inspector")
 
 
 async def test_update_me_rejects_long_name(client: AsyncClient) -> None:
@@ -68,7 +72,7 @@ async def test_update_me_rejects_long_name(client: AsyncClient) -> None:
         response = await client.patch(
             "/api/v1/users/me",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={"name": "A" * 101},
+            json={"first_name": "A" * 100, "last_name": "B"},
         )
 
     assert response.status_code == 422
@@ -87,7 +91,7 @@ async def test_update_me_rejects_blank_name(client: AsyncClient) -> None:
         response = await client.patch(
             "/api/v1/users/me",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={"name": "   "},
+            json={"first_name": "   ", "last_name": "Inspector"},
         )
 
     assert response.status_code == 422
@@ -179,7 +183,10 @@ async def test_change_password_rejects_incorrect_current_password(
 
 
 async def test_user_routes_require_access_token(client: AsyncClient) -> None:
-    update_response = await client.patch("/api/v1/users/me", json={"name": "Inspector"})
+    update_response = await client.patch(
+        "/api/v1/users/me",
+        json={"first_name": "Inspector", "last_name": "Example"},
+    )
     password_response = await client.post(
         "/api/v1/users/me/password",
         json={

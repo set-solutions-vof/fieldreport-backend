@@ -9,6 +9,7 @@ from src.exceptions.missing_metadata_keys import MissingMetadataKeys
 from src.exceptions.password_incorrect import PasswordIncorrect
 from src.exceptions.report_not_found import ReportNotFound
 from src.exceptions.template_analysis_job_not_found import TemplateAnalysisJobNotFound
+from src.exceptions.template_confirmation_not_allowed import TemplateConfirmationNotAllowed
 
 __all__ = [
     "AuthenticationFailed",
@@ -22,4 +23,5 @@ __all__ = [
     "PasswordIncorrect",
     "ReportNotFound",
     "TemplateAnalysisJobNotFound",
+    "TemplateConfirmationNotAllowed",
 ]

@@ -19,10 +19,12 @@ async def test_list_company_members_returns_members() -> None:
     created_at = datetime.now(UTC)
     row = {
         "id": member_id,
-        "name": "Admin",
+        "first_name": "Admin",
+        "last_name": "",
         "email": "admin@example.com",
         "role": "admin",
         "created_at": created_at,
+        "last_sign_in_at": None,
     }
     connection = build_connection(rows=[row])
 
@@ -32,10 +34,98 @@ async def test_list_company_members_returns_members() -> None:
     assert members == [
         TeamMember(
             id=member_id,
-            name="Admin",
+            first_name="Admin",
+            last_name="",
             email="admin@example.com",
             role="admin",
             created_at=created_at,
+            last_sign_in_at=None,
         )
     ]
+    connection.execute.assert_awaited_once()
+
+
+async def test_get_company_member_returns_member() -> None:
+    member_id = uuid4()
+    created_at = datetime.now(UTC)
+    row = {
+        "id": member_id,
+        "first_name": "Admin",
+        "last_name": "User",
+        "email": "admin@example.com",
+        "role": "admin",
+        "created_at": created_at,
+        "last_sign_in_at": None,
+    }
+    connection = build_connection(row)
+
+    with mock_pool(connection):
+        member = await queries.get_company_member(str(uuid4()), str(member_id))
+
+    assert member is not None
+    assert member.first_name == "Admin"
+    connection.execute.assert_awaited_once()
+
+
+async def test_update_company_member_returns_updated_member() -> None:
+    member_id = uuid4()
+    created_at = datetime.now(UTC)
+    row = {
+        "id": member_id,
+        "first_name": "Updated",
+        "last_name": "User",
+        "email": "admin@example.com",
+        "role": "inspector",
+        "created_at": created_at,
+        "last_sign_in_at": None,
+    }
+    connection = build_connection(row)
+
+    with mock_pool(connection):
+        member = await queries.update_company_member(
+            str(uuid4()),
+            str(member_id),
+            "Updated",
+            "User",
+            "inspector",
+        )
+
+    assert member is not None
+    assert member.role == "inspector"
+    connection.execute.assert_awaited_once()
+
+
+async def test_delete_company_member_returns_true_when_deleted() -> None:
+    connection = build_connection({"id": uuid4()})
+
+    with mock_pool(connection):
+        was_deleted = await queries.delete_company_member(str(uuid4()), str(uuid4()))
+
+    assert was_deleted is True
+    connection.execute.assert_awaited_once()
+
+
+async def test_get_company_member_returns_none_when_missing() -> None:
+    connection = build_connection(None)
+
+    with mock_pool(connection):
+        member = await queries.get_company_member(str(uuid4()), str(uuid4()))
+
+    assert member is None
+    connection.execute.assert_awaited_once()
+
+
+async def test_update_company_member_returns_none_when_missing() -> None:
+    connection = build_connection(None)
+
+    with mock_pool(connection):
+        member = await queries.update_company_member(
+            str(uuid4()),
+            str(uuid4()),
+            "Updated",
+            "User",
+            "inspector",
+        )
+
+    assert member is None
     connection.execute.assert_awaited_once()

@@ -1,4 +1,5 @@
 import os
+from datetime import UTC, datetime
 
 import bcrypt
 
@@ -26,12 +27,16 @@ async def login(credentials: LoginCredentials) -> TokenPair:
     if not authentication.verify_password(credentials.password, user.password_hash):
         raise AuthenticationFailed()
 
+    signed_in_at = datetime.now(UTC)
+    await queries.update_last_sign_in_at(str(user.id), signed_in_at)
+
     current_user = CurrentUser(
         id=user.id,
         company_id=user.company_id,
         company_name=user.company_name,
         email=user.email,
-        name=user.name,
+        first_name=user.first_name,
+        last_name=user.last_name,
         role=user.role,
     )
 

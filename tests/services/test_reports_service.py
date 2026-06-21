@@ -34,7 +34,8 @@ def build_current_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="demo@fieldreport.local",
-        name="Demo User",
+        first_name="Demo",
+        last_name="User",
         role="admin",
     )
 
@@ -45,7 +46,8 @@ async def test_list_reports_for_user_returns_repository_reports() -> None:
         company_id=uuid4(),
         company_name="Demo Company",
         email="demo@fieldreport.local",
-        name="Demo User",
+        first_name="Demo",
+        last_name="User",
         role="admin",
     )
     report_summaries = [
@@ -70,7 +72,8 @@ async def test_get_report_detail_returns_evidence_centric_items() -> None:
         company_id=uuid4(),
         company_name="Demo Company",
         email="demo@fieldreport.local",
-        name="Demo User",
+        first_name="Demo",
+        last_name="User",
         role="admin",
     )
     report_id = uuid4()
@@ -169,7 +172,8 @@ async def test_update_report_section_returns_repository_section() -> None:
         company_id=uuid4(),
         company_name="Demo Company",
         email="demo@fieldreport.local",
-        name="Demo User",
+        first_name="Demo",
+        last_name="User",
         role="inspector",
     )
     report_id = uuid4()

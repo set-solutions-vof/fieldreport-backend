@@ -71,6 +71,27 @@ async def fetch_optional_active_company_template(
     return map_optional_active_company_template(company_row)
 
 
+async def fetch_pending_review_job(company_id: str) -> TemplateAnalysisJobRecord | None:
+    statement = (
+        sa.select(*_template_analysis_job_columns())
+        .where(
+            template_analysis_jobs.c.company_id == company_id,
+            template_analysis_jobs.c.status == "pending_review",
+        )
+        .order_by(template_analysis_jobs.c.created_at.desc())
+        .limit(1)
+    )
+
+    async with get_database().acquire() as connection:
+        result = await connection.execute(statement)
+        job_row = result.mappings().first()
+
+    if job_row is None:
+        return None
+
+    return map_template_analysis_job(job_row)
+
+
 async def fetch_optional_latest_template_analysis_job(
     company_id: str,
 ) -> TemplateAnalysisJobRecord | None:
@@ -172,6 +193,20 @@ async def update_template_analysis_job(
         await connection.execute(statement)
 
 
+async def archive_template_analysis_job(job_id: str, company_id: str) -> None:
+    statement = (
+        template_analysis_jobs.update()
+        .where(
+            template_analysis_jobs.c.id == job_id,
+            template_analysis_jobs.c.company_id == company_id,
+        )
+        .values(status="completed", finished_at=sa.func.now())
+    )
+
+    async with get_database().acquire() as connection:
+        await connection.execute(statement)
+
+
 async def delete_template_analysis_job(job_id: str, company_id: str) -> None:
     statement = template_analysis_jobs.delete().where(
         template_analysis_jobs.c.id == job_id,
@@ -254,11 +289,13 @@ async def create_template(
     company_id: str,
     template_id: str,
     structure: TemplateStructure,
+    source_reports_count: int,
 ) -> None:
     statement = templates.insert().values(
         id=template_id,
         company_id=company_id,
         structure=structure.model_dump(mode="json"),
+        source_reports_count=source_reports_count,
         logo_url="",
         primary_color="",
         created_at=sa.func.now(),
@@ -278,10 +315,19 @@ async def set_active_template(company_id: str, template_id: str) -> None:
 
 
 async def _fetch_optional_active_company_template_row(connection, company_id: str):
+    version_count = (
+        sa.select(sa.func.count())
+        .select_from(templates)
+        .where(templates.c.company_id == company_id)
+        .scalar_subquery()
+    )
     statement = (
         sa.select(
             company.c.current_template_id,
             templates.c.structure,
+            templates.c.created_at,
+            templates.c.source_reports_count,
+            version_count.label("version"),
         )
         .select_from(company.outerjoin(templates, templates.c.id == company.c.current_template_id))
         .where(company.c.id == company_id)
@@ -291,10 +337,19 @@ async def _fetch_optional_active_company_template_row(connection, company_id: st
 
 
 async def _fetch_active_company_template_row(connection, company_id: str):
+    version_count = (
+        sa.select(sa.func.count())
+        .select_from(templates)
+        .where(templates.c.company_id == company_id)
+        .scalar_subquery()
+    )
     statement = (
         sa.select(
             company.c.current_template_id,
             templates.c.structure,
+            templates.c.created_at,
+            templates.c.source_reports_count,
+            version_count.label("version"),
         )
         .select_from(company.join(templates, templates.c.id == company.c.current_template_id))
         .where(company.c.id == company_id)
@@ -306,7 +361,10 @@ async def _fetch_active_company_template_row(connection, company_id: str):
 async def _fetch_latest_template_analysis_job_row(connection, company_id: str):
     statement = (
         sa.select(*_template_analysis_job_columns())
-        .where(template_analysis_jobs.c.company_id == company_id)
+        .where(
+            template_analysis_jobs.c.company_id == company_id,
+            template_analysis_jobs.c.status != "completed",
+        )
         .order_by(template_analysis_jobs.c.created_at.desc())
         .limit(1)
     )

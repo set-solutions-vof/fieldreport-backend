@@ -17,7 +17,8 @@ class AuthenticatedUser(BaseModel):
     company_name: str
     email: str
     password_hash: str
-    name: str
+    first_name: str
+    last_name: str
     role: UserRole
 
 
@@ -26,7 +27,8 @@ class CurrentUser(BaseModel):
     company_id: UUID
     company_name: str
     email: str
-    name: str
+    first_name: str
+    last_name: str
     role: UserRole
 
 

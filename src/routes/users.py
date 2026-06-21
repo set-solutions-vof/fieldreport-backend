@@ -22,16 +22,29 @@ async def update_me(
     request_body: UpdateProfileRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> CurrentUserResponse:
-    name = request_body.name.strip()
+    first_name = request_body.first_name.strip()
+    last_name = request_body.last_name.strip()
 
-    if not name:
-        raise HTTPException(status_code=422, detail="name must not be blank")
-    if len(name) > 100:
+    if first_name == "" or last_name == "":
+        raise HTTPException(
+            status_code=422,
+            detail="first_name and last_name are required",
+        )
+
+    if len(f"{first_name} {last_name}".strip()) > 100:
         raise HTTPException(status_code=422, detail="name must not exceed 100 characters")
 
-    updated_user = await users_service.update_profile(current_user, name)
+    updated_user = await users_service.update_profile(current_user, first_name, last_name)
 
-    return CurrentUserResponse.model_validate(updated_user)
+    return CurrentUserResponse(
+        id=updated_user.id,
+        first_name=updated_user.first_name,
+        last_name=updated_user.last_name,
+        email=updated_user.email,
+        role=updated_user.role,
+        company_id=updated_user.company_id,
+        company_name=updated_user.company_name,
+    )
 
 
 @router.post(

@@ -14,7 +14,8 @@ def build_current_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="admin.user@example.com",
-        name="Admin User",
+        first_name="Admin",
+        last_name="User",
         role="admin",
     )
 
@@ -25,7 +26,8 @@ def build_inspector_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="inspector.user@example.com",
-        name="Inspector User",
+        first_name="Inspector",
+        last_name="User",
         role="inspector",
     )
 

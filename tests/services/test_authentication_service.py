@@ -38,3 +38,35 @@ async def test_login_checks_dummy_hash_when_email_is_missing() -> None:
 
     hash_password.assert_called_once()
     check_password.assert_called_once_with(b"secret", b"dummy-hash")
+
+
+async def test_login_records_last_sign_in_at() -> None:
+    from tests.routes.test_auth import build_authenticated_user
+
+    authenticated_user = build_authenticated_user()
+
+    with (
+        patch.object(
+            service.queries,
+            "get_user_by_email",
+            AsyncMock(return_value=authenticated_user),
+        ),
+        patch.object(
+            service.queries,
+            "update_last_sign_in_at",
+            AsyncMock(),
+        ) as update_last_sign_in_at,
+        patch.object(service.authentication, "verify_password", return_value=True),
+        patch.object(service.authentication, "create_access_token", return_value="access"),
+        patch.object(service.authentication, "create_refresh_token", return_value="refresh"),
+    ):
+        token_pair = await service.login(
+            LoginCredentials(
+                email=authenticated_user.email,
+                password="TestPassword2026!",
+            )
+        )
+
+    assert token_pair.access_token == "access"
+    update_last_sign_in_at.assert_awaited_once()
+    assert update_last_sign_in_at.await_args.args[0] == str(authenticated_user.id)

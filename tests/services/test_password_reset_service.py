@@ -15,7 +15,8 @@ def build_authenticated_user() -> AuthenticatedUser:
         company_name="Demo Company",
         email="user@example.com",
         password_hash="old-hash",
-        name="Demo User",
+        first_name="Demo",
+        last_name="User",
         role="admin",
     )
 

@@ -48,11 +48,11 @@ async def test_get_user_password_hash_raises_when_missing() -> None:
     connection.execute.assert_awaited_once()
 
 
-async def test_update_user_name_executes_statement() -> None:
+async def test_update_user_names_executes_statement() -> None:
     connection = build_connection()
 
     with mock_pool(connection):
-        await queries.update_user_name(str(uuid4()), "Updated Inspector")
+        await queries.update_user_names(str(uuid4()), "Updated", "Inspector")
 
     connection.execute.assert_awaited_once()
 

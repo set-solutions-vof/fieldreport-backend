@@ -13,6 +13,7 @@ from src.models.onboarding.company import CompanyOnboarding
 from src.models.onboarding.invite import InviteCreated, InviteRecord
 from src.security import authentication as security
 from src.services import authentication as auth_service
+from src.services import invites
 
 
 @pytest.fixture
@@ -27,7 +28,8 @@ def build_admin_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="admin@example.com",
-        name="Admin",
+        first_name="Admin",
+        last_name="",
         role="admin",
     )
 
@@ -38,7 +40,8 @@ def build_inspector_user() -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="inspector@example.com",
-        name="Inspector",
+        first_name="Inspector",
+        last_name="",
         role="inspector",
     )
 
@@ -123,11 +126,23 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
     current_user = build_admin_user()
     access_token = security.create_access_token(current_user)
     created_at = datetime(2026, 6, 1, 12, 0, tzinfo=UTC)
+    expires_at = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
     invite = InviteCreated(
         id=uuid4(),
+        first_name="New",
+        last_name="User",
         email="new.user@example.com",
         role="admin",
         created_at=created_at,
+        expires_at=expires_at,
+    )
+    email_delivery = invites.InviteEmailDelivery(
+        company_id=str(current_user.company_id),
+        invite_id=str(invite.id),
+        to_email="new.user@example.com",
+        company_name="Demo Company",
+        role="admin",
+        token="raw-token",
     )
 
     with (
@@ -138,8 +153,12 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
         ),
         patch(
             "src.routes.onboarding.invites.create_invite",
-            AsyncMock(return_value=invite),
+            AsyncMock(return_value=(invite, email_delivery)),
         ) as create_invite,
+        patch(
+            "src.routes.onboarding.invites.deliver_invite_email",
+            AsyncMock(),
+        ) as deliver_invite_email,
     ):
         response = await client.post(
             "/api/v1/onboarding/invites",
@@ -150,18 +169,25 @@ async def test_create_onboarding_invite_returns_created_invite(client: AsyncClie
     assert response.status_code == 201
     assert response.json() == {
         "id": str(invite.id),
+        "first_name": "New",
+        "last_name": "User",
         "email": "new.user@example.com",
         "role": "admin",
+        "is_accepted": False,
         "created_at": "2026-06-01T12:00:00Z",
+        "expires_at": "2026-06-08T12:00:00Z",
     }
     assert create_invite.await_args.args == (
         str(current_user.company_id),
         "NEW.User@example.com",
         "admin",
+        "",
+        "",
     )
+    deliver_invite_email.assert_awaited_once_with(email_delivery)
 
 
-async def test_create_onboarding_invite_returns_bad_gateway_when_email_delivery_fails(
+async def test_create_onboarding_invite_returns_bad_gateway_when_smtp_is_not_configured(
     client: AsyncClient,
 ) -> None:
     current_user = build_admin_user()
@@ -222,6 +248,8 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
     expires_at = datetime(2026, 6, 8, 12, 0, tzinfo=UTC)
     invite = InviteRecord(
         id=uuid4(),
+        first_name="New",
+        last_name="User",
         email="new.user@example.com",
         role="inspector",
         is_accepted=False,
@@ -249,6 +277,8 @@ async def test_list_onboarding_invites_returns_company_invites(client: AsyncClie
     assert response.json() == [
         {
             "id": str(invite.id),
+            "first_name": "New",
+            "last_name": "User",
             "email": "new.user@example.com",
             "role": "inspector",
             "is_accepted": False,

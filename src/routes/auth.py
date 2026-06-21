@@ -109,4 +109,12 @@ async def confirm_password_reset(request_body: PasswordResetConfirmRequest) -> N
 async def get_me(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> CurrentUserResponse:
-    return CurrentUserResponse.model_validate(current_user)
+    return CurrentUserResponse(
+        id=current_user.id,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        email=current_user.email,
+        role=current_user.role,
+        company_id=current_user.company_id,
+        company_name=current_user.company_name,
+    )

@@ -17,8 +17,12 @@ async def get_user_password_hash(user_id: str) -> str:
     return password_hash
 
 
-async def update_user_name(user_id: str, name: str) -> None:
-    statement = sa.update(users).where(users.c.id == user_id).values(name=name)
+async def update_user_names(user_id: str, first_name: str, last_name: str) -> None:
+    statement = (
+        sa.update(users)
+        .where(users.c.id == user_id)
+        .values(first_name=first_name, last_name=last_name)
+    )
 
     async with get_database().acquire() as connection:
         await connection.execute(statement)

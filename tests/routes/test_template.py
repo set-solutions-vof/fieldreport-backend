@@ -22,6 +22,23 @@ from src.routes import template as template_route
 from src.security import authentication as security
 from src.services import authentication as auth_service
 
+FIXED_TEMPLATE_UPDATED_AT = datetime(2026, 1, 15, 10, 0, tzinfo=UTC)
+FIXED_TEMPLATE_ID = "11111111-1111-4111-8111-111111111111"
+
+
+def build_active_template_status(**overrides) -> TemplateStatusActive:
+    payload = {
+        "status": "active",
+        "metadata_fields": [],
+        "sections": [TemplateSection(id="summary", label="Summary", render_type="text_block")],
+        "source_reports_count": 3,
+        "template_id": FIXED_TEMPLATE_ID,
+        "version": 2,
+        "updated_at": FIXED_TEMPLATE_UPDATED_AT,
+    }
+    payload.update(overrides)
+    return TemplateStatusActive(**payload)
+
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
@@ -35,7 +52,8 @@ def build_current_user(*, role: str = "admin") -> CurrentUser:
         company_id=uuid4(),
         company_name="Demo Company",
         email="inspector.user@example.com",
-        name="Inspector User",
+        first_name="Inspector",
+        last_name="User",
         role=role,
     )
 
@@ -56,14 +74,7 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
         patch(
             "src.routes.template.templates.load_template_configuration",
             AsyncMock(
-                return_value=TemplateStatusActive(
-                    status="active",
-                    metadata_fields=[],
-                    sections=[
-                        TemplateSection(id="summary", label="Summary", render_type="text_block")
-                    ],
-                    source_reports_count=3,
-                )
+                return_value=build_active_template_status(),
             ),
         ),
     ):
@@ -77,6 +88,9 @@ async def test_get_template_returns_current_company_template_status(client: Asyn
         "status": "active",
         "source_reports_count": 3,
         "metadata_fields": [],
+        "template_id": FIXED_TEMPLATE_ID,
+        "version": 2,
+        "updated_at": FIXED_TEMPLATE_UPDATED_AT.isoformat().replace("+00:00", "Z"),
         "sections": [
             {
                 "id": "summary",
@@ -100,12 +114,10 @@ async def test_get_template_allows_inspector(client: AsyncClient) -> None:
         patch(
             "src.routes.template.templates.load_template_configuration",
             AsyncMock(
-                return_value=TemplateStatusActive(
-                    status="active",
-                    metadata_fields=[],
+                return_value=build_active_template_status(
                     sections=[],
                     source_reports_count=1,
-                )
+                ),
             ),
         ),
     ):
@@ -299,10 +311,7 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
         patch(
             "src.routes.template.templates.confirm_template",
             AsyncMock(
-                return_value=TemplateStatusActive(
-                    status="active",
-                    source_reports_count=3,
-                    metadata_fields=[],
+                return_value=build_active_template_status(
                     sections=[
                         TemplateSection(
                             id="summary",
@@ -331,6 +340,9 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
         "status": "active",
         "source_reports_count": 3,
         "metadata_fields": [],
+        "template_id": FIXED_TEMPLATE_ID,
+        "version": 2,
+        "updated_at": FIXED_TEMPLATE_UPDATED_AT.isoformat().replace("+00:00", "Z"),
         "sections": [
             {
                 "id": "summary",
@@ -352,3 +364,28 @@ async def test_confirm_template_returns_active_template(client: AsyncClient) -> 
             },
         ],
     }
+
+
+async def test_confirm_template_returns_unprocessable_when_confirmation_not_allowed(
+    client: AsyncClient,
+) -> None:
+    from src.exceptions import TemplateConfirmationNotAllowed
+
+    current_user = build_current_user()
+    access_token = security.create_access_token(current_user)
+
+    with (
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch(
+            "src.routes.template.templates.confirm_template",
+            AsyncMock(side_effect=TemplateConfirmationNotAllowed()),
+        ),
+    ):
+        response = await client.post(
+            "/api/v1/template",
+            headers={"Authorization": f"Bearer {access_token}"},
+            json={"sections": []},
+        )
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "Template cannot be confirmed"}
