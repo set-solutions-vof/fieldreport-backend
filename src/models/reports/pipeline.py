@@ -31,3 +31,4 @@ class StoredTranscriptionSegment(BaseModel):
 class StoredImageAnalysis(BaseModel):
     id: UUID
     analysis_text: str
+    dji_metadata: dict | None = None

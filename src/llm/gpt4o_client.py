@@ -6,7 +6,11 @@ from src.llm.client_factory import get_gpt4o_client
 from src.prompts.image_analysis import IMAGE_ANALYSIS_PROMPT
 
 
-async def analyze_inspection_photo(original_file_name: str, file_content: bytes) -> str:
+async def analyze_inspection_photo(
+    original_file_name: str,
+    file_content: bytes,
+    prompt: str = IMAGE_ANALYSIS_PROMPT,
+) -> str:
     client = get_gpt4o_client()
     encoded_file = base64.b64encode(file_content).decode("utf-8")
     mime_type = mimetypes.guess_type(original_file_name)[0]
@@ -19,7 +23,7 @@ async def analyze_inspection_photo(original_file_name: str, file_content: bytes)
                 "content": [
                     {
                         "type": "text",
-                        "text": IMAGE_ANALYSIS_PROMPT,
+                        "text": prompt,
                     },
                     {
                         "type": "image_url",

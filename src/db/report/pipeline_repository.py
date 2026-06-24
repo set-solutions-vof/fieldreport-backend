@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import uuid4
 
 import sqlalchemy as sa
@@ -84,6 +85,7 @@ class ReportPipelineRepository:
         company_id: str,
         storage_key: str,
         analysis_text: str,
+        dji_metadata: dict | None = None,
     ) -> str:
         image_analysis_id = str(uuid4())
         statement = image_analyses.insert().values(
@@ -92,9 +94,12 @@ class ReportPipelineRepository:
             company_id=company_id,
             storage_key=storage_key,
             analysis_text=analysis_text,
-            geotag_lat=None,
-            geotag_lng=None,
-            captured_at=None,
+            geotag_lat=dji_metadata.get("gps_latitude") if dji_metadata else None,
+            geotag_lng=dji_metadata.get("gps_longitude") if dji_metadata else None,
+            captured_at=datetime.fromisoformat(dji_metadata["utc_at_exposure"])
+            if dji_metadata and dji_metadata.get("utc_at_exposure")
+            else None,
+            dji_metadata=dji_metadata,
             created_at=sa.func.now(),
         )
 
@@ -141,6 +146,7 @@ class ReportPipelineRepository:
                 image_analyses.c.storage_key,
                 image_analyses.c.analysis_text,
                 image_analyses.c.captured_at,
+                image_analyses.c.dji_metadata,
                 image_analyses.c.created_at,
             )
             .where(image_analyses.c.inspection_id == inspection_id)

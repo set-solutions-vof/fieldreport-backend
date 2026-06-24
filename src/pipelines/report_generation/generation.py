@@ -32,11 +32,30 @@ def format_transcription_segments_for_prompt(
     )
 
 
+def _format_dji_metadata(meta: dict) -> str:
+    fields = [
+        ("captured_at", meta.get("utc_at_exposure")),
+        ("image_source", meta.get("image_source")),
+        ("drone", meta.get("drone_model")),
+        ("lrf_lat", meta.get("lrf_target_lat")),
+        ("lrf_lon", meta.get("lrf_target_lon")),
+        ("lrf_alt", meta.get("lrf_target_alt")),
+        ("gimbal_yaw", meta.get("gimbal_yaw_degree")),
+    ]
+    parts = [f"{k}={v}" for k, v in fields if v is not None]
+    return f"[Metadata: {', '.join(parts)}]" if parts else ""
+
+
 def format_images_for_prompt(image_rows: list[StoredImageAnalysis]) -> str:
-    return "\n".join(
-        f"{image_index}. {image.analysis_text}"
-        for image_index, image in enumerate(image_rows, start=1)
-    )
+    lines = []
+    for image_index, image in enumerate(image_rows, start=1):
+        line = f"{image_index}. {image.analysis_text}"
+        if image.dji_metadata:
+            meta_str = _format_dji_metadata(image.dji_metadata)
+            if meta_str:
+                line += f"\n{meta_str}"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def build_report_generation_prompt(
