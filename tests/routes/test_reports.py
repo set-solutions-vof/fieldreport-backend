@@ -159,3 +159,48 @@ async def test_retry_report_returns_conflict_for_non_failed_report() -> None:
             assert error.detail == "Report can only be retried when failed"
         else:
             raise AssertionError("Expected HTTPException")
+
+
+async def test_export_report_returns_422_when_sections_not_all_approved() -> None:
+    current_user = build_current_user()
+
+    with patch.object(reports, "check_all_sections_approved", AsyncMock(return_value=False)):
+        try:
+            await reports.export_report(uuid4(), current_user)
+        except HTTPException as error:
+            assert error.status_code == 422
+        else:
+            raise AssertionError("Expected HTTPException")
+
+
+async def test_export_report_returns_pdf_bytes_when_approved() -> None:
+    from unittest.mock import MagicMock
+    from tests.db.sqlalchemy_fakes import FakeResult, build_connection
+
+    current_user = build_current_user()
+    report_id = uuid4()
+    inspection_id = uuid4()
+    pdf_bytes = b"%%PDF fake"
+
+    connection = build_connection(
+        results=[
+            FakeResult(row={"inspection_id": str(inspection_id)}),
+            FakeResult(row=None),
+        ]
+    )
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch.object(reports, "check_all_sections_approved", AsyncMock(return_value=True)),
+        patch.object(reports, "render_report_to_pdf", AsyncMock(return_value=pdf_bytes)),
+        patch.object(reports, "upload_file", AsyncMock()),
+        patch.object(reports, "get_database", return_value=pool),
+    ):
+        response = await reports.export_report(report_id, current_user)
+
+    assert response.status_code == 200
+    assert response.body == pdf_bytes
+    assert response.media_type == "application/pdf"
+    assert f"report-{report_id}.pdf" in response.headers["content-disposition"]

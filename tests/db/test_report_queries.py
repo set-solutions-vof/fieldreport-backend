@@ -628,3 +628,43 @@ async def test_update_report_section_raises_when_section_is_missing() -> None:
             assert str(error) != ""
         else:
             raise AssertionError("Expected ReportNotFound")
+
+
+async def test_check_all_sections_approved_returns_true_when_no_unapproved() -> None:
+    connection = build_connection(row={"unapproved_count": 0})
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result = await queries.check_all_sections_approved("report-id", "company-id")
+
+    assert result is True
+    connection.execute.assert_awaited_once()
+
+
+async def test_check_all_sections_approved_returns_false_when_unapproved_exist() -> None:
+    connection = build_connection(row={"unapproved_count": 3})
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        result = await queries.check_all_sections_approved("report-id", "company-id")
+
+    assert result is False
+
+
+async def test_check_all_sections_approved_excludes_empty_sections() -> None:
+    connection = build_connection(row={"unapproved_count": 0})
+
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+    with patch("src.db.report.queries.get_database", return_value=pool):
+        await queries.check_all_sections_approved("report-id", "company-id")
+
+    stmt = connection.execute.call_args[0][0]
+    compiled = str(stmt.compile(dialect=sa.dialects.postgresql.dialect()))
+    assert "generated_content" in compiled
+    assert "reviewed_content" in compiled

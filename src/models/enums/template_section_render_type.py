@@ -5,4 +5,5 @@ TemplateSectionRenderType = Literal[
     "key_value_table",
     "measurement_table",
     "photo_grid",
+    "repeating_group",
 ]

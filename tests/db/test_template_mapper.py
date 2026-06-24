@@ -4,13 +4,9 @@ from uuid import uuid4
 from src.db.template.mapper import (
     map_active_company_template,
     map_optional_active_company_template,
-    map_template_analysis_job,
 )
 from src.models.templates.domain import TemplateStructure
-from src.models.templates.records import (
-    ActiveCompanyTemplateRecord,
-    TemplateAnalysisJobRecord,
-)
+from src.models.templates.records import ActiveCompanyTemplateRecord
 
 FIXED_TEMPLATE_CREATED_AT = datetime(2026, 1, 15, 10, 0, tzinfo=UTC)
 
@@ -62,31 +58,4 @@ def test_map_active_company_template_parses_record() -> None:
         created_at=FIXED_TEMPLATE_CREATED_AT,
         version=1,
         source_reports_count=0,
-    )
-
-
-def test_map_template_analysis_job_parses_record() -> None:
-    job_id = uuid4()
-    company_id = uuid4()
-    created_at = datetime.now(UTC)
-
-    record = map_template_analysis_job(
-        {
-            "id": job_id,
-            "company_id": company_id,
-            "status": "queued",
-            "source_reports_count": 2,
-            "structure": None,
-            "failure_message": None,
-            "created_at": created_at,
-        }
-    )
-
-    assert record == TemplateAnalysisJobRecord(
-        id=job_id,
-        company_id=company_id,
-        status="queued",
-        source_reports_count=2,
-        structure=TemplateStructure(sections=[]),
-        created_at=created_at,
     )

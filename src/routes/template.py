@@ -1,20 +1,52 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Form, HTTPException, status
+import sqlalchemy as sa
+from fastapi import APIRouter, Depends, HTTPException, Response
 
-from src.exceptions import TemplateAnalysisJobNotFound, TemplateConfirmationNotAllowed
-from src.http.v1.request.template import StartTemplateAnalysisRequest
+from src.db.connection import get_database
+from src.db.schema.tables import company
+from src.db.schema.tables import templates as templates_table
+from src.exceptions import TemplateConfirmationNotAllowed
 from src.models.auth.authentication import CurrentUser
-from src.models.templates import status_resolver
 from src.models.templates.configuration import (
     TemplateStatus,
     TemplateStatusActive,
 )
 from src.models.templates.domain import TemplateStructure
-from src.security.authentication import get_current_user, require_admin
+from src.security.authentication import get_current_user, get_pdf_preview_user, require_admin
 from src.services import templates
+from src.storage.blob import download_file
 
 router = APIRouter(tags=["Template"])
+
+
+@router.get(
+    "/api/v1/template/preview-pdf",
+    summary="Get template preview PDF",
+    description="Returns the company's imported template as a preview PDF.",
+)
+async def get_template_preview_pdf(
+    current_user: Annotated[CurrentUser, Depends(get_pdf_preview_user)],
+) -> Response:
+    stmt = (
+        sa.select(templates_table.c.preview_pdf_storage_key)
+        .select_from(
+            company.join(templates_table, templates_table.c.id == company.c.current_template_id)
+        )
+        .where(company.c.id == str(current_user.company_id))
+    )
+    async with get_database().acquire() as conn:
+        row = (await conn.execute(stmt)).mappings().first()
+
+    if row is None or not row["preview_pdf_storage_key"]:
+        raise HTTPException(status_code=404, detail="Template preview not found")
+
+    pdf_bytes, _ = await download_file("templates", row["preview_pdf_storage_key"])
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="Rapportage Paneel - Preview.pdf"'},
+    )
 
 
 @router.get(
@@ -30,41 +62,9 @@ async def get_template_configuration(
 
 
 @router.post(
-    "/api/v1/template/analysis",
-    response_model=TemplateStatus,
-    status_code=status.HTTP_202_ACCEPTED,
-    summary="Start template analysis",
-    description="Uploads example PDFs and queues template structure analysis.",
-)
-async def start_template_analysis(
-    request_body: Annotated[StartTemplateAnalysisRequest, Form()],
-    current_user: Annotated[CurrentUser, Depends(require_admin)],
-) -> TemplateStatus:
-    return await templates.start_template_analysis(current_user, request_body.files)
-
-
-@router.get(
-    "/api/v1/template/analysis/{job_id}",
-    response_model=TemplateStatus,
-    summary="Get template analysis",
-    description="Returns the status and result of a template analysis job.",
-)
-async def get_template_analysis(
-    job_id: str,
-    current_user: Annotated[CurrentUser, Depends(require_admin)],
-) -> TemplateStatus:
-    try:
-        job = await templates.get_template_analysis_job(current_user, job_id)
-
-        return status_resolver.resolve_template_job_state(job)
-    except TemplateAnalysisJobNotFound:
-        raise HTTPException(status_code=404, detail="Template analysis not found")
-
-
-@router.post(
     "/api/v1/template",
     response_model=TemplateStatusActive,
-    status_code=status.HTTP_201_CREATED,
+    status_code=201,
     summary="Confirm template",
     description="Activates the reviewed template structure for the company.",
 )

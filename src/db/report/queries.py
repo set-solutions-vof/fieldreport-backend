@@ -327,3 +327,26 @@ async def reset_report_for_retry(report_id: str, company_id: str) -> None:
 
     async with get_database().acquire() as connection:
         await connection.execute(statement)
+
+
+async def check_all_sections_approved(report_id: str, company_id: str) -> bool:
+    statement = sa.select(
+        sa.func.count().label("unapproved_count")
+    ).where(
+        report_sections.c.report_id == report_id,
+        report_sections.c.company_id == company_id,
+        report_sections.c.approved == False,
+        sa.or_(
+            report_sections.c.generated_content[0].astext != "",
+            sa.and_(
+                report_sections.c.reviewed_content.isnot(None),
+                report_sections.c.reviewed_content[0].astext != "",
+            ),
+        ),
+    )
+
+    async with get_database().acquire() as connection:
+        result = await connection.execute(statement)
+        row = result.mappings().one()
+
+    return row["unapproved_count"] == 0

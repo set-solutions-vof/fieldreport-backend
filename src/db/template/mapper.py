@@ -1,11 +1,7 @@
 from collections.abc import Mapping
 
 from src.models.templates.domain import TemplateStructure
-from src.models.templates.pipeline import TemplateAnalysisFile
-from src.models.templates.records import (
-    ActiveCompanyTemplateRecord,
-    TemplateAnalysisJobRecord,
-)
+from src.models.templates.records import ActiveCompanyTemplateRecord
 
 
 def map_optional_active_company_template(
@@ -30,20 +26,3 @@ def map_active_company_template(row: Mapping[str, object]) -> ActiveCompanyTempl
     row_data["structure"] = parse_template_structure(row_data["structure"])
 
     return ActiveCompanyTemplateRecord.model_validate(row_data)
-
-
-def map_template_analysis_job(row: Mapping[str, object]) -> TemplateAnalysisJobRecord:
-    row_data = dict(row)
-    if row_data.get("structure") is not None:
-        row_data["structure"] = parse_template_structure(row_data["structure"])
-    else:
-        row_data["structure"] = TemplateStructure(sections=[])
-
-    if row_data["failure_message"] is None:
-        row_data.pop("failure_message")
-
-    return TemplateAnalysisJobRecord.model_validate(row_data)
-
-
-def map_template_analysis_file(row: Mapping[str, object]) -> TemplateAnalysisFile:
-    return TemplateAnalysisFile.model_validate(dict(row))

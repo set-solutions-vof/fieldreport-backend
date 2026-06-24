@@ -3,8 +3,8 @@ from typing import Annotated
 
 import bcrypt
 import jwt
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import Depends, HTTPException, Query, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, OAuth2PasswordBearer
 from jwt import InvalidTokenError
 
 from src.config import settings
@@ -82,6 +82,44 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)]) -> Cur
     if user is None:
         raise credentials_exception
 
+    return user
+
+
+_preview_bearer = HTTPBearer(auto_error=False)
+
+
+async def get_pdf_preview_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_preview_bearer)],
+    access_token: str | None = Query(default=None),
+) -> CurrentUser:
+    token = (credentials.credentials if credentials else None) or access_token
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    try:
+        claims = decode_token(token)
+        if claims.type != "access":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Not authenticated",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except (InvalidTokenError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    user = await queries.get_user_by_id(str(claims.sub))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return user
 
 

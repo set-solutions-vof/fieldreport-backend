@@ -1,16 +1,13 @@
 from datetime import UTC, datetime
-from io import BytesIO
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
-from starlette.datastructures import UploadFile
 
-from src.exceptions import TemplateAnalysisJobNotFound, TemplateConfirmationNotAllowed
+from src.exceptions import TemplateConfirmationNotAllowed
 from src.models.auth.authentication import CurrentUser
-from src.models.enums.template_analysis_job_status import TemplateAnalysisJobStatus
 from src.models.templates.domain import TemplateSection, TemplateStructure
-from src.models.templates.records import ActiveCompanyTemplateRecord, TemplateAnalysisJobRecord
+from src.models.templates.records import ActiveCompanyTemplateRecord
 from src.services import templates as templates_service
 
 FIXED_TEMPLATE_CREATED_AT = datetime(2026, 1, 15, 10, 0, tzinfo=UTC)
@@ -32,31 +29,6 @@ def build_active_template_record(
     )
 
 
-def build_analysis_job_record(
-    *,
-    job_id=None,
-    company_id=None,
-    status: TemplateAnalysisJobStatus | None = None,
-    source_reports_count: int | None = None,
-    structure: TemplateStructure | None = None,
-    failure_message: str | None = None,
-    created_at: datetime | None = None,
-) -> TemplateAnalysisJobRecord:
-    job_data = {
-        "id": job_id if job_id is not None else uuid4(),
-        "company_id": company_id if company_id is not None else uuid4(),
-        "status": status if status is not None else "queued",
-        "source_reports_count": source_reports_count if source_reports_count is not None else 0,
-        "structure": structure if structure is not None else TemplateStructure(sections=[]),
-        "created_at": created_at if created_at is not None else datetime.now(UTC),
-    }
-
-    if failure_message is not None:
-        job_data["failure_message"] = failure_message
-
-    return TemplateAnalysisJobRecord.model_validate(job_data)
-
-
 def build_current_user() -> CurrentUser:
     return CurrentUser(
         id=uuid4(),
@@ -69,97 +41,8 @@ def build_current_user() -> CurrentUser:
     )
 
 
-def build_upload_file(name: str) -> UploadFile:
-    return UploadFile(filename=name, file=BytesIO(b"%PDF-1.4"))
-
-
-async def test_get_template_analysis_job_returns_active_job() -> None:
+async def test_confirm_template_creates_and_activates_template() -> None:
     current_user = build_current_user()
-    structure = TemplateStructure(
-        sections=[TemplateSection(id="photos", label="Photos", render_type="photo_grid")]
-    )
-
-    with patch.object(
-        templates_service.queries,
-        "get_template_analysis_job",
-        AsyncMock(
-            return_value=build_analysis_job_record(
-                status="active", source_reports_count=5, structure=structure
-            )
-        ),
-    ):
-        result = await templates_service.get_template_analysis_job(current_user, str(uuid4()))
-
-    assert result.status == "active"
-    assert result.source_reports_count == 5
-    assert result.structure == structure
-
-
-async def test_start_template_analysis_stores_files_and_creates_job() -> None:
-    current_user = build_current_user()
-    files = [
-        build_upload_file("one.pdf"),
-        build_upload_file("two.pdf"),
-    ]
-    with (
-        patch.object(
-            templates_service.blob,
-            "upload_file",
-            AsyncMock(return_value="https://storage.example/blob"),
-        ) as upload_file,
-        patch.object(
-            templates_service.queries,
-            "replace_template_analysis_job",
-            AsyncMock(),
-        ) as replace_job,
-    ):
-        result = await templates_service.start_template_analysis(current_user, files)
-
-    assert result.status == "processing"
-    assert result.source_reports_count == 2
-    assert upload_file.await_count == 2
-    replace_job.assert_awaited_once()
-    stored_files = replace_job.await_args.args[2]
-    assert [file.original_file_name for file in stored_files] == ["one.pdf", "two.pdf"]
-
-
-async def test_get_template_analysis_job_returns_pending_review_job() -> None:
-    current_user = build_current_user()
-    structure = TemplateStructure(
-        sections=[TemplateSection(id="summary", label="Summary", render_type="text_block")]
-    )
-
-    with patch.object(
-        templates_service.queries,
-        "get_template_analysis_job",
-        AsyncMock(
-            return_value=build_analysis_job_record(
-                status="pending_review", source_reports_count=1, structure=structure
-            )
-        ),
-    ):
-        result = await templates_service.get_template_analysis_job(current_user, str(uuid4()))
-
-    assert result.status == "pending_review"
-    assert result.source_reports_count == 1
-    assert result.structure == structure
-
-
-async def test_get_template_analysis_job_raises_for_missing_job() -> None:
-    current_user = build_current_user()
-
-    with patch.object(
-        templates_service.queries,
-        "get_template_analysis_job",
-        AsyncMock(return_value=None),
-    ):
-        with pytest.raises(TemplateAnalysisJobNotFound):
-            await templates_service.get_template_analysis_job(current_user, str(uuid4()))
-
-
-async def test_confirm_template_creates_and_activates_template_from_reviewed_sections() -> None:
-    current_user = build_current_user()
-    job_id = uuid4()
     template_id = uuid4()
     sections = [
         TemplateSection(id="summary", label="Executive Summary", render_type="text_block"),
@@ -170,19 +53,14 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             fields=["Issue", "Action"],
         ),
     ]
-    job = build_analysis_job_record(job_id=job_id, status="pending_review", source_reports_count=3)
+    active_template = build_active_template_record(source_reports_count=3)
 
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
             templates_service.queries,
-            "fetch_pending_review_job",
-            AsyncMock(return_value=job),
-        ),
-        patch.object(
-            templates_service.queries,
             "fetch_optional_active_company_template",
-            AsyncMock(return_value=None),
+            AsyncMock(return_value=active_template),
         ),
         patch.object(
             templates_service.queries,
@@ -194,11 +72,6 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
             "set_active_template",
             AsyncMock(),
         ) as set_active_template,
-        patch.object(
-            templates_service.queries,
-            "archive_template_analysis_job",
-            AsyncMock(),
-        ) as archive_job,
         patch.object(
             templates_service.queries,
             "fetch_active_company_template",
@@ -248,10 +121,9 @@ async def test_confirm_template_creates_and_activates_template_from_reviewed_sec
         3,
     )
     set_active_template.assert_awaited_once_with(str(current_user.company_id), str(template_id))
-    archive_job.assert_awaited_once_with(str(job_id), str(current_user.company_id))
 
 
-async def test_confirm_template_reconfirm_carries_forward_source_reports_count() -> None:
+async def test_confirm_template_carries_forward_source_reports_count() -> None:
     current_user = build_current_user()
     template_id = uuid4()
     sections = [
@@ -268,11 +140,6 @@ async def test_confirm_template_reconfirm_carries_forward_source_reports_count()
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
         patch.object(
             templates_service.queries,
-            "fetch_pending_review_job",
-            AsyncMock(return_value=None),
-        ),
-        patch.object(
-            templates_service.queries,
             "fetch_optional_active_company_template",
             AsyncMock(return_value=active_template),
         ),
@@ -286,11 +153,6 @@ async def test_confirm_template_reconfirm_carries_forward_source_reports_count()
             "set_active_template",
             AsyncMock(),
         ) as set_active_template,
-        patch.object(
-            templates_service.queries,
-            "archive_template_analysis_job",
-            AsyncMock(),
-        ) as archive_job,
         patch.object(
             templates_service.queries,
             "fetch_active_company_template",
@@ -319,23 +181,15 @@ async def test_confirm_template_reconfirm_carries_forward_source_reports_count()
         5,
     )
     set_active_template.assert_awaited_once_with(str(current_user.company_id), str(template_id))
-    archive_job.assert_not_awaited()
 
 
-async def test_confirm_template_raises_when_no_job_and_no_active_template() -> None:
+async def test_confirm_template_raises_when_no_active_template() -> None:
     current_user = build_current_user()
 
-    with (
-        patch.object(
-            templates_service.queries,
-            "fetch_pending_review_job",
-            AsyncMock(return_value=None),
-        ),
-        patch.object(
-            templates_service.queries,
-            "fetch_optional_active_company_template",
-            AsyncMock(return_value=None),
-        ),
+    with patch.object(
+        templates_service.queries,
+        "fetch_optional_active_company_template",
+        AsyncMock(return_value=None),
     ):
         with pytest.raises(TemplateConfirmationNotAllowed):
             await templates_service.confirm_template(current_user, TemplateStructure(sections=[]))
@@ -348,11 +202,6 @@ async def test_confirm_template_fetches_active_template_after_save() -> None:
 
     with (
         patch.object(templates_service, "uuid4", side_effect=[template_id]),
-        patch.object(
-            templates_service.queries,
-            "fetch_pending_review_job",
-            AsyncMock(return_value=None),
-        ),
         patch.object(
             templates_service.queries,
             "fetch_optional_active_company_template",

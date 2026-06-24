@@ -13,9 +13,9 @@ async def test_load_template_configuration_fetches_and_resolves() -> None:
     with (
         patch.object(
             templates_service.queries,
-            "fetch_template_configuration_context",
-            AsyncMock(return_value=(None, None)),
-        ) as fetch_context,
+            "fetch_optional_active_company_template",
+            AsyncMock(return_value=None),
+        ) as fetch_template,
         patch.object(
             status_resolver,
             "resolve_template_company_state",
@@ -25,5 +25,5 @@ async def test_load_template_configuration_fetches_and_resolves() -> None:
         result = await templates_service.load_template_configuration(company_id)
 
     assert result is expected
-    fetch_context.assert_awaited_once_with(company_id)
-    resolve_state.assert_called_once_with(None, None)
+    fetch_template.assert_awaited_once_with(company_id)
+    resolve_state.assert_called_once_with(None)

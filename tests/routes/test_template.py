@@ -1,24 +1,15 @@
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from io import BytesIO
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from pydantic import ValidationError
 
-from src.exceptions import TemplateAnalysisJobNotFound
-from src.http.v1.request.template import StartTemplateAnalysisRequest
 from src.main import app
 from src.models.auth.authentication import CurrentUser
-from src.models.templates.configuration import (
-    TemplateStatusActive,
-    TemplateStatusProcessing,
-)
+from src.models.templates.configuration import TemplateStatusActive
 from src.models.templates.domain import TemplateSection, TemplateStructure
-from src.models.templates.records import TemplateAnalysisJobRecord
-from src.routes import template as template_route
 from src.security import authentication as security
 from src.services import authentication as auth_service
 
@@ -129,168 +120,6 @@ async def test_get_template_allows_inspector(client: AsyncClient) -> None:
     assert response.status_code == 200
 
 
-async def test_post_template_analysis_requires_admin(client: AsyncClient) -> None:
-    current_user = build_current_user(role="inspector")
-    access_token = security.create_access_token(current_user)
-
-    with patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)):
-        response = await client.post(
-            "/api/v1/template/analysis",
-            headers={"Authorization": f"Bearer {access_token}"},
-            files=[("files", ("one.pdf", BytesIO(b"%PDF-1.4"), "application/pdf"))],
-        )
-
-    assert response.status_code == 403
-
-
-async def test_post_template_analysis_accepts_repeated_files_field(client: AsyncClient) -> None:
-    current_user = build_current_user()
-    access_token = security.create_access_token(current_user)
-
-    with (
-        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
-        patch(
-            "src.routes.template.templates.start_template_analysis",
-            AsyncMock(
-                return_value=TemplateStatusProcessing(
-                    status="processing",
-                    job_id="job-123",
-                    source_reports_count=3,
-                )
-            ),
-        ) as start_analysis,
-    ):
-        response = await client.post(
-            "/api/v1/template/analysis",
-            headers={"Authorization": f"Bearer {access_token}"},
-            files=[
-                ("files", ("one.pdf", BytesIO(b"%PDF-1.4"), "application/pdf")),
-                ("files", ("two.pdf", BytesIO(b"%PDF-1.4"), "application/pdf")),
-                ("files", ("three.pdf", BytesIO(b"%PDF-1.4"), "application/pdf")),
-            ],
-        )
-
-    assert response.status_code == 202
-    assert response.json() == {
-        "status": "processing",
-        "job_id": "job-123",
-        "source_reports_count": 3,
-    }
-    start_analysis.assert_awaited_once()
-    assert len(start_analysis.await_args.args[1]) == 3
-
-
-async def test_post_template_analysis_rejects_empty_upload_list(client: AsyncClient) -> None:
-    current_user = build_current_user()
-
-    with pytest.raises(ValidationError):
-        await template_route.start_template_analysis(
-            StartTemplateAnalysisRequest(files=[]),
-            current_user,
-        )
-
-
-async def test_post_template_analysis_missing_files_returns_validation_error(
-    client: AsyncClient,
-) -> None:
-    current_user = build_current_user()
-    access_token = security.create_access_token(current_user)
-
-    with patch.object(
-        auth_service.queries,
-        "get_user_by_id",
-        AsyncMock(return_value=current_user),
-    ):
-        response = await client.post(
-            "/api/v1/template/analysis",
-            headers={"Authorization": f"Bearer {access_token}"},
-            files=[],
-        )
-
-    assert response.status_code == 422
-
-
-async def test_get_template_analysis_returns_pending_review(client: AsyncClient) -> None:
-    current_user = build_current_user()
-    access_token = security.create_access_token(current_user)
-    job_id = uuid4()
-
-    with (
-        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
-        patch(
-            "src.routes.template.templates.get_template_analysis_job",
-            AsyncMock(
-                return_value=TemplateAnalysisJobRecord(
-                    id=job_id,
-                    company_id=current_user.company_id,
-                    status="pending_review",
-                    source_reports_count=3,
-                    created_at=datetime.now(UTC),
-                    structure=TemplateStructure(
-                        sections=[
-                            TemplateSection(
-                                id="findings",
-                                label="Findings",
-                                render_type="key_value_table",
-                                fields=["Issue", "Action"],
-                            )
-                        ]
-                    ),
-                )
-            ),
-        ),
-    ):
-        response = await client.get(
-            "/api/v1/template/analysis/job-123",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "status": "pending_review",
-        "job_id": str(job_id),
-        "source_reports_count": 3,
-        "metadata_fields": [],
-        "sections": [
-            {
-                "id": "findings",
-                "label": "Findings",
-                "order": 0,
-                "render_type": "key_value_table",
-                "fields": ["Issue", "Action"],
-                "found_in": 0,
-                "groups": None,
-            }
-        ],
-    }
-
-
-async def test_get_template_analysis_returns_not_found_for_unknown_job(client: AsyncClient) -> None:
-    current_user = build_current_user()
-    access_token = security.create_access_token(current_user)
-
-    with (
-        patch.object(
-            auth_service.queries,
-            "get_user_by_id",
-            AsyncMock(return_value=current_user),
-        ),
-        patch(
-            "src.routes.template.templates.get_template_analysis_job",
-            AsyncMock(
-                side_effect=TemplateAnalysisJobNotFound("job-123", str(current_user.company_id))
-            ),
-        ),
-    ):
-        response = await client.get(
-            "/api/v1/template/analysis/job-123",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-
-    assert response.status_code == 404
-    assert response.json() == {"detail": "Template analysis not found"}
-
-
 async def test_confirm_template_returns_active_template(client: AsyncClient) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
@@ -389,3 +218,146 @@ async def test_confirm_template_returns_unprocessable_when_confirmation_not_allo
 
     assert response.status_code == 422
     assert response.json() == {"detail": "Template cannot be confirmed"}
+
+
+async def test_get_template_preview_pdf_requires_auth(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/template/preview-pdf")
+
+    assert response.status_code == 401
+
+
+async def test_get_template_preview_pdf_returns_pdf_when_key_exists(client: AsyncClient) -> None:
+    from tests.db.sqlalchemy_fakes import build_connection
+
+    current_user = build_current_user()
+    access_token = security.create_access_token(current_user)
+    pdf_bytes = b"%%PDF fake"
+
+    connection = build_connection(row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"})
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch("src.routes.template.get_database", return_value=pool),
+        patch(
+            "src.routes.template.download_file",
+            AsyncMock(return_value=(pdf_bytes, "application/pdf")),
+        ),
+    ):
+        response = await client.get(
+            "/api/v1/template/preview-pdf",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert response.status_code == 200
+    assert response.content == pdf_bytes
+    assert "application/pdf" in response.headers["content-type"]
+
+
+async def test_get_template_preview_pdf_returns_404_when_key_is_null(client: AsyncClient) -> None:
+    from tests.db.sqlalchemy_fakes import build_connection
+
+    current_user = build_current_user()
+    access_token = security.create_access_token(current_user)
+
+    connection = build_connection(row={"preview_pdf_storage_key": None})
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch("src.routes.template.get_database", return_value=pool),
+    ):
+        response = await client.get(
+            "/api/v1/template/preview-pdf",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Template preview not found"}
+
+
+async def test_get_template_preview_pdf_returns_pdf_via_query_param_token(client: AsyncClient) -> None:
+    from tests.db.sqlalchemy_fakes import build_connection
+
+    current_user = build_current_user()
+    access_token = security.create_access_token(current_user)
+    pdf_bytes = b"%%PDF fake"
+
+    connection = build_connection(row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"})
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch("src.routes.template.get_database", return_value=pool),
+        patch(
+            "src.routes.template.download_file",
+            AsyncMock(return_value=(pdf_bytes, "application/pdf")),
+        ),
+    ):
+        response = await client.get(f"/api/v1/template/preview-pdf?access_token={access_token}")
+
+    assert response.status_code == 200
+    assert response.content == pdf_bytes
+
+
+async def test_get_template_preview_pdf_returns_401_when_token_is_invalid(client: AsyncClient) -> None:
+    response = await client.get(
+        "/api/v1/template/preview-pdf",
+        headers={"Authorization": "Bearer not.a.valid.token"},
+    )
+
+    assert response.status_code == 401
+
+
+async def test_get_template_preview_pdf_returns_401_when_token_type_is_refresh(client: AsyncClient) -> None:
+    current_user = build_current_user()
+    refresh_token = security.create_refresh_token(current_user)
+
+    response = await client.get(
+        "/api/v1/template/preview-pdf",
+        headers={"Authorization": f"Bearer {refresh_token}"},
+    )
+
+    assert response.status_code == 401
+
+
+async def test_get_template_preview_pdf_returns_401_when_user_not_found(client: AsyncClient) -> None:
+    current_user = build_current_user()
+    access_token = security.create_access_token(current_user)
+
+    with patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=None)):
+        response = await client.get(
+            "/api/v1/template/preview-pdf",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert response.status_code == 401
+
+
+async def test_get_template_preview_pdf_returns_404_when_no_template(client: AsyncClient) -> None:
+    from tests.db.sqlalchemy_fakes import build_connection
+
+    current_user = build_current_user()
+    access_token = security.create_access_token(current_user)
+
+    connection = build_connection(row=None)
+    pool = MagicMock()
+    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
+    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
+        patch("src.routes.template.get_database", return_value=pool),
+    ):
+        response = await client.get(
+            "/api/v1/template/preview-pdf",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+
+    assert response.status_code == 404

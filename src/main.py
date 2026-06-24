@@ -20,7 +20,7 @@ from src.routes import (
     users,
 )
 from src.storage import blob
-from src.workers import report_generation_worker, template_analysis_worker
+from src.workers import report_generation_worker
 
 
 @asynccontextmanager
@@ -29,7 +29,6 @@ async def lifespan(app: FastAPI):
     await blob.ensure_containers()
 
     client_factory.get_gpt4o_client()
-    client_factory.get_deepseek_client()
     client_factory.get_whisper_transcribe_client()
 
     report_generation_task = asyncio.create_task(
@@ -37,17 +36,10 @@ async def lifespan(app: FastAPI):
         name="report-generation-worker",
     )
 
-    template_task = asyncio.create_task(
-        template_analysis_worker.run_template_analysis_worker(),
-        name="template-analysis-worker",
-    )
-
     yield
 
     report_generation_task.cancel()
-
-    template_task.cancel()
-    await asyncio.gather(report_generation_task, template_task, return_exceptions=True)
+    await asyncio.gather(report_generation_task, return_exceptions=True)
     await blob.close_service_client()
     await connection.close_database()
 

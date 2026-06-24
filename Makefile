@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := install
 
-.PHONY: install format format-check lint stan test check run worker stop db-upgrade db-downgrade
+.PHONY: install format format-check lint stan test check run stop db-upgrade db-downgrade demo-reset
 
 install:
 	uv python install
@@ -29,6 +29,9 @@ db-upgrade:
 db-downgrade:
 	uv run alembic downgrade base
 
+demo-reset:
+	PYTHONPATH=$(CURDIR) uv run python scripts/reset_demo.py
+
 
 all: format lint stan test
 
@@ -43,22 +46,13 @@ run:
 	fi
 	@cp -n .env.example .env 2>/dev/null || true
 	uv run alembic upgrade head
-	@template_worker_pid=""; \
-	audio_worker_pid=""; \
-	trap 'if [ -n "$$template_worker_pid" ]; then kill "$$template_worker_pid" 2>/dev/null || true; fi; if [ -n "$$audio_worker_pid" ]; then kill "$$audio_worker_pid" 2>/dev/null || true; fi' EXIT INT TERM; \
-	uv run python -m src.workers.template_analysis_worker & \
-	template_worker_pid=$$!; \
+	@report_worker_pid=""; \
+	trap 'if [ -n "$$report_worker_pid" ]; then kill "$$report_worker_pid" 2>/dev/null || true; fi' EXIT INT TERM; \
 	uv run python -m src.workers.report_generation_worker & \
-	audio_worker_pid=$$!; \
+	report_worker_pid=$$!; \
 	uv run uvicorn src.main:app --reload
-
-
-worker:
-	@cp -n .env.example .env 2>/dev/null || true
-	uv run python -m src.workers.template_analysis_worker
 
 stop:
 	-pkill -f "$(CURDIR)/.venv/bin/uvicorn src.main:app --reload"
-	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.template_analysis_worker"
 	-pkill -f "$(CURDIR)/.venv/bin/python -m src.workers.report_generation_worker"
 	docker compose down

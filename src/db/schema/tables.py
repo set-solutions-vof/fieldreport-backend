@@ -31,6 +31,7 @@ render_type_enum = postgresql.ENUM(
     "key_value_table",
     "measurement_table",
     "photo_grid",
+    "repeating_group",
     name="render_type_enum",
     create_type=False,
 )
@@ -77,6 +78,9 @@ templates = sa.Table(
     metadata,
     sa.Column("id", postgresql.UUID(as_uuid=False), primary_key=True),
     sa.Column("company_id", postgresql.UUID(as_uuid=False), nullable=False),
+    sa.Column("name", sa.String(), nullable=True),
+    sa.Column("docx_storage_key", sa.String(), nullable=True),
+    sa.Column("preview_pdf_storage_key", sa.String(), nullable=True),
     sa.Column("structure", postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column("source_reports_count", sa.Integer(), nullable=False),
     sa.Column("logo_url", sa.String(), nullable=False),

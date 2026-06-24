@@ -1,8 +1,12 @@
 from typing import Annotated
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
+from src.db.connection import get_database
+from src.db.report.queries import check_all_sections_approved
+from src.db.schema.tables import reports as reports_table
 from src.exceptions import ReportNotFound
 from src.http.v1.request.report import ReportSectionUpdateRequest
 from src.http.v1.response.report import (
@@ -16,6 +20,8 @@ from src.http.v1.response.report import (
 from src.models.auth.authentication import CurrentUser
 from src.security.authentication import get_current_user
 from src.services import reports
+from src.services.report_pdf import render_report_to_pdf
+from src.storage.blob import upload_file
 
 router = APIRouter(tags=["Reports"])
 
@@ -96,3 +102,57 @@ async def retry_report(
         raise HTTPException(status_code=409, detail="Report can only be retried when failed")
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/api/v1/reports/{report_id}/export",
+    summary="Export report to PDF",
+    description="Renders approved report sections to PDF and returns the file.",
+)
+async def export_report(
+    report_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> Response:
+    company_id = current_user.company_id
+
+    all_approved = await check_all_sections_approved(str(report_id), company_id)
+    if not all_approved:
+        raise HTTPException(
+            status_code=422,
+            detail="All report sections must be approved before export.",
+        )
+
+    pdf_bytes = await render_report_to_pdf(str(report_id), company_id)
+
+    async with get_database().acquire() as conn:
+        row = (await conn.execute(
+            sa.select(reports_table.c.inspection_id)
+            .where(
+                reports_table.c.id == str(report_id),
+                reports_table.c.company_id == company_id,
+            )
+        )).mappings().one()
+
+    inspection_id = row["inspection_id"]
+    pdf_key = f"{inspection_id}/reports/{report_id}.pdf"
+
+    await upload_file("inspections", pdf_key, pdf_bytes, "application/pdf")
+
+    async with get_database().acquire() as conn:
+        await conn.execute(
+            reports_table.update()
+            .where(
+                reports_table.c.id == str(report_id),
+                reports_table.c.company_id == company_id,
+            )
+            .values(pdf_storage_key=pdf_key, updated_at=sa.func.now())
+        )
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="report-{report_id}.pdf"',
+            "Content-Length": str(len(pdf_bytes)),
+        },
+    )
