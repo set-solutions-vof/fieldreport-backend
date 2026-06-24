@@ -8,6 +8,7 @@ from io import BytesIO
 
 import sqlalchemy as sa
 from docx.shared import Cm
+from PIL import Image
 from docxtpl import DocxTemplate, InlineImage
 
 from src.db.connection import get_database
@@ -159,6 +160,10 @@ def _content(row) -> str:
 async def _fetch_image_bytes(key: str) -> BytesIO | None:
     try:
         data, _ = await download_file("inspections", key)
-        return BytesIO(data)
+        img = Image.open(BytesIO(data)).convert("RGB")
+        out = BytesIO()
+        img.save(out, format="JPEG")
+        out.seek(0)
+        return out
     except Exception:
         return None
