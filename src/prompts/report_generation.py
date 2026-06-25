@@ -25,6 +25,7 @@ Geef uitsluitend een JSON-object terug met deze structuur:
 }}
 
 Regels:
+- De secties paneelnummer, string, type_paneel, oriëntatie, hellingshoek, positie_op_dak, gem_paneeltemp, max_temperatuur, min_temperatuur en temperatuurverschil bevatten uitsluitend een korte waarde: een getal met eenheid, een naam of maximaal een paar woorden. Geen volzinnen.
 - Gebruik alleen informatie die aanwezig is in de transcriptie en fotoanalyses.
 - Verzin geen bevindingen, oorzaken, metingen, datums, namen of conclusies.
 - Als een sectie geen relevante broninformatie heeft, zet generated_content op "" en

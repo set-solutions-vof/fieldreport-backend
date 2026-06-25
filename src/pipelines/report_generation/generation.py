@@ -149,6 +149,8 @@ async def persist_pipeline_results(
         strict=True,
     ):
         for transcription_ref in section_data.transcription_refs:
+            if transcription_ref < 1 or transcription_ref > len(segment_rows):
+                continue
             transcription_segment_id = str(segment_rows[transcription_ref - 1].id)
             await repository.insert_report_section_source_transcription(
                 report_section_id,
@@ -156,6 +158,8 @@ async def persist_pipeline_results(
             )
 
         for image_ref in section_data.image_refs:
+            if image_ref < 1 or image_ref > len(image_rows):
+                continue
             image_analysis_id = str(image_rows[image_ref - 1].id)
             await repository.insert_report_section_source_image(
                 report_section_id,

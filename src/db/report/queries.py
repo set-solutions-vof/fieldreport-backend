@@ -87,7 +87,7 @@ def _report_sections_join():
     return (
         report_sections.join(reports, reports.c.id == report_sections.c.report_id)
         .join(inspections, inspections.c.id == reports.c.inspection_id)
-        .join(
+        .outerjoin(
             report_section_evidence,
             report_section_evidence.c.report_section_id == report_sections.c.id,
         )

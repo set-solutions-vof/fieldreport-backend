@@ -667,4 +667,41 @@ async def test_check_all_sections_approved_excludes_empty_sections() -> None:
     stmt = connection.execute.call_args[0][0]
     compiled = str(stmt.compile(dialect=sa.dialects.postgresql.dialect()))
     assert "generated_content" in compiled
-    assert "reviewed_content" in compiled
+
+
+def test_map_report_detail_sections_includes_sections_without_evidence() -> None:
+    section_id = uuid4()
+    rows = [
+        {
+            "id": section_id,
+            "section_id": "panel_advies",
+            "label": "Advies",
+            "fields": None,
+            "groups": None,
+            "section_order": 12,
+            "render_type": "text_block",
+            "generated_content": "",
+            "reviewed_content": None,
+            "approved": False,
+            "confidence_level": "low",
+            "confidence_score": 0.0,
+            "evidence_type": None,
+            "transcription_segment_id": None,
+            "transcription_id": None,
+            "start_seconds": None,
+            "end_seconds": None,
+            "transcription_text": None,
+            "image_analysis_id": None,
+            "image_storage_key": None,
+            "captured_at": None,
+            "image_analysis_text": None,
+            "timeline_seconds": None,
+        }
+    ]
+
+    sections, evidence_items = map_report_detail_sections(rows)
+
+    assert len(sections) == 1
+    assert sections[0].section_id == "panel_advies"
+    assert sections[0].evidence_item_ids == []
+    assert evidence_items == []

@@ -126,7 +126,8 @@ def map_report_sections(rows: list[Mapping[str, object]]) -> list[ReportSection]
             sections_by_id[section_id] = section
             sections.append(section)
 
-        sections_by_id[section_id].evidence_sources.append(map_report_section_source(row))
+        if row["evidence_type"] is not None:
+            sections_by_id[section_id].evidence_sources.append(map_report_section_source(row))
 
     return sections
 
@@ -161,9 +162,10 @@ def map_report_detail_sections(
             sections_by_id[section_id] = section
             sections.append(section)
 
-        evidence_item = map_report_evidence_item(row)
-        sections_by_id[section_id].evidence_item_ids.append(evidence_item.id)
-        evidence_items_by_id[evidence_item.id] = evidence_item
+        if row["evidence_type"] is not None:
+            evidence_item = map_report_evidence_item(row)
+            sections_by_id[section_id].evidence_item_ids.append(evidence_item.id)
+            evidence_items_by_id[evidence_item.id] = evidence_item
 
     evidence_items = sorted(
         evidence_items_by_id.values(),

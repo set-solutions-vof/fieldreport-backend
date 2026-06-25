@@ -105,14 +105,17 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
         for field in _PANEL_FIELDS:
             panel[field] = panel_data.get((n, field), "")
 
-        normaal_idx = (n - 1) * 2
+        normaal_idx = (n - 1) * 3
         thermisch_idx = normaal_idx + 1
+        locatie_idx = normaal_idx + 2
 
         normaal_io = photo_bytes[normaal_idx] if normaal_idx < len(photo_bytes) else None
         thermisch_io = photo_bytes[thermisch_idx] if thermisch_idx < len(photo_bytes) else None
+        locatie_io = photo_bytes[locatie_idx] if locatie_idx < len(photo_bytes) else None
 
         panel["normaal_foto"] = InlineImage(tpl, normaal_io, width=Cm(8)) if normaal_io else ""
         panel["thermisch_foto"] = InlineImage(tpl, thermisch_io, width=Cm(8)) if thermisch_io else ""
+        panel["locatie_foto"] = InlineImage(tpl, locatie_io, width=Cm(8)) if locatie_io else ""
 
         panels.append(panel)
 
