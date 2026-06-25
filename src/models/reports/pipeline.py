@@ -32,3 +32,5 @@ class StoredImageAnalysis(BaseModel):
     id: UUID
     analysis_text: str
     dji_metadata: dict | None = None
+    thermal_metrics: dict | None = None
+    panel_location_key: str | None = None

@@ -42,9 +42,7 @@ SEED_SQL_PATH = DEMO_DIR / "seed.sql"
 
 async def seed_database() -> None:
     seed_statements = [
-        statement.strip()
-        for statement in SEED_SQL_PATH.read_text().split(";")
-        if statement.strip()
+        statement.strip() for statement in SEED_SQL_PATH.read_text().split(";") if statement.strip()
     ]
     engine = create_async_engine(settings.database_url)
 

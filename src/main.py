@@ -51,12 +51,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_kwargs: dict[str, object] = {
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if settings.app_env == "dev":
+    cors_kwargs["allow_origin_regex"] = r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+else:
+    cors_kwargs["allow_origins"] = settings.cors_origins
+
+app.add_middleware(CORSMiddleware, **cors_kwargs)
 
 app.include_router(health.router)
 app.include_router(auth.router)

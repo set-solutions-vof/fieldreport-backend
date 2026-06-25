@@ -233,7 +233,9 @@ async def test_get_template_preview_pdf_returns_pdf_when_key_exists(client: Asyn
     access_token = security.create_access_token(current_user)
     pdf_bytes = b"%%PDF fake"
 
-    connection = build_connection(row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"})
+    connection = build_connection(
+        row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"}
+    )
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -280,14 +282,18 @@ async def test_get_template_preview_pdf_returns_404_when_key_is_null(client: Asy
     assert response.json() == {"detail": "Template preview not found"}
 
 
-async def test_get_template_preview_pdf_returns_pdf_via_query_param_token(client: AsyncClient) -> None:
+async def test_get_template_preview_pdf_returns_pdf_via_query_param_token(
+    client: AsyncClient,
+) -> None:
     from tests.db.sqlalchemy_fakes import build_connection
 
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
     pdf_bytes = b"%%PDF fake"
 
-    connection = build_connection(row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"})
+    connection = build_connection(
+        row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"}
+    )
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -306,7 +312,9 @@ async def test_get_template_preview_pdf_returns_pdf_via_query_param_token(client
     assert response.content == pdf_bytes
 
 
-async def test_get_template_preview_pdf_returns_401_when_token_is_invalid(client: AsyncClient) -> None:
+async def test_get_template_preview_pdf_returns_401_when_token_is_invalid(
+    client: AsyncClient,
+) -> None:
     response = await client.get(
         "/api/v1/template/preview-pdf",
         headers={"Authorization": "Bearer not.a.valid.token"},
@@ -315,7 +323,9 @@ async def test_get_template_preview_pdf_returns_401_when_token_is_invalid(client
     assert response.status_code == 401
 
 
-async def test_get_template_preview_pdf_returns_401_when_token_type_is_refresh(client: AsyncClient) -> None:
+async def test_get_template_preview_pdf_returns_401_when_token_type_is_refresh(
+    client: AsyncClient,
+) -> None:
     current_user = build_current_user()
     refresh_token = security.create_refresh_token(current_user)
 
@@ -327,7 +337,9 @@ async def test_get_template_preview_pdf_returns_401_when_token_type_is_refresh(c
     assert response.status_code == 401
 
 
-async def test_get_template_preview_pdf_returns_401_when_user_not_found(client: AsyncClient) -> None:
+async def test_get_template_preview_pdf_returns_401_when_user_not_found(
+    client: AsyncClient,
+) -> None:
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 

@@ -125,13 +125,18 @@ async def export_report(
     pdf_bytes = await render_report_to_pdf(str(report_id), company_id)
 
     async with get_database().acquire() as conn:
-        row = (await conn.execute(
-            sa.select(reports_table.c.inspection_id)
-            .where(
-                reports_table.c.id == str(report_id),
-                reports_table.c.company_id == company_id,
+        row = (
+            (
+                await conn.execute(
+                    sa.select(reports_table.c.inspection_id).where(
+                        reports_table.c.id == str(report_id),
+                        reports_table.c.company_id == company_id,
+                    )
+                )
             )
-        )).mappings().one()
+            .mappings()
+            .one()
+        )
 
     inspection_id = row["inspection_id"]
     pdf_key = f"{inspection_id}/reports/{report_id}.pdf"

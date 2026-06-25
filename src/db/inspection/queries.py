@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from src.db.connection import DatabaseConnection, get_database
 from src.db.inspection.mapper import map_inspection_media_file
 from src.db.schema.tables import (
+    image_analyses,
     inspection_audio_files,
     inspection_photo_files,
     inspections,
@@ -94,7 +95,8 @@ async def fetch_inspection_audio_files(inspection_id: str) -> list[InspectionMed
 
 
 async def inspection_photo_belongs_to_company(company_id: str, storage_key: str) -> bool:
-    statement = (
+    # Check original uploads
+    stmt_uploaded = (
         sa.select(sa.literal(1))
         .select_from(
             inspection_photo_files.join(
@@ -108,12 +110,28 @@ async def inspection_photo_belongs_to_company(company_id: str, storage_key: str)
         )
         .limit(1)
     )
+    # Also allow pipeline-generated images (e.g. panel location annotations)
+    stmt_generated = (
+        sa.select(sa.literal(1))
+        .select_from(
+            image_analyses.join(
+                inspections,
+                inspections.c.id == image_analyses.c.inspection_id,
+            )
+        )
+        .where(
+            inspections.c.company_id == company_id,
+            image_analyses.c.storage_key == storage_key,
+        )
+        .limit(1)
+    )
 
     async with get_database().acquire() as connection:
-        result = await connection.execute(statement)
-        row = result.first()
-
-    return row is not None
+        row = (await connection.execute(stmt_uploaded)).first()
+        if row is not None:
+            return True
+        row = (await connection.execute(stmt_generated)).first()
+        return row is not None
 
 
 async def fetch_inspection_photo_files(inspection_id: str) -> list[InspectionMediaFile]:

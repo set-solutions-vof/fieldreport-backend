@@ -86,6 +86,8 @@ class ReportPipelineRepository:
         storage_key: str,
         analysis_text: str,
         dji_metadata: dict | None = None,
+        thermal_metrics: dict | None = None,
+        panel_location_key: str | None = None,
     ) -> str:
         image_analysis_id = str(uuid4())
         statement = image_analyses.insert().values(
@@ -100,7 +102,9 @@ class ReportPipelineRepository:
             if dji_metadata and dji_metadata.get("utc_at_exposure")
             else None,
             dji_metadata=dji_metadata,
-            created_at=sa.func.now(),
+            thermal_metrics=thermal_metrics,
+            panel_location_key=panel_location_key,
+            created_at=sa.func.clock_timestamp(),
         )
 
         await self.connection.execute(statement)
@@ -147,6 +151,8 @@ class ReportPipelineRepository:
                 image_analyses.c.analysis_text,
                 image_analyses.c.captured_at,
                 image_analyses.c.dji_metadata,
+                image_analyses.c.thermal_metrics,
+                image_analyses.c.panel_location_key,
                 image_analyses.c.created_at,
             )
             .where(image_analyses.c.inspection_id == inspection_id)

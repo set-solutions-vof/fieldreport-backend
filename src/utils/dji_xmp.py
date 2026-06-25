@@ -16,7 +16,9 @@ def extract_dji_xmp(file_content: bytes) -> DjiXmpMetadata | None:
     if end == -1:
         return None
 
-    root = ElementTree.fromstring(file_content[start : end + len(_XMP_END)].decode("utf-8", errors="replace"))
+    root = ElementTree.fromstring(
+        file_content[start : end + len(_XMP_END)].decode("utf-8", errors="replace")
+    )
 
     def get(tag: str) -> str | None:
         key = f"{{{_DJI_NS}}}{tag}"

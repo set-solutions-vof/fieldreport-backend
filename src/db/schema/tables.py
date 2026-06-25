@@ -145,6 +145,8 @@ image_analyses = sa.Table(
     sa.Column("geotag_lng", sa.Float(), nullable=True),
     sa.Column("captured_at", sa.DateTime(timezone=True), nullable=True),
     sa.Column("dji_metadata", postgresql.JSONB(), nullable=True),
+    sa.Column("thermal_metrics", postgresql.JSONB(), nullable=True),
+    sa.Column("panel_location_key", sa.String(), nullable=True),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )
 

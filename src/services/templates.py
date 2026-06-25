@@ -28,7 +28,9 @@ async def confirm_template(
         raise TemplateConfirmationNotAllowed()
 
     template_id = str(uuid4())
-    await queries.create_template(company_id, template_id, structure, active_template.source_reports_count)
+    await queries.create_template(
+        company_id, template_id, structure, active_template.source_reports_count
+    )
     await queries.set_active_template(company_id, template_id)
 
     active_template = await queries.fetch_active_company_template(company_id)

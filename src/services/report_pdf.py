@@ -11,6 +11,7 @@ from docx.shared import Cm
 from PIL import Image
 from docxtpl import DocxTemplate, InlineImage
 
+from src.config import settings
 from src.db.connection import get_database
 from src.db.schema.tables import (
     company,
@@ -23,16 +24,49 @@ from src.db.schema.tables import (
 from src.storage.blob import download_file
 
 _PANEL_FIELDS = [
-    "paneelnummer", "string", "type_paneel", "orientatie", "hellingshoek",
-    "positie_op_dak", "gem_paneeltemp", "max_temperatuur", "min_temperatuur",
-    "temperatuurverschil", "bevindingen", "conclusie", "advies",
+    "paneelnummer",
+    "string",
+    "type_paneel",
+    "orientatie",
+    "hellingshoek",
+    "positie_op_dak",
+    "gem_paneeltemp",
+    "max_temperatuur",
+    "min_temperatuur",
+    "temperatuurverschil",
+    "bevindingen",
+    "conclusie",
+    "advies",
 ]
 
 _METADATA_FIELDS = [
-    "projectnummer", "opdrachtgever", "locatie", "datum_inspectie",
-    "tijdstip_inspectie", "inspecteur", "weersomstandigheden",
-    "buitentemperatuur", "windsnelheid", "instraling", "drone_camera",
+    "projectnummer",
+    "opdrachtgever",
+    "locatie",
+    "datum_inspectie",
+    "tijdstip_inspectie",
+    "inspecteur",
+    "weersomstandigheden",
+    "buitentemperatuur",
+    "windsnelheid",
+    "instraling",
+    "drone_camera",
 ]
+
+
+def _soffice_executable() -> str:
+    if settings.soffice_path:
+        if os.path.isfile(settings.soffice_path) and os.access(settings.soffice_path, os.X_OK):
+            return settings.soffice_path
+        raise RuntimeError(f"SOFFICE_PATH is not executable: {settings.soffice_path}")
+
+    path = shutil.which("soffice")
+    if path:
+        return path
+
+    raise RuntimeError(
+        "LibreOffice (soffice) not found. Set SOFFICE_PATH or install LibreOffice on PATH."
+    )
 
 
 async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
@@ -75,15 +109,16 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
     for row in section_rows:
         sid = row["section_id"]
         if sid.startswith("panel_"):
-            panel_data[(1, sid[len("panel_"):])] = _content(row)
+            panel_data[(1, sid[len("panel_") :])] = _content(row)
 
     panel_count = max((n for (n, _) in panel_data), default=0)
 
     stmt = (
         sa.select(image_analyses.c.storage_key)
         .select_from(
-            image_analyses.join(inspections, inspections.c.id == image_analyses.c.inspection_id)
-            .join(reports, reports.c.inspection_id == inspections.c.id)
+            image_analyses.join(
+                inspections, inspections.c.id == image_analyses.c.inspection_id
+            ).join(reports, reports.c.inspection_id == inspections.c.id)
         )
         .where(reports.c.id == report_id, reports.c.company_id == company_id)
         .order_by(image_analyses.c.created_at.asc())
@@ -114,7 +149,9 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
         locatie_io = photo_bytes[locatie_idx] if locatie_idx < len(photo_bytes) else None
 
         panel["normaal_foto"] = InlineImage(tpl, normaal_io, width=Cm(8)) if normaal_io else ""
-        panel["thermisch_foto"] = InlineImage(tpl, thermisch_io, width=Cm(8)) if thermisch_io else ""
+        panel["thermisch_foto"] = (
+            InlineImage(tpl, thermisch_io, width=Cm(8)) if thermisch_io else ""
+        )
         panel["locatie_foto"] = InlineImage(tpl, locatie_io, width=Cm(8)) if locatie_io else ""
 
         panels.append(panel)
@@ -129,11 +166,13 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
         lo_profile = os.path.join(tmp_dir, f"lo_profile_{uuid.uuid4().hex}")
         result = subprocess.run(
             [
-                "soffice",
+                _soffice_executable(),
                 "--headless",
                 f"-env:UserInstallation=file://{lo_profile}",
-                "--convert-to", "pdf",
-                "--outdir", tmp_dir,
+                "--convert-to",
+                "pdf",
+                "--outdir",
+                tmp_dir,
                 docx_path,
             ],
             capture_output=True,

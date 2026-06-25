@@ -5,6 +5,7 @@
 install:
 	uv python install
 	uv sync
+	PYTHONPATH=$(CURDIR) uv run python scripts/ensure_soffice.py
 
 format:
 	uv run ruff format .

@@ -21,6 +21,36 @@ def test_content_returns_empty_when_both_absent() -> None:
     assert report_pdf._content(row) == ""
 
 
+def test_soffice_executable_uses_soffice_path_setting() -> None:
+    with (
+        patch.object(report_pdf.settings, "soffice_path", "/custom/soffice"),
+        patch.object(report_pdf.os.path, "isfile", return_value=True),
+        patch.object(report_pdf.os, "access", return_value=True),
+    ):
+        assert report_pdf._soffice_executable() == "/custom/soffice"
+
+
+def test_soffice_executable_uses_path_lookup() -> None:
+    with (
+        patch.object(report_pdf.settings, "soffice_path", ""),
+        patch.object(report_pdf.shutil, "which", return_value="/usr/bin/soffice"),
+    ):
+        assert report_pdf._soffice_executable() == "/usr/bin/soffice"
+
+
+def test_soffice_executable_raises_when_missing() -> None:
+    with (
+        patch.object(report_pdf.settings, "soffice_path", ""),
+        patch.object(report_pdf.shutil, "which", return_value=None),
+    ):
+        try:
+            report_pdf._soffice_executable()
+        except RuntimeError as error:
+            assert "SOFFICE_PATH" in str(error)
+        else:
+            raise AssertionError("Expected RuntimeError")
+
+
 async def test_fetch_image_bytes_returns_bytesio_on_success() -> None:
     with patch.object(report_pdf, "download_file", AsyncMock(return_value=(b"data", "image/jpeg"))):
         result = await report_pdf._fetch_image_bytes("photos/img.jpg")
@@ -45,22 +75,26 @@ async def test_render_report_to_pdf_returns_pdf_bytes() -> None:
     results = [
         FakeResult(row={"docx_storage_key": "tpl/key.docx"}),
         FakeResult(row={"metadata": {"projectnummer": "P001", "opdrachtgever": "ACME"}}),
-        FakeResult(rows=[
-            {
-                "section_id": "panel_paneelnummer",
-                "reviewed_content": None,
-                "generated_content": ["Panel 1"],
-            },
-            {
-                "section_id": "panel_conclusie",
-                "reviewed_content": ["Rev conclusie"],
-                "generated_content": ["Gen conclusie"],
-            },
-        ]),
-        FakeResult(rows=[
-            {"storage_key": "photos/photo1.jpg"},
-            {"storage_key": "photos/photo2.jpg"},
-        ]),
+        FakeResult(
+            rows=[
+                {
+                    "section_id": "panel_paneelnummer",
+                    "reviewed_content": None,
+                    "generated_content": ["Panel 1"],
+                },
+                {
+                    "section_id": "panel_conclusie",
+                    "reviewed_content": ["Rev conclusie"],
+                    "generated_content": ["Gen conclusie"],
+                },
+            ]
+        ),
+        FakeResult(
+            rows=[
+                {"storage_key": "photos/photo1.jpg"},
+                {"storage_key": "photos/photo2.jpg"},
+            ]
+        ),
     ]
     connection = build_connection(results=results)
     pool = MagicMock()
@@ -82,11 +116,13 @@ async def test_render_report_to_pdf_returns_pdf_bytes() -> None:
         patch.object(
             report_pdf,
             "download_file",
-            AsyncMock(side_effect=[
-                (fake_docx, "application/vnd.openxmlformats"),
-                (b"photo1", "image/jpeg"),
-                (b"photo2", "image/jpeg"),
-            ]),
+            AsyncMock(
+                side_effect=[
+                    (fake_docx, "application/vnd.openxmlformats"),
+                    (b"photo1", "image/jpeg"),
+                    (b"photo2", "image/jpeg"),
+                ]
+            ),
         ),
         patch.object(report_pdf, "DocxTemplate", return_value=mock_tpl),
         patch.object(report_pdf, "InlineImage", return_value="PHOTO"),

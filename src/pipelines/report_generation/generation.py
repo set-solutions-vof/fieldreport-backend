@@ -46,6 +46,20 @@ def _format_dji_metadata(meta: dict) -> str:
     return f"[Metadata: {', '.join(parts)}]" if parts else ""
 
 
+def _format_thermal_metrics(metrics: dict) -> str:
+    panels = metrics.get("panels", [])
+    if not panels:
+        return ""
+    lines = ["[Thermische meting per paneel (kader-pixels uitgesloten):"]
+    for p in panels:
+        lines.append(
+            f"  Paneel {p['panel_index']} (rij {p['row']}, kolom {p['col']}): "
+            f"Tmin={p['tmin_c']}°C  Tmax={p['tmax_c']}°C  Tgem={p['tgem_c']}°C  ΔT={p['delta_t_c']}°C"
+        )
+    lines.append("]")
+    return "\n".join(lines)
+
+
 def format_images_for_prompt(image_rows: list[StoredImageAnalysis]) -> str:
     lines = []
     for image_index, image in enumerate(image_rows, start=1):
@@ -54,6 +68,10 @@ def format_images_for_prompt(image_rows: list[StoredImageAnalysis]) -> str:
             meta_str = _format_dji_metadata(image.dji_metadata)
             if meta_str:
                 line += f"\n{meta_str}"
+        if image.thermal_metrics:
+            line += f"\n{_format_thermal_metrics(image.thermal_metrics)}"
+        if image.panel_location_key:
+            line += f"\n[Locatiefoto paneel: {image.panel_location_key}]"
         lines.append(line)
     return "\n".join(lines)
 

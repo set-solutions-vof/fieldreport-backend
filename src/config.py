@@ -42,9 +42,10 @@ class Settings(BaseSettings):
         default="http://localhost:5173", validation_alias="FRONTEND_BASE_URL"
     )
     cors_origins: list[str] = Field(
-        default=["http://localhost:5173"],
+        default=["http://localhost:5173", "http://127.0.0.1:5173"],
         validation_alias="CORS_ORIGINS",
     )
+    soffice_path: str = Field(default="", validation_alias="SOFFICE_PATH")
 
 
 settings = Settings.model_validate({})

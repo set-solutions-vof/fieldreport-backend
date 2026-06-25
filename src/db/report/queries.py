@@ -330,9 +330,7 @@ async def reset_report_for_retry(report_id: str, company_id: str) -> None:
 
 
 async def check_all_sections_approved(report_id: str, company_id: str) -> bool:
-    statement = sa.select(
-        sa.func.count().label("unapproved_count")
-    ).where(
+    statement = sa.select(sa.func.count().label("unapproved_count")).where(
         report_sections.c.report_id == report_id,
         report_sections.c.company_id == company_id,
         report_sections.c.approved == False,

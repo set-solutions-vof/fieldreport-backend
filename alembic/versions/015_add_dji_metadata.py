@@ -7,12 +7,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute(
-        "ALTER TABLE image_analyses ADD COLUMN IF NOT EXISTS dji_metadata JSONB"
-    )
+    op.execute("ALTER TABLE image_analyses ADD COLUMN IF NOT EXISTS dji_metadata JSONB")
 
 
 def downgrade() -> None:
-    op.execute(
-        "ALTER TABLE image_analyses DROP COLUMN IF EXISTS dji_metadata"
-    )
+    op.execute("ALTER TABLE image_analyses DROP COLUMN IF EXISTS dji_metadata")
