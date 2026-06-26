@@ -161,6 +161,8 @@ async def persist_pipeline_results(
         section_pairs,
     )
 
+    cited_image_ids: set[str] = set()
+
     for report_section_id, (section_data, _) in zip(
         report_section_ids,
         section_pairs,
@@ -179,7 +181,18 @@ async def persist_pipeline_results(
             if image_ref < 1 or image_ref > len(image_rows):
                 continue
             image_analysis_id = str(image_rows[image_ref - 1].id)
+            cited_image_ids.add(image_analysis_id)
             await repository.insert_report_section_source_image(
                 report_section_id,
                 image_analysis_id,
             )
+
+    if report_section_ids:
+        first_section_id = report_section_ids[0]
+        for image in image_rows:
+            image_id = str(image.id)
+            if image_id not in cited_image_ids:
+                await repository.insert_report_section_source_image(
+                    first_section_id,
+                    image_id,
+                )

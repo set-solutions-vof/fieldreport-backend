@@ -193,8 +193,8 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
             panel[field] = panel_data.get((n, field), "")
 
         normaal_idx = (n - 1) * 3
-        thermisch_idx = normaal_idx + 1
-        locatie_idx = normaal_idx + 2
+        locatie_idx = normaal_idx + 1
+        thermisch_idx = normaal_idx + 2
 
         normaal_io = photo_bytes[normaal_idx] if normaal_idx < len(photo_bytes) else None
         thermisch_io = photo_bytes[thermisch_idx] if thermisch_idx < len(photo_bytes) else None

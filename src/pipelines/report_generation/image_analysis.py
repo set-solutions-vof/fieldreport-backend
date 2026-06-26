@@ -36,17 +36,18 @@ async def analyze_inspection_photo_files(
 
     overview_bytes, overview_key = _find_overview(downloaded)
 
-    # Sort non-overview files: visual (_V) first, thermal (_T) second, others last.
-    # The PDF service expects groups of 3 per panel: [visual, thermal, location].
-    def _sort_key(pf: InspectionMediaFile) -> int:
-        stem = Path(pf.storage_key).stem.upper()
+    # Sort by (pair_name, type) so each panel's V and T are consecutive.
+    # Insertion order per panel: visual → location → thermal.
+    # The PDF service expects groups of 3 with that same order.
+    def _sort_key(pf: InspectionMediaFile) -> tuple[str, int]:
+        stem = Path(pf.original_file_name).stem.upper()
         if _is_overview_key(pf.storage_key, downloaded):
-            return 99  # overview last so we can skip it cleanly
+            return ("~", 99)
         if stem.endswith("_V"):
-            return 0
+            return (stem[:-2], 0)
         if stem.endswith("_T"):
-            return 1
-        return 2
+            return (stem[:-2], 1)
+        return (stem, 2)
 
     sorted_files = sorted(
         [pf for pf in photo_files if pf.storage_key != overview_key],
