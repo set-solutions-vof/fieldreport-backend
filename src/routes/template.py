@@ -1,11 +1,7 @@
 from typing import Annotated
 
-import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from src.db.connection import get_database
-from src.db.schema.tables import company
-from src.db.schema.tables import templates as templates_table
 from src.exceptions import TemplateConfirmationNotAllowed
 from src.models.auth.authentication import CurrentUser
 from src.models.templates.configuration import (
@@ -14,8 +10,7 @@ from src.models.templates.configuration import (
 )
 from src.models.templates.domain import TemplateStructure
 from src.security.authentication import get_current_user, get_pdf_preview_user, require_admin
-from src.services import templates
-from src.storage.blob import download_file
+from src.services import report_pdf, templates
 
 router = APIRouter(tags=["Template"])
 
@@ -28,20 +23,11 @@ router = APIRouter(tags=["Template"])
 async def get_template_preview_pdf(
     current_user: Annotated[CurrentUser, Depends(get_pdf_preview_user)],
 ) -> Response:
-    stmt = (
-        sa.select(templates_table.c.preview_pdf_storage_key)
-        .select_from(
-            company.join(templates_table, templates_table.c.id == company.c.current_template_id)
-        )
-        .where(company.c.id == str(current_user.company_id))
-    )
-    async with get_database().acquire() as conn:
-        row = (await conn.execute(stmt)).mappings().first()
-
-    if row is None or not row["preview_pdf_storage_key"]:
+    try:
+        pdf_bytes = await report_pdf.render_template_preview_to_pdf(str(current_user.company_id))
+    except ValueError:
         raise HTTPException(status_code=404, detail="Template preview not found")
 
-    pdf_bytes, _ = await download_file("templates", row["preview_pdf_storage_key"])
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

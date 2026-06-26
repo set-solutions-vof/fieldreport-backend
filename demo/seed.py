@@ -12,9 +12,7 @@ CURRENT_TEMPLATE_ID = "e4378133-da5e-4caf-b7d2-2605c6e88a72"
 DEMO_DIR = Path(__file__).parent
 REPO_ROOT = DEMO_DIR.parent
 TEMPLATE_DOCX_PATH = REPO_ROOT / "templates" / "thermofly_paneel_tagged.docx"
-TEMPLATE_PREVIEW_PDF_PATH = DEMO_DIR / "thermofly_paneel_preview.pdf"
 TEMPLATE_DOCX_KEY = f"thermofly/paneel/{CURRENT_TEMPLATE_ID}.docx"
-TEMPLATE_PREVIEW_PDF_KEY = f"thermofly/paneel/{CURRENT_TEMPLATE_ID}_preview.pdf"
 
 TRUNCATE_SQL = """
 TRUNCATE TABLE
@@ -62,12 +60,6 @@ async def seed_template_blobs() -> None:
         TEMPLATE_DOCX_KEY,
         TEMPLATE_DOCX_PATH.read_bytes(),
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
-    await upload_file(
-        "templates",
-        TEMPLATE_PREVIEW_PDF_KEY,
-        TEMPLATE_PREVIEW_PDF_PATH.read_bytes(),
-        "application/pdf",
     )
     await close_service_client()
 

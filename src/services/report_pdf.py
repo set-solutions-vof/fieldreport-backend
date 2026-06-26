@@ -53,6 +53,67 @@ _METADATA_FIELDS = [
     "drone_camera",
 ]
 
+_PREVIEW_PHOTO_SLOTS = (
+    ("normaal_foto", "Normaal foto", (220, 220, 220)),
+    ("thermisch_foto", "Thermisch foto", (255, 210, 170)),
+    ("locatie_foto", "Locatie foto", (200, 220, 245)),
+)
+_PREVIEW_PHOTO_SIZE = (800, 600)
+_PREVIEW_PHOTO_WIDTH = Cm(8)
+
+
+async def render_template_preview_to_pdf(company_id: str) -> bytes:
+    stmt = (
+        sa.select(templates.c.docx_storage_key)
+        .select_from(company.join(templates, templates.c.id == company.c.current_template_id))
+        .where(company.c.id == company_id)
+    )
+    async with get_database().acquire() as conn:
+        row = (await conn.execute(stmt)).mappings().first()
+
+    if row is None or not row["docx_storage_key"]:
+        raise ValueError("Template preview not found")
+
+    docx_bytes, _ = await download_file("templates", row["docx_storage_key"])
+    tpl = DocxTemplate(BytesIO(docx_bytes))
+    tpl.render({"panels": [_build_preview_panel(tpl)]})
+    return _docx_template_to_pdf(tpl)
+
+
+def _build_preview_panel(tpl: DocxTemplate) -> dict:
+    panel = {
+        **{field: f"[{field}]" for field in _METADATA_FIELDS},
+        **{field: f"[{field}]" for field in _PANEL_FIELDS},
+    }
+
+    for field, label, color in _PREVIEW_PHOTO_SLOTS:
+        panel[field] = InlineImage(
+            tpl,
+            _preview_photo_placeholder(label, color),
+            width=_PREVIEW_PHOTO_WIDTH,
+        )
+
+    return panel
+
+
+def _preview_photo_placeholder(label: str, color: tuple[int, int, int]) -> BytesIO:
+    from PIL import ImageDraw, ImageFont
+
+    image = Image.new("RGB", _PREVIEW_PHOTO_SIZE, color=color)
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+    text_bbox = draw.textbbox((0, 0), label, font=font)
+    text_position = (
+        (_PREVIEW_PHOTO_SIZE[0] - text_bbox[2]) // 2,
+        (_PREVIEW_PHOTO_SIZE[1] - text_bbox[3]) // 2,
+    )
+    draw.text(text_position, label, fill=(80, 80, 80), font=font)
+
+    output = BytesIO()
+    image.save(output, format="JPEG")
+    output.seek(0)
+    return output
+
 
 def _soffice_executable() -> str:
     if settings.soffice_path:
@@ -157,7 +218,10 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
         panels.append(panel)
 
     tpl.render({"panels": panels})
+    return _docx_template_to_pdf(tpl)
 
+
+def _docx_template_to_pdf(tpl: DocxTemplate) -> bytes:
     tmp_dir = tempfile.mkdtemp()
     try:
         docx_path = os.path.join(tmp_dir, "report.docx")
@@ -183,8 +247,8 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
             raise RuntimeError(f"LibreOffice conversion failed: {result.stderr.decode()}")
 
         pdf_path = docx_path.replace(".docx", ".pdf")
-        with open(pdf_path, "rb") as f:
-            return f.read()
+        with open(pdf_path, "rb") as file:
+            return file.read()
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 

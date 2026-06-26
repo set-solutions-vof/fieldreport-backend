@@ -227,25 +227,20 @@ async def test_get_template_preview_pdf_requires_auth(client: AsyncClient) -> No
 
 
 async def test_get_template_preview_pdf_returns_pdf_when_key_exists(client: AsyncClient) -> None:
-    from tests.db.sqlalchemy_fakes import build_connection
-
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
     pdf_bytes = b"%%PDF fake"
 
-    connection = build_connection(
-        row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"}
-    )
+    connection = build_connection(row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"})
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with (
         patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
-        patch("src.routes.template.get_database", return_value=pool),
         patch(
-            "src.routes.template.download_file",
-            AsyncMock(return_value=(pdf_bytes, "application/pdf")),
+            "src.routes.template.report_pdf.render_template_preview_to_pdf",
+            AsyncMock(return_value=pdf_bytes),
         ),
     ):
         response = await client.get(
@@ -259,19 +254,15 @@ async def test_get_template_preview_pdf_returns_pdf_when_key_exists(client: Asyn
 
 
 async def test_get_template_preview_pdf_returns_404_when_key_is_null(client: AsyncClient) -> None:
-    from tests.db.sqlalchemy_fakes import build_connection
-
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    connection = build_connection(row={"preview_pdf_storage_key": None})
-    pool = MagicMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-
     with (
         patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
-        patch("src.routes.template.get_database", return_value=pool),
+        patch(
+            "src.routes.template.report_pdf.render_template_preview_to_pdf",
+            AsyncMock(side_effect=ValueError("Template preview not found")),
+        ),
     ):
         response = await client.get(
             "/api/v1/template/preview-pdf",
@@ -282,28 +273,23 @@ async def test_get_template_preview_pdf_returns_404_when_key_is_null(client: Asy
     assert response.json() == {"detail": "Template preview not found"}
 
 
-async def test_get_template_preview_pdf_returns_pdf_via_query_param_token(
-    client: AsyncClient,
-) -> None:
+async def test_get_template_preview_pdf_returns_pdf_via_query_param_token(client: AsyncClient) -> None:
     from tests.db.sqlalchemy_fakes import build_connection
 
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
     pdf_bytes = b"%%PDF fake"
 
-    connection = build_connection(
-        row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"}
-    )
+    connection = build_connection(row={"preview_pdf_storage_key": "thermofly/paneel/abc_preview.pdf"})
     pool = MagicMock()
     pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
     pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
 
     with (
         patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
-        patch("src.routes.template.get_database", return_value=pool),
         patch(
-            "src.routes.template.download_file",
-            AsyncMock(return_value=(pdf_bytes, "application/pdf")),
+            "src.routes.template.report_pdf.render_template_preview_to_pdf",
+            AsyncMock(return_value=pdf_bytes),
         ),
     ):
         response = await client.get(f"/api/v1/template/preview-pdf?access_token={access_token}")
@@ -353,19 +339,15 @@ async def test_get_template_preview_pdf_returns_401_when_user_not_found(
 
 
 async def test_get_template_preview_pdf_returns_404_when_no_template(client: AsyncClient) -> None:
-    from tests.db.sqlalchemy_fakes import build_connection
-
     current_user = build_current_user()
     access_token = security.create_access_token(current_user)
 
-    connection = build_connection(row=None)
-    pool = MagicMock()
-    pool.acquire.return_value.__aenter__ = AsyncMock(return_value=connection)
-    pool.acquire.return_value.__aexit__ = AsyncMock(return_value=None)
-
     with (
         patch.object(auth_service.queries, "get_user_by_id", AsyncMock(return_value=current_user)),
-        patch("src.routes.template.get_database", return_value=pool),
+        patch(
+            "src.routes.template.report_pdf.render_template_preview_to_pdf",
+            AsyncMock(side_effect=ValueError("Template preview not found")),
+        ),
     ):
         response = await client.get(
             "/api/v1/template/preview-pdf",
