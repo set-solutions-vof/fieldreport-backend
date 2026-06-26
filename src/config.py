@@ -45,7 +45,7 @@ class Settings(BaseSettings):
         default=["http://localhost:5173", "http://127.0.0.1:5173"],
         validation_alias="CORS_ORIGINS",
     )
-    soffice_path: str = Field(default="", validation_alias="SOFFICE_PATH")
+    gotenberg_host: str = Field(default="localhost", validation_alias="GOTENBERG_HOST")
 
 
 settings = Settings.model_validate({})

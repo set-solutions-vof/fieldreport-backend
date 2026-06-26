@@ -1,11 +1,7 @@
 import asyncio
-import os
-import shutil
-import subprocess
-import tempfile
-import uuid
 from io import BytesIO
 
+import aiohttp
 import sqlalchemy as sa
 from docx.shared import Cm
 from PIL import Image
@@ -21,7 +17,7 @@ from src.db.schema.tables import (
     reports,
     templates,
 )
-from src.storage.blob import download_file
+from src.storage.blob import download_file, file_exists, upload_file
 
 _PANEL_FIELDS = [
     "paneelnummer",
@@ -74,10 +70,19 @@ async def render_template_preview_to_pdf(company_id: str) -> bytes:
     if row is None or not row["docx_storage_key"]:
         raise ValueError("Template preview not found")
 
-    docx_bytes, _ = await download_file("templates", row["docx_storage_key"])
+    docx_key = row["docx_storage_key"]
+    preview_key = f"{docx_key}.preview.pdf"
+
+    if await file_exists("templates", preview_key):
+        cached, _ = await download_file("templates", preview_key)
+        return cached
+
+    docx_bytes, _ = await download_file("templates", docx_key)
     tpl = DocxTemplate(BytesIO(docx_bytes))
     tpl.render({"panels": [_build_preview_panel(tpl)]})
-    return _docx_template_to_pdf(tpl)
+    pdf_bytes = await _docx_template_to_pdf(tpl)
+    await upload_file("templates", preview_key, pdf_bytes, "application/pdf")
+    return pdf_bytes
 
 
 def _build_preview_panel(tpl: DocxTemplate) -> dict:
@@ -114,20 +119,6 @@ def _preview_photo_placeholder(label: str, color: tuple[int, int, int]) -> Bytes
     output.seek(0)
     return output
 
-
-def _soffice_executable() -> str:
-    if settings.soffice_path:
-        if os.path.isfile(settings.soffice_path) and os.access(settings.soffice_path, os.X_OK):
-            return settings.soffice_path
-        raise RuntimeError(f"SOFFICE_PATH is not executable: {settings.soffice_path}")
-
-    path = shutil.which("soffice")
-    if path:
-        return path
-
-    raise RuntimeError(
-        "LibreOffice (soffice) not found. Set SOFFICE_PATH or install LibreOffice on PATH."
-    )
 
 
 async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
@@ -218,39 +209,20 @@ async def render_report_to_pdf(report_id: str, company_id: str) -> bytes:
         panels.append(panel)
 
     tpl.render({"panels": panels})
-    return _docx_template_to_pdf(tpl)
+    return await _docx_template_to_pdf(tpl)
 
 
-def _docx_template_to_pdf(tpl: DocxTemplate) -> bytes:
-    tmp_dir = tempfile.mkdtemp()
-    try:
-        docx_path = os.path.join(tmp_dir, "report.docx")
-        tpl.save(docx_path)
+async def _docx_template_to_pdf(tpl: DocxTemplate) -> bytes:
+    buf = BytesIO()
+    tpl.save(buf)
 
-        lo_profile = os.path.join(tmp_dir, f"lo_profile_{uuid.uuid4().hex}")
-        result = subprocess.run(
-            [
-                _soffice_executable(),
-                "--headless",
-                f"-env:UserInstallation=file://{lo_profile}",
-                "--convert-to",
-                "pdf",
-                "--outdir",
-                tmp_dir,
-                docx_path,
-            ],
-            capture_output=True,
-            timeout=60,
-        )
+    form = aiohttp.FormData()
+    form.add_field("files", buf.getvalue(), filename="report.docx", content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-        if result.returncode != 0:
-            raise RuntimeError(f"LibreOffice conversion failed: {result.stderr.decode()}")
-
-        pdf_path = docx_path.replace(".docx", ".pdf")
-        with open(pdf_path, "rb") as file:
-            return file.read()
-    finally:
-        shutil.rmtree(tmp_dir, ignore_errors=True)
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f"http://{settings.gotenberg_host}:3000/forms/libreoffice/convert", data=form) as resp:
+            resp.raise_for_status()
+            return await resp.read()
 
 
 def _content(row) -> str:

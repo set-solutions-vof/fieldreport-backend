@@ -17,6 +17,11 @@ async def upload_file(container: str, key: str, data: bytes, content_type: str) 
     return blob_client.url
 
 
+async def file_exists(container: str, key: str) -> bool:
+    blob_client = _service_client_instance().get_blob_client(container=container, blob=key)
+    return await blob_client.exists()
+
+
 async def download_file(container: str, key: str) -> tuple[bytes, str]:
     blob_client = _service_client_instance().get_blob_client(container=container, blob=key)
     properties = await blob_client.get_blob_properties()

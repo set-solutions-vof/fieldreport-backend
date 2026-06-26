@@ -15,14 +15,29 @@ services:
       timeout: 5s
       retries: 5
 
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
   api:
     build: .
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      GOTENBERG_HOST: gotenberg
     depends_on:
       db:
+        condition: service_healthy
+      gotenberg:
         condition: service_healthy
 
   worker:
@@ -30,8 +45,12 @@ services:
     command: ["python", "-m", "src.workers.template_analysis_worker"]
     env_file:
       - .env
+    environment:
+      GOTENBERG_HOST: gotenberg
     depends_on:
       db:
+        condition: service_healthy
+      gotenberg:
         condition: service_healthy
 
   azurite:

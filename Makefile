@@ -5,7 +5,6 @@
 install:
 	uv python install
 	uv sync
-	PYTHONPATH=$(CURDIR) uv run python scripts/ensure_soffice.py
 
 format:
 	uv run ruff format .
@@ -31,7 +30,7 @@ db-downgrade:
 	uv run alembic downgrade base
 
 demo-seed:
-	@if ! nc -z localhost 5432 2>/dev/null || ! nc -z localhost 10000 2>/dev/null; then \
+	@if ! nc -z localhost 5433 2>/dev/null || ! nc -z localhost 10000 2>/dev/null; then \
 		if ! docker info >/dev/null 2>&1; then \
 			echo "Error: Docker is not running. Start Docker Desktop and try again."; \
 			exit 1; \
@@ -40,6 +39,7 @@ demo-seed:
 		docker compose up db azurite -d --wait; \
 	fi
 	@cp -n .env.example .env 2>/dev/null || true
+	@until nc -z localhost 5433 2>/dev/null; do sleep 0.5; done
 	uv run alembic upgrade head
 	PYTHONPATH=$(CURDIR) uv run python demo/seed.py
 
@@ -49,15 +49,16 @@ demo-reset: demo-seed
 all: format lint stan test
 
 run:
-	@if ! nc -z localhost 5432 2>/dev/null || ! nc -z localhost 10000 2>/dev/null; then \
+	@if ! nc -z localhost 5433 2>/dev/null || ! nc -z localhost 10000 2>/dev/null || ! nc -z localhost 3000 2>/dev/null; then \
 		if ! docker info >/dev/null 2>&1; then \
 			echo "Error: Docker is not running. Start Docker Desktop and try again."; \
 			exit 1; \
 		fi; \
-		echo "PostgreSQL or Azurite not detected — starting via Docker Compose..."; \
-		docker compose up db azurite -d --wait; \
+		echo "PostgreSQL, Azurite, or Gotenberg not detected — starting via Docker Compose..."; \
+		docker compose up db azurite gotenberg -d --wait; \
 	fi
 	@cp -n .env.example .env 2>/dev/null || true
+	@until nc -z localhost 5433 2>/dev/null; do sleep 0.5; done
 	uv run alembic upgrade head
 	@report_worker_pid=""; \
 	trap 'if [ -n "$$report_worker_pid" ]; then kill "$$report_worker_pid" 2>/dev/null || true; fi' EXIT INT TERM; \
